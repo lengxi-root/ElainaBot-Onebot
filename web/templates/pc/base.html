@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <title>{% if title %}{{ title }} - {% endif %}{{ web_interface.framework_name }}{{ web_interface.pc_title_suffix }}</title>
+    <base href="{{ prefix }}/">
+    {% if web_interface.favicon_url %}
+    <link rel="icon" type="image/x-icon" href="{{ web_interface.favicon_url }}">
+    <link rel="shortcut icon" type="image/x-icon" href="{{ web_interface.favicon_url }}">
+    {% endif %}
+    <link href="{{ url_for('web.static', filename='css/vendor/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('web.static', filename='css/vendor/bootstrap-icons.css') }}" rel="stylesheet">
+    
+    <script>
+        window.websocketEnabled = false;
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentPage = urlParams.get('page') || 'dashboard';
+    </script>
+    
+    <link rel="stylesheet" href="{{ url_for('web.static', filename='css/common.css') }}">
+    {% block extra_styles %}{% endblock %}
+</head>
+<body>
+    <div class="page-header">
+        <div class="container-fluid">
+            <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center;">
+                <button class="toggle-sidebar" id="toggle-sidebar" style="position: absolute; left: 15px;" aria-label="切换菜单">
+                    <i class="bi bi-list"></i>
+                </button>
+                
+                <h1 class="page-title d-flex align-items-center mb-0" style="position: absolute; left: 10%; transform: translateX(0);">
+                    <i class="bi bi-laptop me-2"></i>
+                    <span class="title-text">{{ web_interface.framework_name }}{{ web_interface.pc_title_suffix }}</span>
+                </h1>
+                
+                <div class="d-flex align-items-center header-actions" style="margin-left: auto;">
+                    <div class="me-3 connection-indicator-wrapper">
+                        <span class="connection-status disconnected" id="connection-indicator"></span>
+                        <span class="text-light connection-text" id="connection-text">未连接</span>
+                    </div>
+
+                    <span class="text-light me-3 time-display"><i class="bi bi-clock"></i> <span id="current-time"></span></span>
+                    <button class="btn btn-sm btn-outline-danger restart-btn" onclick="restartBot()" id="restart-btn">
+                        <i class="bi bi-power"></i> <span class="btn-text">重启</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="wrapper">
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-menu">
+                {% set current_token = request.args.get('token', '') %}
+                <a class="sidebar-item" href="?token={{ current_token }}&page=dashboard" data-page="dashboard">
+                    <i class="bi bi-speedometer2"></i>
+                    <span class="item-text">仪表盘</span>
+                </a>
+                <a class="sidebar-item" href="?token={{ current_token }}&page=logs" data-page="logs">
+                    <i class="bi bi-journal-text"></i>
+                    <span class="item-text">日志</span>
+                </a>
+                <a class="sidebar-item" href="?token={{ current_token }}&page=plugins" data-page="plugins">
+                    <i class="bi bi-grid"></i>
+                    <span class="item-text">插件列表</span>
+                </a>
+                <a class="sidebar-item" href="?token={{ current_token }}&page=sandbox" data-page="sandbox">
+                    <i class="bi bi-play-circle"></i>
+                    <span class="item-text">沙盒测试</span>
+                </a>
+                <a class="sidebar-item" href="?token={{ current_token }}&page=message" data-page="message">
+                    <i class="bi bi-chat-dots"></i>
+                    <span class="item-text">消息发送</span>
+                </a>
+                <a class="sidebar-item" href="?token={{ current_token }}&page=config" data-page="config">
+                    <i class="bi bi-gear-fill"></i>
+                    <span class="item-text">配置管理</span>
+                </a>
+                <a class="sidebar-item" href="?token={{ current_token }}&page=changelog" data-page="changelog">
+                    <i class="bi bi-clock-history"></i>
+                    <span class="item-text">更新日志</span>
+                </a>
+                
+                <!-- 调试信息 -->
+                <!-- Plugin routes: {{ plugin_routes|length if plugin_routes else 'None' }} -->
+                
+                {% if plugin_routes and plugin_routes|length > 0 %}
+                <div class="sidebar-divider"></div>
+                <div class="sidebar-section-title">
+                    <i class="bi bi-puzzle"></i>
+                    <span class="item-text">插件扩展</span>
+                </div>
+                {% for path, info in plugin_routes.items() %}
+                <a class="sidebar-item sidebar-plugin-item" href="?token={{ current_token }}&page=plugin-{{ path }}" data-page="plugin-{{ path }}">
+                    <i class="{{ info.menu_icon }}"></i>
+                    <span class="item-text">{{ info.menu_name }}</span>
+                </a>
+                {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="content" id="main-content">
+            <div class="container-fluid main-content">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('web.static', filename='js/vendor/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('web.static', filename='js/vendor/socket.io.min.js') }}"></script>
+    <script src="{{ url_for('web.static', filename='js/vendor/chart.min.js') }}"></script>
+    <script src="{{ url_for('web.static', filename='js/vendor/chartjs-plugin-datalabels.min.js') }}"></script>
+    <script src="{{ url_for('web.static', filename='js/common.js') }}"></script>
+    {% block scripts %}{% endblock %}
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const page = urlParams.get('page');
+            const pluginPath = urlParams.get('plugin');
+            
+            const sidebarItems = document.querySelectorAll('.sidebar-item');
+            sidebarItems.forEach(item => {
+                item.classList.remove('active');
+                
+                // 检查插件页面
+                if (page === 'plugin' && item.dataset.page === 'plugin' && item.dataset.plugin === pluginPath) {
+                    item.classList.add('active');
+                } else if (item.dataset.page === page && page !== 'plugin') {
+                    item.classList.add('active');
+                }
+                
+                item.addEventListener('click', function(e) {
+                    const targetPage = this.dataset.page;
+                    if (targetPage && window.pageLoadOptimizer) {
+                        window.pageLoadOptimizer.switchPage(targetPage);
+                    }
+                });
+            });
+            
+            if (window.pageLoadOptimizer && currentPage) {
+                window.pageLoadOptimizer.currentPage = currentPage;
+            }
+            
+            // 加载插件页面
+            if (page === 'plugin' && pluginPath) {
+                loadPluginPage(pluginPath);
+            }
+        });
+        
+        // 加载插件页面的函数
+        async function loadPluginPage(pluginPath) {
+            const container = document.getElementById('main-content');
+            if (!container) return;
+            
+            // 显示加载中
+            container.innerHTML = `
+                <div class="plugin-page-container">
+                    <div class="plugin-page-loading">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="text-muted">正在加载插件页面...</p>
+                    </div>
+                </div>
+            `;
+            
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const token = urlParams.get('token');
+                const response = await fetch(`/web/plugin/${pluginPath}?token=${token}`);
+                
+                if (!response.ok) {
+                    throw new Error('加载失败');
+                }
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || '未知错误');
+                }
+                
+                // 渲染插件页面
+                container.innerHTML = `
+                    <div class="plugin-page-container">
+                        <div class="mb-3">
+                            <h4><i class="bi bi-puzzle-fill me-2"></i>${data.title || '插件页面'}</h4>
+                            <hr>
+                        </div>
+                        ${data.html || ''}
+                    </div>
+                `;
+                
+                // 如果有自定义CSS，添加到页面
+                if (data.css) {
+                    const styleEl = document.createElement('style');
+                    styleEl.id = 'plugin-custom-css';
+                    styleEl.textContent = data.css;
+                    document.head.appendChild(styleEl);
+                }
+                
+                // 如果有自定义JavaScript，执行
+                if (data.script) {
+                    const scriptEl = document.createElement('script');
+                    scriptEl.textContent = data.script;
+                    document.body.appendChild(scriptEl);
+                }
+                
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="plugin-page-container">
+                        <div class="plugin-page-error">
+                            <h5><i class="bi bi-exclamation-triangle me-2"></i>加载失败</h5>
+                            <p class="mb-0">${error.message}</p>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        async function restartBot() {
+            const restartBtn = document.getElementById('restart-btn');
+            const originalText = restartBtn.innerHTML;
+            
+            if (!confirm('⚠️ 确定要重启机器人吗？\n\n这将临时中断服务，重启完成后页面会自动刷新。')) {
+                return;
+            }
+            
+            try {
+                restartBtn.disabled = true;
+                restartBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> 重启中...';
+                restartBtn.className = 'btn btn-warning btn-sm';
+                
+                const response = await fetch('/web/api/restart', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        restartBtn.innerHTML = '<i class="bi bi-check-circle"></i> 重启中...';
+                        showRestartStatus();
+                        checkServerStatus();
+                    } else {
+                        throw new Error(result.error || '重启失败');
+                    }
+                } else {
+                    throw new Error('请求失败');
+                }
+                
+            } catch (error) {
+                console.error('重启失败:', error);
+                restartBtn.disabled = false;
+                restartBtn.innerHTML = originalText;
+                restartBtn.className = 'btn btn-outline-danger btn-sm';
+                showToast('重启失败: ' + error.message, 'error');
+            }
+        }
+
+        function showRestartStatus() {
+            const overlay = document.createElement('div');
+            overlay.id = 'restart-overlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                z-index: 9999;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            `;
+            
+            const statusCard = document.createElement('div');
+            statusCard.style.cssText = `
+                background: white;
+                padding: 30px;
+                border-radius: 10px;
+                text-align: center;
+                max-width: 400px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            `;
+            
+            statusCard.innerHTML = `
+                <div class="mb-3">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                <h5 class="mb-3">🔄 机器人重启中</h5>
+                <p class="text-muted mb-3">正在等待服务器响应...</p>
+                <div class="progress mb-3">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" style="width: 100%"></div>
+                </div>
+                <small class="text-muted">
+                    <span id="restart-status-text">检测服务器状态中...</span><br>
+                    <span id="restart-attempts">检测次数: 0</span>
+                </small>
+            `;
+            
+            overlay.appendChild(statusCard);
+            document.body.appendChild(overlay);
+        }
+
+        let checkAttempts = 0;
+        async function checkServerStatus() {
+            checkAttempts++;
+            const statusText = document.getElementById('restart-status-text');
+            const attemptsText = document.getElementById('restart-attempts');
+            
+            if (attemptsText) {
+                attemptsText.textContent = `检测次数: ${checkAttempts}`;
+            }
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000);
+                
+                const response = await fetch('/web/api/status', {
+                    method: 'GET',
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.status === 'ok') {
+                        if (statusText) {
+                            statusText.textContent = '✅ 服务器已恢复，正在刷新页面...';
+                        }
+                        
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                        return;
+                    }
+                }
+            } catch (error) {
+                if (statusText) {
+                    statusText.textContent = `⏳ 等待服务器恢复... (${Math.floor(checkAttempts * 0.3)}s)`;
+                }
+            }
+            
+            setTimeout(checkServerStatus, 300);
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-white bg-${type === 'error' ? 'danger' : 'success'} border-0`;
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 10000;
+                min-width: 300px;
+            `;
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'assertive');
+            toast.setAttribute('aria-atomic', 'true');
+            
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+            
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ web_interface.framework_name }}{{ web_interface.login_title_suffix }} - 身份验证</title>
+    <base href="{{ prefix }}/">
+    {% if web_interface.favicon_url %}
+    <link rel="icon" type="image/x-icon" href="{{ web_interface.favicon_url }}">
+    <link rel="shortcut icon" type="image/x-icon" href="{{ web_interface.favicon_url }}">
+    {% endif %}
+    <link href="{{ url_for('web.static', filename='css/vendor/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('web.static', filename='css/vendor/bootstrap-icons.css') }}" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        
+        .login-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 400px;
+            width: 100%;
+            margin: 20px;
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .login-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #4361ee, #3f37c9);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            color: white;
+            font-size: 32px;
+        }
+        
+        .login-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .login-subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .form-floating {
+            margin-bottom: 20px;
+        }
+        
+        .form-control {
+            border-radius: 12px;
+            border: 2px solid #e9ecef;
+            padding: 12px 16px;
+            transition: all 0.3s;
+        }
+        
+        .form-control:focus {
+            border-color: #4361ee;
+            box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
+        }
+        
+        .btn-login {
+            background: linear-gradient(135deg, #4361ee, #3f37c9);
+            border: none;
+            border-radius: 12px;
+            padding: 12px 24px;
+            font-weight: 600;
+            color: white;
+            width: 100%;
+            transition: all 0.3s;
+        }
+        
+        .btn-login:hover {
+            background: linear-gradient(135deg, #3f37c9, #4361ee);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(67, 97, 238, 0.3);
+            color: white;
+        }
+        
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            border-left: 4px solid #e74c3c;
+        }
+        
+        .security-info {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+        
+        .security-info i {
+            color: #4361ee;
+            margin-right: 5px;
+        }
+        
+        .official-group {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 13px;
+            color: #666;
+            text-align: center;
+            border: 1px solid #e9ecef;
+        }
+        
+        .official-group i {
+            color: #4361ee;
+            margin-right: 6px;
+        }
+        
+        .group-link {
+            color: #4361ee;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 6px;
+            margin-top: 8px;
+        }
+        
+        .group-link:hover {
+            color: #3f37c9;
+            background: rgba(67, 97, 238, 0.1);
+            text-decoration: none;
+            transform: translateY(-1px);
+        }
+        
+        .group-number {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        @media (max-width: 480px) {
+            .login-container {
+                margin: 10px;
+                padding: 30px 25px;
+            }
+            
+            .login-icon {
+                width: 60px;
+                height: 60px;
+                font-size: 24px;
+            }
+            
+            .login-title {
+                font-size: 20px;
+            }
+            
+            .official-group {
+                font-size: 12px;
+                padding: 12px;
+            }
+            
+            .group-link {
+                font-size: 12px;
+                padding: 5px 10px;
+            }
+            
+            .group-number {
+                display: block;
+                margin-top: 2px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <div class="login-icon">
+                <i class="bi bi-shield-lock"></i>
+            </div>
+            <h1 class="login-title">身份验证</h1>
+                            <p class="login-subtitle">请输入密码以访问{{ web_interface.framework_name }}管理面板</p>
+        </div>
+        
+        {% if error %}
+        <div class="error-message">
+            <i class="bi bi-exclamation-triangle"></i>
+            {{ error }}
+        </div>
+        {% endif %}
+        
+        <form method="POST" action="/web/login">
+            <input type="hidden" name="token" value="{{ token }}">
+            
+            <div class="form-floating">
+                <input type="password" class="form-control" id="password" name="password" 
+                       placeholder="请输入密码" required autofocus>
+                <label for="password">
+                    <i class="bi bi-key"></i> 管理员密码
+                </label>
+            </div>
+            
+            <button type="submit" class="btn btn-login">
+                <i class="bi bi-unlock"></i>
+                验证身份
+            </button>
+        </form>
+        
+        <div class="security-info">
+            <i class="bi bi-info-circle"></i>
+            此页面受到双重安全验证保护<br>
+            会话将在7天后自动过期
+        </div>
+        
+        <div class="official-group">
+            <div>
+                <i class="bi bi-people"></i>
+                需要帮助或有疑问？加入我们的官方交流群
+            </div>
+            <a href="https://qm.qq.com/q/H3yycM4Pq8" target="_blank" rel="noopener noreferrer" class="group-link">
+                <i class="bi bi-chat-dots"></i>
+                                    {{ web_interface.framework_name }}Bot框架 <span class="group-number">631348711</span>
+            </a>
+        </div>
+    </div>
+    
+    <script>
+        // 自动聚焦到密码输入框
+        document.getElementById('password').focus();
+        
+        // 回车键提交表单
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                this.form.submit();
+            }
+        });
+    </script>
+</body>
+</html> 

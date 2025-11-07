@@ -1,0 +1,423 @@
+{% extends "pc/base.html" %}
+
+{% block content %}
+<style>
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+</style>
+<!-- 单独进程Web警告 -->
+<div id="standalone-web-warning" class="alert alert-warning alert-dismissible fade show" style="display: none;" role="alert">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <strong>注意：</strong> 您正在使用单独进程WEB，无法接收实时日志。请进入数据库查看全部日志。
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+
+<!-- 日志标签页 -->
+<ul class="nav nav-tabs" id="logTabs" role="tablist">
+    <li class="nav-item">
+        <a class="nav-link active" id="received-tab" data-bs-toggle="tab" href="#received" role="tab">
+            <i class="bi bi-chat-dots"></i> 接收消息
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" id="plugin-tab" data-bs-toggle="tab" href="#plugin" role="tab">
+            <i class="bi bi-puzzle"></i> 插件日志
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" id="framework-tab" data-bs-toggle="tab" href="#framework" role="tab">
+            <i class="bi bi-gear"></i> 框架日志
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" id="error-tab" data-bs-toggle="tab" href="#error" role="tab">
+            <i class="bi bi-exclamation-triangle"></i> 错误日志
+        </a>
+    </li>
+</ul>
+
+<div class="tab-content">
+    <!-- 使用JS动态生成的日志面板容器 -->
+    <div class="tab-pane fade show active" id="received" role="tabpanel"></div>
+    <div class="tab-pane fade" id="plugin" role="tabpanel"></div>
+    <div class="tab-pane fade" id="framework" role="tabpanel"></div>
+    <div class="tab-pane fade" id="error" role="tabpanel"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PAGE_SIZE = 50;
+const logPanelConfig = {
+    received: { title: '接收到的消息', icon: 'chat-dots', emptyText: '暂无消息', autoScroll: true },
+    plugin: { title: '插件日志', icon: 'puzzle', emptyText: '暂无日志', autoScroll: true },
+    framework: { title: '框架日志', icon: 'gear', emptyText: '暂无日志', autoScroll: true },
+    error: { title: '错误日志', icon: 'exclamation-triangle', emptyText: '暂无错误日志', autoScroll: true }
+};
+const logContainers = {};
+const autoScrollCheckboxes = {};
+
+function initLogPanels() {
+    Object.keys(logPanelConfig).forEach(type => {
+        const config = logPanelConfig[type];
+        const tabPane = document.getElementById(type);
+        
+        let logsContent = '';
+        if (type === 'received') {
+            logsContent = `
+                <table class="log-table">
+                    <thead>
+                        <tr>
+                            <th class="col-time">时间</th>
+                            <th class="col-group-id">群ID</th>
+                            <th class="col-user-id">用户ID</th>
+                            <th class="col-content">消息内容</th>
+                            <th class="col-action">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="${type}-logs-tbody">
+                        <tr class="empty-logs">
+                            <td colspan="5" style="text-align: center; padding: 30px;">
+                                <i class="bi bi-inbox fs-1 d-block mb-2"></i> ${config.emptyText}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            `;
+        } else {
+            logsContent = `
+                <div class="empty-logs">
+                    <i class="bi bi-inbox fs-1 d-block mb-2"></i> ${config.emptyText}
+                </div>
+            `;
+        }
+        
+        tabPane.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0"><i class="bi bi-${config.icon}"></i> ${config.title}</h6>
+                <div class="auto-scroll-toggle">
+                    <input type="checkbox" id="${type}-auto-scroll" class="form-check-input" checked>
+                    <label for="${type}-auto-scroll" class="form-check-label ms-1">自动滚动</label>
+                </div>
+            </div>
+            <div class="logs-container" id="${type}-logs">
+                ${logsContent}
+            </div>
+            <div class="pagination-container">
+                <div class="pagination-info">
+                    显示 <span id="${type}-range">0-0</span> / <span id="${type}-total">0</span> 条记录
+                </div>
+                <div class="pagination-controls">
+                    <button class="btn btn-sm btn-outline-primary" id="${type}-prev" onclick="goToPage('${type}', logContainers['${type}'].currentPage - 1)">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <span class="mx-2 text-small">第 <span id="${type}-current-page">1</span> 页</span>
+                    <button class="btn btn-sm btn-outline-primary" id="${type}-next" onclick="goToPage('${type}', logContainers['${type}'].currentPage + 1)">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        const container = type === 'received' 
+            ? document.getElementById(`${type}-logs-tbody`)
+            : document.getElementById(`${type}-logs`);
+            
+        logContainers[type] = {
+            container: container,
+            pagination: {
+                range: document.getElementById(`${type}-range`),
+                total: document.getElementById(`${type}-total`),
+                currentPage: document.getElementById(`${type}-current-page`),
+                prevBtn: document.getElementById(`${type}-prev`),
+                nextBtn: document.getElementById(`${type}-next`)
+            },
+            currentPage: 1,
+            totalPages: 1,
+            totalLogs: 0,
+            autoScroll: config.autoScroll || true,
+            isTable: type === 'received',
+        };
+        
+        const checkbox = document.getElementById(`${type}-auto-scroll`);
+        checkbox.checked = logContainers[type].autoScroll;
+        checkbox.addEventListener('change', () => {
+            logContainers[type].autoScroll = checkbox.checked;
+        });
+    });
+}
+
+function goToPage(type, page) {
+    const logInfo = logContainers[type];
+    if (!logInfo || page < 1 || page > logInfo.totalPages) return;
+    
+    logInfo.currentPage = page;
+    updatePaginationButtons(type);
+    updatePaginationInfo(type);
+    
+    if (socket) {
+        socket.emit('request_logs', { type, page, page_size: PAGE_SIZE });
+    }
+}
+
+function updatePaginationButtons(type) {
+    const logInfo = logContainers[type];
+    if (!logInfo) return;
+    
+    logInfo.pagination.prevBtn.disabled = logInfo.currentPage <= 1;
+    logInfo.pagination.nextBtn.disabled = logInfo.currentPage >= logInfo.totalPages;
+    logInfo.pagination.currentPage.textContent = logInfo.currentPage;
+}
+
+function updatePaginationInfo(type) {
+    const logInfo = logContainers[type];
+    if (!logInfo) return;
+    
+    const start = Math.max(1, (logInfo.currentPage - 1) * PAGE_SIZE + 1);
+    const end = Math.min(start + PAGE_SIZE - 1, logInfo.totalLogs);
+    logInfo.pagination.range.textContent = logInfo.totalLogs > 0 ? `${start}-${end}` : '0-0';
+    logInfo.pagination.total.textContent = logInfo.totalLogs;
+}
+
+function updateLogDisplay(type, logs) {
+    const logInfo = logContainers[type];
+    if (!logInfo) return;
+    
+    const container = logInfo.container;
+    if (!logs || logs.length === 0) {
+        if (logInfo.isTable) {
+            container.innerHTML = `<tr class="empty-logs"><td colspan="5" style="text-align: center; padding: 30px;"><i class="bi bi-inbox fs-1 d-block mb-2"></i> 暂无日志</td></tr>`;
+        } else {
+            container.innerHTML = `<div class="empty-logs"><i class="bi bi-inbox fs-1 d-block mb-2"></i> 暂无日志</div>`;
+        }
+        return;
+    }
+    
+    container.innerHTML = '';
+    logs.forEach(log => addLogEntry(container, log, false, type));
+    
+    const emptyLog = container.querySelector('.empty-logs');
+    if (emptyLog) emptyLog.remove();
+}
+
+function addLogEntry(container, log, prepend = false, logType = null) {
+    const emptyLog = container.querySelector('.empty-logs');
+    if (emptyLog) emptyLog.remove();
+    
+    if (!logType) {
+        logType = Object.keys(logContainers).find(key => logContainers[key].container === container);
+    }
+    
+    const logInfo = logContainers[logType];
+    const timestamp = log.timestamp || new Date().toLocaleString('zh-CN');
+    const content = log.content || log;
+    
+    if (logInfo && logInfo.isTable) {
+        const row = document.createElement('tr');
+        row.className = 'animated-fade';
+        
+        const groupId = log.group_id || '-';
+        const userId = log.user_id || '-';
+        const messageContent = log.message || log.content;
+        
+        row.innerHTML = `
+            <td class="col-time">${timestamp}</td>
+            <td class="col-group-id">${escapeHtml(groupId)}</td>
+            <td class="col-user-id">${escapeHtml(userId)}</td>
+            <td class="col-content">${escapeHtml(messageContent)}</td>
+            <td class="col-action">
+                <i class="bi bi-clipboard log-copy-btn" title="复制消息内容" onclick="copyTableLogContent(this)"></i>
+            </td>
+        `;
+        
+        prepend && container.firstChild 
+            ? container.insertBefore(row, container.firstChild)
+            : container.appendChild(row);
+    } else {
+        const entry = document.createElement('div');
+        entry.className = 'log-entry animated-fade';
+        
+        let entryHtml = `
+            <div class="d-flex justify-content-between">
+                <div>
+                    <span class="timestamp">[${timestamp}]</span>
+                    <span class="message-content">${content}</span>
+                </div>
+                <i class="bi bi-clipboard log-copy-btn" title="复制日志内容" onclick="copyLogContent(this)"></i>
+            </div>
+        `;
+        
+        if (log.traceback) {
+            entryHtml += `
+            <div class="mt-2">
+                <button class="btn btn-sm btn-outline-danger mb-2" 
+                        onclick="this.nextElementSibling.classList.toggle('d-none');this.textContent=this.textContent.includes('显示')?'隐藏调用栈':'显示调用栈'">
+                    显示调用栈
+                </button>
+                <pre class="plugin-error d-none">${log.traceback}</pre>
+            </div>`;
+        }
+        
+        entry.innerHTML = entryHtml;
+        prepend && container.firstChild 
+            ? container.insertBefore(entry, container.firstChild)
+            : container.appendChild(entry);
+    }
+    
+    if (prepend && logType && logContainers[logType].autoScroll) {
+        const logsContainer = container.closest('.logs-container');
+        if (logsContainer) logsContainer.scrollTop = 0;
+    }
+    
+    while (container.children.length > 200) {
+        container.removeChild(container.lastChild);
+    }
+}
+
+function copyToClipboard(content, button) {
+    const textarea = document.createElement('textarea');
+    textarea.value = content;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    const success = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    
+    button.className = success ? 'bi bi-check-circle log-copy-btn copy-success' : 'bi bi-exclamation-circle log-copy-btn copy-fail';
+    button.style.color = success ? '#28a745' : '#dc3545';
+    setTimeout(() => { 
+        button.className = 'bi bi-clipboard log-copy-btn'; 
+        button.style.color = ''; 
+    }, 2000);
+}
+
+function copyTableLogContent(button) {
+    const row = button.closest('tr');
+    const cells = row.querySelectorAll('td');
+    const content = `时间: ${cells[0].textContent}\n群ID: ${cells[1].textContent}\n用户ID: ${cells[2].textContent}\n消息: ${cells[3].textContent}`;
+    copyToClipboard(content, button);
+}
+
+function copyLogContent(button) {
+    const contentElement = button.parentNode.parentNode.querySelector('.message-content');
+    const content = contentElement?.textContent.trim();
+    if (content) copyToClipboard(content, button);
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function checkStandaloneWeb() {
+    fetch('/web/api/system/status')
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.standalone_web === true) {
+            document.getElementById('standalone-web-warning').style.display = 'block';
+        } else if (data.success) {
+            document.getElementById('standalone-web-warning').style.display = 'none';
+        }
+    })
+    .catch(() => {});
+}
+
+function loadTodayLogs() {
+    /**
+     * 从数据库加载今日的历史日志
+     * 每次进入日志界面都会重新加载，不使用缓存
+     */
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    
+    if (!token) {
+        console.warn('未找到token，跳过加载今日日志');
+        return;
+    }
+    
+    // 显示加载提示
+    Object.keys(logContainers).forEach(type => {
+        const container = logContainers[type].container;
+        if (logContainers[type].isTable) {
+            container.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px;"><i class="bi bi-arrow-clockwise spin"></i> 正在加载今日日志...</td></tr>`;
+        } else {
+            container.innerHTML = `<div class="text-center py-3"><i class="bi bi-arrow-clockwise spin"></i> 正在加载今日日志...</div>`;
+        }
+    });
+    
+    fetch(`/web/api/logs/today?token=${encodeURIComponent(token)}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.data) {
+            // 处理每种类型的日志
+            Object.keys(logContainers).forEach(type => {
+                const logData = data.data[type];
+                if (logData && logData.logs) {
+                    // 将历史日志添加到对应的容器中
+                    updateLogDisplay(type, logData.logs);
+                    
+                    // 更新日志统计信息
+                    const logInfo = logContainers[type];
+                    logInfo.totalLogs = logData.total;
+                    updatePaginationInfo(type);
+                    
+                    console.log(`已加载 ${type} 类型的今日日志: ${logData.total} 条`);
+                } else {
+                    // 如果没有日志，显示空状态
+                    updateLogDisplay(type, []);
+                }
+            });
+            
+            console.log(`成功加载今日日志，日期: ${data.date}，每种类型最多: ${data.limit} 条`);
+        } else {
+            console.error('加载今日日志失败:', data.message || '未知错误');
+            // 加载失败时显示空状态
+            Object.keys(logContainers).forEach(type => {
+                updateLogDisplay(type, []);
+            });
+        }
+    })
+    .catch(error => {
+        console.error('加载今日日志请求失败:', error);
+        // 请求失败时显示空状态
+        Object.keys(logContainers).forEach(type => {
+            updateLogDisplay(type, []);
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    initLogPanels();
+    checkStandaloneWeb();
+    
+    // 加载今日历史日志
+    loadTodayLogs();
+    
+    // 初始化分页（但不立即加载，因为已经加载了今日日志）
+    Object.keys(logContainers).forEach(type => {
+        logContainers[type].currentPage = 1;
+        updatePaginationButtons(type);
+    });
+    
+    window.updateLogDisplay = updateLogDisplay;
+    window.handleNewLog = function(data) {
+        const logType = data.type;
+        if (logContainers[logType]?.currentPage === 1) {
+            addLogEntry(logContainers[logType].container, data.data, true, logType);
+            logContainers[logType].totalLogs++;
+            updatePaginationInfo(logType);
+        }
+    };
+    
+    initSocket('logs');
+});
+</script>
+{% endblock %}

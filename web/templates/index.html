@@ -1,0 +1,29 @@
+{% set page = request.args.get('page', 'dashboard') %}
+{% if page == 'dashboard' %}
+    {% set title = '仪表盘' %}
+    {% include 'pc/dashboard.html' %}
+{% elif page == 'logs' %}
+    {% set title = '日志管理' %}
+    {% include 'pc/logs.html' %}
+{% elif page == 'plugins' %}
+    {% set title = '插件管理' %}
+    {% include 'pc/plugins.html' %}
+{% elif page == 'sandbox' %}
+    {% set title = '沙盒测试' %}
+    {% include 'pc/sandbox.html' %}
+{% elif page == 'message' %}
+    {% set title = '消息发送' %}
+    {% include 'pc/message.html' %}
+{% elif page == 'config' %}
+    {% set title = '配置管理' %}
+    {% include 'pc/config.html' %}
+{% elif page == 'changelog' %}
+    {% set title = '更新日志' %}
+    {% include 'pc/changelog.html' %}
+{% elif page.startswith('plugin-') %}
+    {% set title = '插件页面' %}
+    {% include 'pc/plugin_page.html' %}
+{% else %}
+    {% set title = '仪表盘' %}
+    {% include 'pc/dashboard.html' %}
+{% endif %}

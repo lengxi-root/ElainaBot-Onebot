@@ -1,0 +1,9 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+websockets==13.1
+requests==2.32.3
+httpx==0.28.1
+psutil==5.9.5
+Flask==3.0.2
+Flask-SocketIO==5.3.6
+flask-cors==5.0.1
