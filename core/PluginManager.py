@@ -785,6 +785,11 @@ class PluginManager:
         is_first_reply = [True]
         wrapped_methods = cls._create_method_logger(original_methods, plugin_name, is_first_reply, event)
         
+        # 检查是否有代发插件（df.py）
+        df_plugin = cls._find_df_plugin()
+        if df_plugin:
+            wrapped_methods = cls._create_df_wrapper(wrapped_methods, df_plugin, event, plugin_name, is_first_reply)
+        
         for method_name, wrapped_method in wrapped_methods.items():
             if wrapped_method:
                 setattr(event, method_name, wrapped_method)
@@ -847,6 +852,55 @@ class PluginManager:
             for method_name, original_method in original_methods.items():
                 if original_method:
                     setattr(event, method_name, original_method)
+    
+    @classmethod
+    def _find_df_plugin(cls):
+        """查找代发插件（df.py）"""
+        for plugin_class in cls._plugins.keys():
+            if hasattr(plugin_class, '_source_file'):
+                file_path = plugin_class._source_file
+                if file_path and file_path.endswith('df.py'):
+                    # 检查是否有 handle_forward 方法
+                    if hasattr(plugin_class, 'handle_forward') and callable(getattr(plugin_class, 'handle_forward')):
+                        return plugin_class
+        return None
+    
+    @classmethod
+    def _create_df_wrapper(cls, wrapped_methods, df_plugin, event, plugin_name, is_first_reply):
+        """为代发插件创建包装器"""
+        def _wrap_reply_method(original_wrapped_method, method_name):
+            def df_wrapped_method(*args, **kwargs):
+                # 提取内容
+                if method_name == 'reply':
+                    content = args[0] if args else kwargs.get('content', '')
+                else:
+                    content = args[1] if len(args) > 1 else kwargs.get('content', '')
+                
+                # 调用代发插件的 handle_forward 方法
+                try:
+                    result = df_plugin.handle_forward(event, content, method_name)
+                    if result:
+                        # 如果代发成功，仍然调用原始方法记录日志
+                        if is_first_reply[0]:
+                            is_first_reply[0] = False
+                        return result
+                except Exception as e:
+                    logger.error(f"代发插件异常: {e}")
+                
+                # 代发失败，使用原始方法
+                return original_wrapped_method(*args, **kwargs)
+            
+            return df_wrapped_method
+        
+        # 包装所有 reply 方法
+        new_wrapped_methods = {}
+        for method_name, wrapped_method in wrapped_methods.items():
+            if wrapped_method:
+                new_wrapped_methods[method_name] = _wrap_reply_method(wrapped_method, method_name)
+            else:
+                new_wrapped_methods[method_name] = wrapped_method
+        
+        return new_wrapped_methods
     
     @classmethod
     def _create_method_logger(cls, original_methods_dict, plugin_name, is_first_reply, event):
