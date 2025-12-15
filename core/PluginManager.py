@@ -48,6 +48,10 @@ class Plugin:
     @staticmethod
     def get_regex_handlers():
         raise NotImplementedError("子类必须实现get_regex_handlers方法")
+    
+    @classmethod
+    def on_event(cls, event):
+        pass
 
 class PluginManager:
     _regex_handlers = {}
@@ -59,6 +63,8 @@ class PluginManager:
     _handler_patterns_cache = {}
     _web_routes = {}  # 存储web插件路由信息
     _api_routes = {}  # 存储插件自定义API路由
+    _df_plugin = None  # 代发插件实例
+    _api_intercepted = False  # API是否已被拦截
 
     @classmethod
     def _safe_execute(cls, func, error_msg_template, *args, **kwargs):
@@ -617,27 +623,53 @@ class PluginManager:
             except Exception as e:
                 _log_error(f"注册Web路由失败: {plugin_class.__name__} - {str(e)}", traceback.format_exc())
         
+        # 调用插件的初始化方法（如果存在）
+        if hasattr(plugin_class, 'on_plugin_load') and callable(getattr(plugin_class, 'on_plugin_load')):
+            try:
+                plugin_class.on_plugin_load()
+            except Exception as e:
+                _log_error(f"插件 {plugin_class.__name__} 初始化失败: {e}", traceback.format_exc())
+        
         cls._rebuild_sorted_handlers()
         cls._handler_patterns_cache.clear()
+        
+        # 检查是否有代发插件，如果有则设置API拦截
+        cls._setup_api_interception()
+        
         return handlers_count
 
-    # === 消息分发 ===
+    # === 事件分发 ===
     @classmethod
     def dispatch_message(cls, event):
+        """
+        分发所有OneBot事件（message/notice/request）
+        
+        - message事件: 进行正则匹配和权限检查
+        - notice/request事件: 调用所有插件的on_event方法
+        """
         try:
             cls.load_plugins()
             
             if hasattr(event, 'handled') and event.handled:
                 return True
-                
-            is_owner = event.user_id in OWNER_IDS
-            is_group = cls._is_group_chat(event)
             
-            result = cls._process_message(event, is_owner, is_group)
-            return result
+            # 消息事件：进行正则匹配和权限检查
+            if event.post_type == 'message':
+                is_owner = event.user_id in OWNER_IDS if event.user_id else False
+                is_group = cls._is_group_chat(event)
+                result = cls._process_message(event, is_owner, is_group)
+                
+                # 调用所有插件的on_event钩子
+                cls._dispatch_to_all_plugins(event)
+                return result
+            
+            # notice/request事件：调用所有插件的on_event方法
+            else:
+                cls._dispatch_to_all_plugins(event)
+                return True
             
         except Exception as e:
-            error_msg = f"消息分发处理失败: {str(e)}"
+            error_msg = f"事件分发处理失败: {str(e)}"
             error_trace = traceback.format_exc()
             _log_error(error_msg, error_trace)
             
@@ -655,6 +687,47 @@ class PluginManager:
                 pass
             
             return False
+    
+    @classmethod
+    def _dispatch_to_all_plugins(cls, event):
+        """
+        将事件分发给所有插件的on_event方法
+        按优先级顺序调用
+        """
+        # _plugins 结构: {plugin_class: priority}
+        # 按优先级排序
+        sorted_plugins = sorted(cls._plugins.items(), key=lambda x: x[1])
+        
+        for plugin_class, priority in sorted_plugins:
+            # 检查插件是否实现了on_event方法
+            if not hasattr(plugin_class, 'on_event') or not callable(getattr(plugin_class, 'on_event')):
+                continue
+            
+            try:
+                # 调用插件的on_event方法
+                result = plugin_class.on_event(event)
+                
+                # 如果返回False，停止传递
+                if result is False:
+                    logger.debug(f"事件被插件 {plugin_class.__name__} 拦截")
+                    break
+                    
+            except Exception as e:
+                error_msg = f"插件 {plugin_class.__name__} 的 on_event 方法执行失败: {str(e)}"
+                error_trace = traceback.format_exc()
+                _log_error(error_msg, error_trace)
+                
+                # 记录到数据库
+                try:
+                    add_log_to_db('error', {
+                        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                        'plugin_name': plugin_class.__name__,
+                        'event_type': event.post_type,
+                        'content': error_msg,
+                        'traceback': error_trace
+                    })
+                except:
+                    pass
 
     @classmethod
     def _process_message(cls, event, is_owner, is_group):
@@ -785,11 +858,6 @@ class PluginManager:
         is_first_reply = [True]
         wrapped_methods = cls._create_method_logger(original_methods, plugin_name, is_first_reply, event)
         
-        # 检查是否有代发插件（df.py）
-        df_plugin = cls._find_df_plugin()
-        if df_plugin:
-            wrapped_methods = cls._create_df_wrapper(wrapped_methods, df_plugin, event, plugin_name, is_first_reply)
-        
         for method_name, wrapped_method in wrapped_methods.items():
             if wrapped_method:
                 setattr(event, method_name, wrapped_method)
@@ -862,9 +930,135 @@ class PluginManager:
                 if file_path and file_path.endswith('df.py'):
                     # 检查是否有 handle_forward 方法
                     if hasattr(plugin_class, 'handle_forward') and callable(getattr(plugin_class, 'handle_forward')):
-                        return plugin_class
+                        return plugin_class()
         return None
     
+    @classmethod
+    def _setup_api_interception(cls):
+        """设置API拦截，当有代发插件时接管所有消息发送"""
+        if cls._api_intercepted:
+            return
+        
+        df_plugin = cls._find_df_plugin()
+        if not df_plugin:
+            return
+        
+        cls._df_plugin = df_plugin
+        
+        try:
+            from core.onebot.api import OneBotAPI
+            
+            # 保存原始方法
+            if not hasattr(OneBotAPI, '_original_send_group_msg'):
+                OneBotAPI._original_send_group_msg = OneBotAPI.send_group_msg
+            if not hasattr(OneBotAPI, '_original_send_private_msg'):
+                OneBotAPI._original_send_private_msg = OneBotAPI.send_private_msg
+            
+            # 创建拦截方法
+            def intercepted_send_group_msg(self, group_id, message, **kwargs):
+                return cls._intercept_group_message(self, group_id, message, **kwargs)
+            
+            def intercepted_send_private_msg(self, user_id, message, **kwargs):
+                return cls._intercept_private_message(self, user_id, message, **kwargs)
+            
+            # 替换方法
+            OneBotAPI.send_group_msg = intercepted_send_group_msg
+            OneBotAPI.send_private_msg = intercepted_send_private_msg
+            
+            cls._api_intercepted = True
+            logger.info("✅ API拦截已启用，所有消息发送将通过代发插件处理")
+            
+        except Exception as e:
+            logger.error(f"❌ 设置API拦截失败: {e}")
+    
+    @classmethod
+    def _intercept_group_message(cls, api_instance, group_id, message, **kwargs):
+        """拦截群消息发送"""
+        try:
+            # 构造一个临时事件对象用于代发
+            from core.MessageEvent import MessageEvent
+            import json
+            
+            temp_event_data = {
+                'post_type': 'message',
+                'message_type': 'group',
+                'group_id': int(group_id),
+                'user_id': 0,  # 临时用户ID
+                'message_id': 0,
+                'raw_message': str(message),
+                'time': int(time.time()),
+                'self_id': 0,
+                'sender': {'user_id': 0}
+            }
+            
+            temp_event = MessageEvent(json.dumps(temp_event_data))
+            # 确保is_group属性正确设置
+            temp_event.is_group = True
+            
+            # 提取消息内容
+            if isinstance(message, str):
+                content = message
+            elif isinstance(message, list):
+                content = ''.join([seg.get('data', {}).get('text', '') if seg.get('type') == 'text' else f"[{seg.get('type', '')}]" for seg in message])
+            else:
+                content = str(message)
+            
+            # 调用代发插件
+            if cls._df_plugin and hasattr(cls._df_plugin, 'handle_forward'):
+                result = cls._df_plugin.handle_forward(temp_event, content, 'reply')
+                if result:
+                    return result
+            
+        except Exception as e:
+            logger.error(f"代发拦截异常: {e}")
+        
+        # 代发失败，使用原始方法
+        return api_instance._original_send_group_msg(group_id, message, **kwargs)
+    
+    @classmethod
+    def _intercept_private_message(cls, api_instance, user_id, message, **kwargs):
+        """拦截私聊消息发送"""
+        try:
+            # 构造一个临时事件对象用于代发
+            from core.MessageEvent import MessageEvent
+            import json
+            
+            temp_event_data = {
+                'post_type': 'message',
+                'message_type': 'private',
+                'user_id': int(user_id),
+                'group_id': 0,
+                'message_id': 0,
+                'raw_message': str(message),
+                'time': int(time.time()),
+                'self_id': 0,
+                'sender': {'user_id': int(user_id)}
+            }
+            
+            temp_event = MessageEvent(json.dumps(temp_event_data))
+            # 确保is_group属性正确设置
+            temp_event.is_group = False
+            
+            # 提取消息内容
+            if isinstance(message, str):
+                content = message
+            elif isinstance(message, list):
+                content = ''.join([seg.get('data', {}).get('text', '') if seg.get('type') == 'text' else f"[{seg.get('type', '')}]" for seg in message])
+            else:
+                content = str(message)
+            
+            # 调用代发插件
+            if cls._df_plugin and hasattr(cls._df_plugin, 'handle_forward'):
+                result = cls._df_plugin.handle_forward(temp_event, content, 'reply')
+                if result:
+                    return result
+            
+        except Exception as e:
+            logger.error(f"代发拦截异常: {e}")
+        
+        # 代发失败，使用原始方法
+        return api_instance._original_send_private_msg(user_id, message, **kwargs)
+
     @classmethod
     def _create_df_wrapper(cls, wrapped_methods, df_plugin, event, plugin_name, is_first_reply):
         """为代发插件创建包装器"""

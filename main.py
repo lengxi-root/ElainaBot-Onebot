@@ -159,9 +159,10 @@ sys.excepthook = lambda exctype, value, tb: log_error(f"{exctype.__name__}: {val
 
 def convert_onebot_event_to_message_event(onebot_event):
     """将 OneBot 事件转换为框架的 MessageEvent"""
-    from core.onebot.adapter import MessageEvent as OneBotMessageEvent
+    from core.onebot.adapter import OneBotV11Event
     
-    if not isinstance(onebot_event, OneBotMessageEvent):
+    # 允许所有OneBot事件类型通过
+    if not isinstance(onebot_event, OneBotV11Event):
         return None
     
     data = onebot_event.to_dict()
@@ -172,12 +173,22 @@ def convert_onebot_event_to_message_event(onebot_event):
 
 async def process_onebot_event(onebot_event):
     """处理 OneBot 事件（异步版本）"""
+    # 所有OneBot事件统一转换为MessageEvent
     message_event = convert_onebot_event_to_message_event(onebot_event)
     
-    if message_event:
-        # 记录接收到的消息到日志
+    if not message_event:
+        return
+    
+    # 根据事件类型记录日志
+    if message_event.post_type == 'message':
         log_received_message(message_event)
-        await asyncio.to_thread(process_message_event_internal, message_event)
+    elif message_event.post_type == 'notice':
+        logger.info(f"📬 通知事件: {message_event.notice_type} | 群 {message_event.group_id} | 用户 {message_event.user_id}")
+    elif message_event.post_type == 'request':
+        logger.info(f"📨 请求事件: {message_event.request_type} | 群 {message_event.group_id} | 用户 {message_event.user_id} | 验证消息: {message_event.content}")
+    
+    # 所有事件统一通过PluginManager分发
+    await asyncio.to_thread(process_message_event_internal, message_event)
 
 def log_received_message(event):
     """记录接收到的消息"""

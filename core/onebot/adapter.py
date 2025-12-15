@@ -60,6 +60,54 @@ class HeartbeatMetaEvent(MetaEvent):
     pass
 
 
+class NoticeEvent(OneBotV11Event):
+    """通知事件"""
+    def __init__(self, **data):
+        super().__init__(**data)
+        self.notice_type = data.get('notice_type', '')
+        self.user_id = data.get('user_id', 0)
+        self.group_id = data.get('group_id')
+
+
+class GroupIncreaseNoticeEvent(NoticeEvent):
+    """群成员增加事件"""
+    def __init__(self, **data):
+        super().__init__(**data)
+        self.sub_type = data.get('sub_type', '')  # approve/invite
+        self.operator_id = data.get('operator_id', 0)
+
+
+class GroupDecreaseNoticeEvent(NoticeEvent):
+    """群成员减少事件"""
+    def __init__(self, **data):
+        super().__init__(**data)
+        self.sub_type = data.get('sub_type', '')  # leave/kick/kick_me
+        self.operator_id = data.get('operator_id', 0)
+
+
+class RequestEvent(OneBotV11Event):
+    """请求事件"""
+    def __init__(self, **data):
+        super().__init__(**data)
+        self.request_type = data.get('request_type', '')
+        self.user_id = data.get('user_id', 0)
+        self.comment = data.get('comment', '')
+        self.flag = data.get('flag', '')
+
+
+class FriendRequestEvent(RequestEvent):
+    """好友请求事件"""
+    pass
+
+
+class GroupRequestEvent(RequestEvent):
+    """加群请求事件"""
+    def __init__(self, **data):
+        super().__init__(**data)
+        self.sub_type = data.get('sub_type', '')  # add/invite
+        self.group_id = data.get('group_id', 0)
+
+
 class OneBotV11Adapter:
     def __init__(self, access_token: Optional[str] = None, secret: Optional[str] = None):
         self.access_token = access_token
@@ -104,6 +152,22 @@ class OneBotV11Adapter:
                 elif meta_event_type == "heartbeat":
                     return HeartbeatMetaEvent(**json_data)
                 return MetaEvent(**json_data)
+            elif post_type == "notice":
+                notice_type = json_data.get("notice_type")
+                logger.info(f"🔔 收到通知事件: {notice_type} | 原始数据: {json_data}")
+                if notice_type == "group_increase":
+                    return GroupIncreaseNoticeEvent(**json_data)
+                elif notice_type == "group_decrease":
+                    return GroupDecreaseNoticeEvent(**json_data)
+                return NoticeEvent(**json_data)
+            elif post_type == "request":
+                request_type = json_data.get("request_type")
+                logger.info(f"📮 收到请求事件: {request_type} | 原始数据: {json_data}")
+                if request_type == "friend":
+                    return FriendRequestEvent(**json_data)
+                elif request_type == "group":
+                    return GroupRequestEvent(**json_data)
+                return RequestEvent(**json_data)
             return OneBotV11Event(**json_data)
         except:
             return None

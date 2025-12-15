@@ -192,7 +192,7 @@ class Message:
 
 
 class OneBotMessageEvent:
-    """OneBot v11 消息事件类"""
+    """OneBot v11 事件类（支持 message/notice/request）"""
     
     # 消息类型常量
     GROUP_MESSAGE = 'group'
@@ -219,39 +219,106 @@ class OneBotMessageEvent:
             self.data = data
         
         # 基本信息
-        self.post_type = self.data.get('post_type', '')
-        self.message_type = self._parse_message_type()
+        self.post_type = self.data.get('post_type', '')  # message/notice/request/meta_event
         self.time = self.data.get('time', int(time.time()))
         self.self_id = str(self.data.get('self_id', ''))
-        self.message_id = self.data.get('message_id', '')
         
-        # 用户和群组信息
-        self.user_id = str(self.data.get('user_id', ''))
+        # 用户和群组信息（所有事件都可能有）
+        self.user_id = str(self.data.get('user_id', '')) if self.data.get('user_id') else None
         self.group_id = str(self.data.get('group_id', '')) if self.data.get('group_id') else None
         
-        # 发送者信息
-        self.sender = self.data.get('sender', {})
-        self.sender_nickname = self.sender.get('nickname', '')
-        self.sender_card = self.sender.get('card', '')
+        # === 消息事件特有字段 ===
+        if self.post_type == 'message':
+            self.message_type = self._parse_message_type()
+            self.message_id = self.data.get('message_id', '')
+            
+            # 发送者信息
+            self.sender = self.data.get('sender', {})
+            self.sender_nickname = self.sender.get('nickname', '')
+            self.sender_card = self.sender.get('card', '')
+            
+            # 消息内容
+            self.message = self.data.get('message', [])
+            self.raw_message = self.data.get('raw_message', '')
+            self.content = self._parse_content()
+            
+            # 消息类型判断
+            self.is_group = self.message_type == self.GROUP_MESSAGE
+            self.is_private = self.message_type == self.PRIVATE_MESSAGE
+            
+            # event_type 属性
+            if self.is_group:
+                self.event_type = "GROUP_MESSAGE"
+            elif self.is_private:
+                self.event_type = "PRIVATE_MESSAGE"
+            else:
+                self.event_type = "MESSAGE"
         
-        # 消息内容
-        self.message = self.data.get('message', [])
-        self.raw_message = self.data.get('raw_message', '')
-        self.content = self._parse_content()
+        # === 通知事件特有字段 ===
+        elif self.post_type == 'notice':
+            self.notice_type = self.data.get('notice_type', '')  # group_increase/group_decrease等
+            self.sub_type = self.data.get('sub_type', '')
+            self.operator_id = str(self.data.get('operator_id', '')) if self.data.get('operator_id') else None
+            
+            # 调试日志
+            import logging
+            logger = logging.getLogger('ElainaBot')
+            logger.debug(f"解析通知事件: notice_type={self.notice_type}, group_id={self.group_id}, user_id={self.user_id}")
+            
+            # 设置默认值
+            self.message_type = self.UNKNOWN_MESSAGE
+            self.message_id = ''
+            self.sender = {}
+            self.sender_nickname = ''
+            self.sender_card = ''
+            self.message = []
+            self.raw_message = ''
+            self.content = ''
+            self.is_group = bool(self.group_id)
+            self.is_private = False
+            self.event_type = f"NOTICE_{self.notice_type.upper()}"
         
-        # 消息类型判断
-        self.is_group = self.message_type == self.GROUP_MESSAGE
-        self.is_private = self.message_type == self.PRIVATE_MESSAGE
+        # === 请求事件特有字段 ===
+        elif self.post_type == 'request':
+            self.request_type = self.data.get('request_type', '')  # friend/group
+            self.sub_type = self.data.get('sub_type', '')
+            self.comment = self.data.get('comment', '')  # 验证消息
+            self.flag = self.data.get('flag', '')  # 请求标识
+            
+            # 调试日志
+            import logging
+            logger = logging.getLogger('ElainaBot')
+            logger.debug(f"解析请求事件: request_type={self.request_type}, group_id={self.group_id}, user_id={self.user_id}, comment={self.comment}")
+            
+            # 设置默认值
+            self.message_type = self.UNKNOWN_MESSAGE
+            self.message_id = ''
+            self.sender = {}
+            self.sender_nickname = ''
+            self.sender_card = ''
+            self.message = []
+            self.raw_message = ''
+            self.content = self.comment  # 请求事件的内容就是验证消息
+            self.is_group = self.request_type == 'group'
+            self.is_private = False
+            self.event_type = f"REQUEST_{self.request_type.upper()}"
         
-        # event_type 属性
-        if self.is_group:
-            self.event_type = "GROUP_MESSAGE"
-        elif self.is_private:
-            self.event_type = "PRIVATE_MESSAGE"
+        # === 元事件 ===
         else:
-            self.event_type = "MESSAGE"
+            # meta_event 或未知类型
+            self.message_type = self.UNKNOWN_MESSAGE
+            self.message_id = ''
+            self.sender = {}
+            self.sender_nickname = ''
+            self.sender_card = ''
+            self.message = []
+            self.raw_message = ''
+            self.content = ''
+            self.is_group = False
+            self.is_private = False
+            self.event_type = self.post_type.upper()
         
-        # 其他属性
+        # 其他通用属性
         self.ignore = False
         self.matches = None
         self._api = None

@@ -49,6 +49,9 @@ class LogDatabaseManager:
         # 初始化SQL模板
         self._init_sql_templates()
         
+        # 跟踪当前日期以检测日期变更
+        self._current_date = datetime.datetime.now().strftime('%Y%m%d')
+        
         # 创建今天的表
         self._ensure_today_tables()
         
@@ -256,6 +259,13 @@ class LogDatabaseManager:
             return
         
         try:
+            # 检查日期是否变更，如果变更则创建新表
+            current_date = datetime.datetime.now().strftime('%Y%m%d')
+            if current_date != self._current_date:
+                logger.info(f"📅 日期变更 {self._current_date} -> {current_date}，创建新表")
+                self._current_date = current_date
+                self._ensure_today_tables()
+            
             table_name = self._get_table_name(log_type)
             insert_sql = self._insert_templates[log_type].format(table_name=table_name)
             extractor = self._field_extractors[log_type]
