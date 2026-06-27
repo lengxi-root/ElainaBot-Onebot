@@ -1,0 +1,36 @@
+# ===== 框架全局设置 =====
+# 修改后自动热加载，无需重启
+
+# HTTP 服务器
+server:
+  host: "0.0.0.0"
+  port: 5003
+
+# Web 面板
+web:
+  access_token: "admin"                    # URL 参数验证令牌
+  admin_password: "admin"                  # 管理员密码
+  framework_name: "Elaina"                 # 框架名称
+  favicon_url: ""                          # 网页图标 URL
+
+# OneBot 协议
+onebot:
+  access_token: ""                         # OneBot 连接鉴权 token（可选）
+  secret: ""                               # OneBot 签名密钥（可选）
+
+# 主人配置
+owner:
+  ids:                                     # 主人 QQ 号列表
+    - ""
+
+# 日志配置
+logging:
+  dir: "log"                               # 日志根目录
+  insert_interval: 2                       # 批量写入间隔(秒)
+  retention_days: 30                       # 日志保留天数
+  wal_mode: true                           # SQLite WAL模式
+
+# 依赖管理
+pip:
+  auto_install: true                       # 自动安装模块/插件依赖
+  mirror: ""                               # pip 镜像源

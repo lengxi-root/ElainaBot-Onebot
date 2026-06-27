@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Data
+data/*.db
+data/log/
+data/media/
+
+# Config (keep examples only)
+config/settings.yaml
+config/bot.yaml
+
+# Node
+web/vue/node_modules/
+web/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
