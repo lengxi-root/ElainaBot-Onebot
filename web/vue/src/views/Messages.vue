@@ -416,9 +416,10 @@ async function onNewLog(data) {
   if (data.log_type !== 'message') return; fetchChatsDebounced(); if (!current.value) return
   const gid = data.group_id || '', uid = data.user_id || '', cid = current.value.chat_id
   if ((apiChatType.value === 'group' && gid === cid) || (apiChatType.value === 'user' && uid === cid && !gid)) {
-    const nick = data.is_bot ? (data.bot_name || 'Bot') : await getNick(uid)
+    const isSelf = data.direction === 'send'
+    const nick = isSelf ? (data.bot_name || 'Bot') : await getNick(uid)
     if (_unmounted) return
-    const item = prepareMessage({ id: history.value.length, message_id: data.message_id || '', reference_id: data.reference_id || '', user_id: uid, appid: data.appid || app.currentBot?.appid || '', bot_qq: data.bot_qq || '', nickname: nick, content: data.content || '', timestamp: data.timestamp || '', is_self: !!data.is_bot, source: data.source || '', raw_message: data.raw_message || '' })
+    const item = prepareMessage({ id: history.value.length, message_id: data.message_id || '', reference_id: data.reference_id || '', user_id: uid, appid: data.appid || app.currentBot?.appid || '', bot_qq: isSelf ? (data.appid || '') : '', nickname: nick, content: data.content || '', timestamp: data.timestamp || '', is_self: isSelf, source: data.source || '', raw_message: data.raw_message || '' })
     history.value.push(item)
     resolveMessageReferences(history.value)
     if (isNearBottom()) nextTick(scrollBottom)

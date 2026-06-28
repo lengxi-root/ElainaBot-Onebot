@@ -247,11 +247,16 @@ class Application:
             if self._web_log_cb:
                 self._web_log_cb('message', {
                     'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    'content': display,
+                    'content': content,
                     'user_id': str(event.user_id),
                     'group_id': str(event.group_id or ''),
-                    'sender': sender,
+                    'message_id': str(event.message_id),
                     'message_type': event.message_type,
+                    'sender': sender,
+                    'appid': str(event.self_id or ''),
+                    'bot_name': str(event.self_id or ''),
+                    'direction': 'receive',
+                    'raw_message': json.dumps(event.raw_data, ensure_ascii=False),
                 })
 
         elif isinstance(event, NoticeEvent):

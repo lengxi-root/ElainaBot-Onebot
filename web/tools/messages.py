@@ -278,19 +278,34 @@ async def handle_get_chat_history(request: web.Request):
 # ──────────── 发送 / 撤回 ────────────
 
 def _log_sent(chat_type, chat_id, content, message_id):
+    ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    appid = _primary_id()
     svc = _common.log_service()
-    if not svc:
-        return
-    svc.add('message', {
-        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+    if svc:
+        svc.add('message', {
+            'timestamp': ts,
+            'content': content,
+            'user_id': '' if chat_type == 'group' else chat_id,
+            'group_id': chat_id if chat_type == 'group' else '',
+            'message_id': str(message_id or ''),
+            'message_type': chat_type,
+            'source': 'WebPanel',
+            'extra': 'send',
+        }, appid=appid)
+    # 实时推送到 Web 面板
+    from web.ws import push_log
+    push_log('message', {
+        'timestamp': ts,
         'content': content,
         'user_id': '' if chat_type == 'group' else chat_id,
         'group_id': chat_id if chat_type == 'group' else '',
         'message_id': str(message_id or ''),
         'message_type': chat_type,
-        'source': 'WebPanel',
-        'extra': 'send',
-    }, appid=_primary_id())
+        'appid': appid,
+        'bot_name': appid,
+        'direction': 'send',
+        'raw_message': '',
+    })
 
 
 async def handle_send_message(request: web.Request):
