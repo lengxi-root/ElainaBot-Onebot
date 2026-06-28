@@ -20,6 +20,8 @@ class OneBotAdapter:
         self.bots: Dict[str, Any] = {}
         self.websockets: Dict[str, Any] = {}
         self.api_responses: Dict[str, asyncio.Future] = {}
+        # HTTP 客户端: name -> {url, token} (框架主动调用 OneBot HTTP API)
+        self.http_clients: Dict[str, Dict[str, str]] = {}
 
     def _check_signature(self, body: bytes, signature: Optional[str]) -> bool:
         if not self.secret:
@@ -97,3 +99,29 @@ class OneBotAdapter:
         if self.websockets:
             return next(iter(self.websockets.values()))
         return None
+
+    def register_http_client(self, name: str, url: str, token: str = ''):
+        """注册 HTTP 客户端目标 (框架 -> OneBot HTTP API)"""
+        self.http_clients[name] = {'url': (url or '').rstrip('/'), 'token': token or ''}
+
+    def clear_http_clients(self):
+        self.http_clients.clear()
+
+    async def http_call_action(self, action: str, params: dict = None) -> Optional[dict]:
+        """通过 HTTP 调用 OneBot API (POST {url}/{action})"""
+        if not self.http_clients:
+            return None
+        import aiohttp
+        client = next(iter(self.http_clients.values()))
+        url = f"{client['url']}/{action}"
+        headers = {'Content-Type': 'application/json'}
+        if client.get('token'):
+            headers['Authorization'] = 'Bearer ' + client['token']
+        try:
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(url, json=params or {}, headers=headers) as resp:
+                    return await resp.json()
+        except Exception as e:
+            logger.warning(f'HTTP API 调用失败: {action} - {e}')
+            return None

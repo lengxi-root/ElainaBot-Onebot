@@ -13,6 +13,7 @@ from web.tools import (
     logs,
     market,
     messages,
+    onebot_conn,
     plugin_mgr,
     statistics,
     system,
@@ -69,6 +70,9 @@ def get_routes() -> list:
         # ── 配置 ──
         web.get('/api/config', _(config_handler.handle_get_config)),
         web.post('/api/config/save', _(config_handler.handle_save_config)),
+        # ── OneBot 网络连接 ──
+        web.get('/api/onebot/connections', _(onebot_conn.handle_get_connections)),
+        web.post('/api/onebot/connections', _(onebot_conn.handle_save_connections)),
         # ── 消息 ──
         web.post('/api/message/chats', _(messages.handle_get_chats)),
         web.post('/api/message/history', _(messages.handle_get_chat_history)),
@@ -145,6 +149,7 @@ def set_context(app_instance, base_dir: str):
     database.set_context(app_instance, base_dir)
     statistics.set_context(app_instance, base_dir)
     messages.set_context(app_instance, base_dir)
+    onebot_conn.set_context(app_instance)
     market.set_context(base_dir)
     update.set_context(base_dir)
 
