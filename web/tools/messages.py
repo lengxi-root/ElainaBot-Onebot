@@ -243,6 +243,10 @@ async def handle_get_chat_history(request: web.Request):
     for r, is_self, recalled, meta, uid in parsed:
         raw = r.get('raw_data', '')
         mid = str(r.get('message_id', ''))
+        role = ''
+        if raw and raw.startswith('{'):
+            with contextlib.suppress(Exception):
+                role = str(((json.loads(raw).get('sender') or {}).get('role')) or '')
         appid = str(r.get('source', '') or '') if r.get('source') not in ('WebPanel', '') else _primary_id()
         if mid and not is_self:
             last_msg_id = mid
@@ -258,6 +262,7 @@ async def handle_get_chat_history(request: web.Request):
             'content': r.get('content', ''),
             'timestamp': r.get('timestamp', ''),
             'is_self': is_self,
+            'role': role,
             'source': 'web_panel' if r.get('source') == 'WebPanel' else 'onebot',
             'raw_message': raw if not recalled else '',
             'recalled': recalled,
