@@ -45,12 +45,12 @@
           </div>
           <div class="msg-list" ref="msgListRef">
             <div v-if="hasMore" class="load-more" @click="loadMore">加载更多</div>
-            <div v-for="msg in messages" :key="msg.id || msg.time" class="msg-bubble">
+            <div v-for="msg in messages" :key="msg.id" class="msg-bubble" :class="{ 'is-self': msg.is_self, recalled: msg.recalled }">
               <div class="msg-meta">
-                <span class="msg-sender">{{ msg.user_id }}</span>
-                <span class="msg-time">{{ msg.time }}</span>
+                <span class="msg-sender">{{ msg.nickname || msg.user_id }}</span>
+                <span class="msg-time">{{ msg.timestamp }}</span>
               </div>
-              <div class="msg-content">{{ msg.content }}</div>
+              <div class="msg-content">{{ msg.recalled ? '[已撤回]' : msg.content }}</div>
             </div>
             <div v-if="!messages.length" class="msg-empty">暂无消息记录</div>
           </div>
@@ -89,16 +89,23 @@ const filteredChats = computed(() => {
 })
 
 async function loadChats() {
-  const res = await store.fetchApi('/messages/chats')
-  if (res && res.success) {
-    chats.value = (res.chats || []).map(c => ({
-      id: c.chat_id || '',
-      type: c.type || 'private',
-      name: c.nickname || c.chat_id || '',
-      count: c.msg_count || 0,
-      last_time: c.last_time || '',
-    }))
+  const [gRes, uRes] = await Promise.all([
+    store.postApi('/message/chats', { type: 'group' }),
+    store.postApi('/message/chats', { type: 'user' }),
+  ])
+  const list = []
+  if (gRes && gRes.success) {
+    for (const c of (gRes.data?.chats || [])) {
+      list.push({ id: c.chat_id || '', type: 'group', name: c.nickname || c.chat_id || '', count: c.msg_count || 0, last_time: c.last_time || '' })
+    }
   }
+  if (uRes && uRes.success) {
+    for (const c of (uRes.data?.chats || [])) {
+      list.push({ id: c.chat_id || '', type: 'private', name: c.nickname || c.chat_id || '', count: c.msg_count || 0, last_time: c.last_time || '' })
+    }
+  }
+  list.sort((a, b) => (b.last_time || '').localeCompare(a.last_time || ''))
+  chats.value = list
 }
 
 async function selectChat(chat) {
@@ -111,19 +118,18 @@ async function selectChat(chat) {
 async function loadHistory() {
   const chat = selectedChat.value
   if (!chat) return
-  const res = await store.postApi('/messages/history', {
+  const res = await store.postApi('/message/history', {
     chat_id: chat.id,
-    type: chat.type,
-    page: page.value,
-    limit: 50,
+    chat_type: chat.type === 'private' ? 'user' : 'group',
   })
   if (res && res.success) {
+    const msgs = res.data?.messages || []
     if (page.value === 1) {
-      messages.value = res.messages || []
+      messages.value = msgs
     } else {
-      messages.value = [...(res.messages || []), ...messages.value]
+      messages.value = [...msgs, ...messages.value]
     }
-    hasMore.value = (res.messages || []).length >= 50
+    hasMore.value = res.data?.has_more || false
   }
 }
 
@@ -256,6 +262,8 @@ onMounted(() => {
   line-height: 1.5;
   word-break: break-all;
 }
+.msg-bubble.is-self .msg-sender { color: var(--success); }
+.msg-bubble.recalled .msg-content { opacity: 0.5; font-style: italic; }
 .msg-empty { color: var(--text3); text-align: center; padding: 40px 0; font-size: 13px; }
 .msg-placeholder {
   flex: 1; display: flex; align-items: center; justify-content: center;

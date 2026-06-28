@@ -201,7 +201,10 @@ async def handle_password_status(request: web.Request):
 
     pwd = str(cfg.get('settings', 'web.admin_password', '') or '')
     is_default = not pwd or (not auth.is_hashed(pwd) and pwd in _WEAK_PASSWORDS)
-    return web.json_response({'success': True, 'is_default': is_default})
+    is_weak = False
+    if pwd and auth.is_hashed(pwd):
+        is_weak = any(auth.verify_password(w, pwd) for w in _WEAK_PASSWORDS)
+    return web.json_response({'success': True, 'is_default': is_default, 'is_weak': is_weak})
 
 
 # ======================== 自定义页面 (OneBot 暂无插件 web 页面机制) ========================
