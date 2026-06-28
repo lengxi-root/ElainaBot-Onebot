@@ -36,7 +36,7 @@ def _transform_message_rows(rows: list, appid: str = '') -> list:
             'message_id': r.get('message_id', ''),
             'message_type': r.get('message_type', ''),
             'appid': bot_id,
-            'bot_name': bot_id,
+            'bot_name': '',
             'direction': direction,
             'raw_message': r.get('raw_data', ''),
         })
