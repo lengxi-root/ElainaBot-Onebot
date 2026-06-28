@@ -107,7 +107,10 @@ class Application:
 
         # 5) 插件管理器
         self._plugin_manager = PluginManager(self._path('plugins'))
+        owner_ids = cfg.get('settings', 'owner_ids', []) or []
+        self._plugin_manager.set_owner_ids(owner_ids)
         await self._plugin_manager.load_all()
+        self._plugin_manager.start_watcher()
 
         # 6) 日志服务
         log_base = self._path('data', cfg.get('settings', 'logging.dir', 'log'))
@@ -164,6 +167,8 @@ class Application:
 
     async def shutdown(self):
         log.info('正在关闭...')
+        if self._plugin_manager:
+            self._plugin_manager.stop_watcher()
         if self._connection_manager:
             await self._connection_manager.stop()
         if self._config_watcher:
@@ -177,9 +182,13 @@ class Application:
         log.info('已关闭')
 
     async def process_event(self, event):
-        """处理 OneBot 事件"""
+        """处理 OneBot 事件 (异步分发)"""
         if isinstance(event, MetaEvent):
             return
+
+        # 注入 API 引用, 使插件可通过 event.reply() 调用
+        from core.onebot.api import get_api
+        event._api = get_api()
 
         # Hook: on_raw_event
         await self._hook_manager.emit('on_raw_event', event)
@@ -187,9 +196,8 @@ class Application:
         # 日志记录
         self._log_event(event)
 
-        # 分发到插件
-        if isinstance(event, MessageEvent):
-            self._plugin_manager.dispatch(event)
+        # 异步分发到插件 (消息事件 + 通知/请求事件)
+        await self._plugin_manager.dispatch(event)
 
     def _log_event(self, event):
         """记录事件日志"""
@@ -241,7 +249,7 @@ class Application:
                     'message_type': event.message_type,
                     'raw_data': json.dumps(event.raw_data, ensure_ascii=False),
                     'extra': json.dumps({'nickname': nickname}, ensure_ascii=False),
-                }, appid=str(event.self_id or ''))
+                }, bot_qq=str(event.self_id or ''))
 
             # 推送到 Web 面板
             if self._web_log_cb:
@@ -253,8 +261,7 @@ class Application:
                     'message_id': str(event.message_id),
                     'message_type': event.message_type,
                     'sender': sender,
-                    'appid': str(event.self_id or ''),
-                    'bot_name': str(event.self_id or ''),
+                    'bot_qq': str(event.self_id or ''),
                     'direction': 'receive',
                     'raw_message': json.dumps(event.raw_data, ensure_ascii=False),
                 })
@@ -274,7 +281,7 @@ class Application:
                     'group_id': str(event.group_id or ''),
                     'message_type': event.notice_type,
                     'raw_data': json.dumps(event.raw_data, ensure_ascii=False),
-                }, appid=str(event.self_id or ''))
+                }, bot_qq=str(event.self_id or ''))
             # 撤回事件：标记对应消息为已撤回
             if self._log_service and event.notice_type in ('group_recall', 'friend_recall'):
                 recalled_mid = str(event.raw_data.get('message_id', '') or '')
@@ -283,7 +290,7 @@ class Application:
                         'message',
                         "UPDATE log SET extra = 'recalled' WHERE message_id = ?",
                         (recalled_mid,),
-                        appid=str(event.self_id or ''),
+                        bot_qq=str(event.self_id or ''),
                     )
 
     def push_web_log(self, log_type: str, entry: dict):

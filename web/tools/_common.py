@@ -45,11 +45,16 @@ def primary_appid() -> str:
     return ids[0] if ids else ''
 
 
-def query_log(log_type: str, sql: str, params=None, appid: str = '') -> list:
+def primary_bot_qq() -> str:
+    """primary_appid 的别名"""
+    return primary_appid()
+
+
+def query_log(log_type: str, sql: str, params=None, bot_qq: str = '') -> list:
     svc = log_service()
     if not svc:
         return []
-    return svc.query(log_type, sql, params, appid=appid)
+    return svc.query(log_type, sql, params, bot_qq=bot_qq)
 
 
 # ── 昵称缓存 (通过 OneBot get_stranger_info) ──

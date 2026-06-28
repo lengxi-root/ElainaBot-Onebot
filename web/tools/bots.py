@@ -57,9 +57,8 @@ async def handle_get_bots(request: web.Request):
             info = await _login_info(self_id) if connected else {}
             name = info.get('nickname', '') or self_id
             bots.append({
-                'appid': self_id,
+                'bot_qq': self_id,
                 'name': name,
-                'robot_qq': self_id,
                 'qq': self_id,
                 'avatar': _avatar(self_id),
                 'connected': connected,

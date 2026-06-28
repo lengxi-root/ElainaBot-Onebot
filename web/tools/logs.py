@@ -15,19 +15,19 @@ def set_context(app_instance):
     _common.set_app(app_instance)
 
 
-def _query_recent(log_type: str, appid: str = '') -> list:
-    rows = _common.query_log(log_type, _LOG_SQL, appid=appid)
+def _query_recent(log_type: str, bot_qq: str = '') -> list:
+    rows = _common.query_log(log_type, _LOG_SQL, bot_qq=bot_qq)
     rows.reverse()  # 升序: 旧 → 新
     return rows
 
 
-def _transform_message_rows(rows: list, appid: str = '') -> list:
+def _transform_message_rows(rows: list, bot_qq: str = '') -> list:
     """将 DB 行转换为前端 Logs.vue 期望的字段格式"""
     result = []
     for r in rows:
         extra = r.get('extra', '')
         direction = 'send' if extra == 'send' else 'receive'
-        bot_id = r.get('source', '') or appid
+        bot_id = r.get('source', '') or bot_qq
         result.append({
             'timestamp': r.get('timestamp', ''),
             'content': r.get('content', ''),
@@ -35,8 +35,7 @@ def _transform_message_rows(rows: list, appid: str = '') -> list:
             'group_id': r.get('group_id', ''),
             'message_id': r.get('message_id', ''),
             'message_type': r.get('message_type', ''),
-            'appid': bot_id,
-            'bot_name': '',
+            'bot_qq': bot_id,
             'direction': direction,
             'raw_message': r.get('raw_data', ''),
         })
@@ -44,13 +43,13 @@ def _transform_message_rows(rows: list, appid: str = '') -> list:
 
 
 def _gather_recent_sync():
-    appid = _common.primary_appid()
-    msg_rows = _query_recent('message', appid=appid)
+    bot_qq = _common.primary_appid()
+    msg_rows = _query_recent('message', bot_qq=bot_qq)
     return {
-        'message': _transform_message_rows(msg_rows, appid),
+        'message': _transform_message_rows(msg_rows, bot_qq),
         'framework': _query_recent('framework'),
         'error': _query_recent('error'),
-        'lifecycle': _query_recent('lifecycle', appid=appid),
+        'lifecycle': _query_recent('lifecycle', bot_qq=bot_qq),
     }
 
 

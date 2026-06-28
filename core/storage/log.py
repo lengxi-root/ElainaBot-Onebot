@@ -23,8 +23,8 @@ class LogService:
         self._wal_mode = wal_mode
         self._insert_interval = insert_interval
         self._retention_days = retention_days
-        self._queues = {}  # {(log_type, appid): deque}
-        self._connections = {}  # {(log_type, appid): sqlite3.Connection}
+        self._queues = {}  # {(log_type, bot_qq): deque}
+        self._connections = {}  # {(log_type, bot_qq): sqlite3.Connection}
         self._lock = threading.Lock()
         self._running = False
         self._flush_task = None
@@ -45,13 +45,13 @@ class LogService:
             conn.close()
         self._connections.clear()
 
-    def _get_conn(self, log_type: str, appid: str = '') -> sqlite3.Connection:
-        key = (log_type, appid or '')
+    def _get_conn(self, log_type: str, bot_qq: str = '') -> sqlite3.Connection:
+        key = (log_type, bot_qq or '')
         if key in self._connections:
             return self._connections[key]
-        # appid 不为空时, 按机器人 QQ 分目录存储 (data/log/<qq>/<type>.db)
-        if appid:
-            db_dir = os.path.join(self._base_dir, str(appid))
+        # bot_qq 不为空时, 按机器人 QQ 分目录存储 (data/log/<qq>/<type>.db)
+        if bot_qq:
+            db_dir = os.path.join(self._base_dir, str(bot_qq))
             os.makedirs(db_dir, exist_ok=True)
             db_path = os.path.join(db_dir, f'{log_type}.db')
         else:
@@ -82,21 +82,21 @@ class LogService:
         self._connections[key] = conn
         return conn
 
-    def add(self, log_type: str, entry: dict, appid: str = ''):
-        """添加日志条目到队列 (appid 不为空时按机器人 QQ 分库)"""
-        key = (log_type, appid or '')
+    def add(self, log_type: str, entry: dict, bot_qq: str = ''):
+        """添加日志条目到队列 (bot_qq 不为空时按机器人 QQ 分库)"""
+        key = (log_type, bot_qq or '')
         if key not in self._queues:
             self._queues[key] = deque()
         self._queues[key].append(entry)
 
-    def add_sync(self, log_type: str, entry: dict, appid: str = ''):
+    def add_sync(self, log_type: str, entry: dict, bot_qq: str = ''):
         """同步添加（等同于 add）"""
-        self.add(log_type, entry, appid)
+        self.add(log_type, entry, bot_qq)
 
-    def execute(self, log_type: str, sql: str, params=None, appid: str = '') -> int:
+    def execute(self, log_type: str, sql: str, params=None, bot_qq: str = '') -> int:
         """执行写操作（UPDATE/DELETE），返回受影响行数"""
         try:
-            conn = self._get_conn(log_type, appid)
+            conn = self._get_conn(log_type, bot_qq)
             with self._lock:
                 cursor = conn.execute(sql, params or [])
                 conn.commit()
@@ -105,10 +105,10 @@ class LogService:
             log.warning(f'执行写操作失败 [{log_type}]: {e}')
             return 0
 
-    def query(self, log_type: str, sql: str, params=None, appid: str = '') -> list:
+    def query(self, log_type: str, sql: str, params=None, bot_qq: str = '') -> list:
         """查询日志"""
         try:
-            conn = self._get_conn(log_type, appid)
+            conn = self._get_conn(log_type, bot_qq)
             with self._lock:
                 cursor = conn.execute(sql, params or [])
                 rows = cursor.fetchall()
@@ -132,9 +132,9 @@ class LogService:
                 entries.append(queue.popleft())
             if not entries:
                 continue
-            log_type, appid = key
+            log_type, bot_qq = key
             try:
-                conn = self._get_conn(log_type, appid)
+                conn = self._get_conn(log_type, bot_qq)
                 with self._lock:
                     for entry in entries:
                         conn.execute(
@@ -162,7 +162,7 @@ class LogService:
         if self._retention_days <= 0:
             return
         cutoff = (datetime.datetime.now() - datetime.timedelta(days=self._retention_days)).strftime('%Y-%m-%d %H:%M:%S')
-        for (log_type, _appid), conn in self._connections.items():
+        for (log_type, _bot_qq), conn in self._connections.items():
             try:
                 with self._lock:
                     conn.execute('DELETE FROM log WHERE timestamp < ?', (cutoff,))

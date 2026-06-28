@@ -1,8 +1,7 @@
-"""OneBot v11 事件模型"""
+"""OneBot v11 事件模型 (异步框架)"""
 
-import json
 import time
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 
 class OneBotEvent:
@@ -13,9 +12,14 @@ class OneBotEvent:
         self.time = data.get('time', int(time.time()))
         self.self_id = data.get('self_id', '')
         self.post_type = data.get('post_type', '')
+        self._api = None  # 由 Application 注入
 
     def to_dict(self) -> dict:
         return self.raw_data
+
+    @property
+    def content(self) -> str:
+        return ''
 
 
 class MessageEvent(OneBotEvent):
@@ -57,6 +61,36 @@ class MessageEvent(OneBotEvent):
             if isinstance(seg, dict) and seg.get('type') == 'text':
                 parts.append(seg.get('data', {}).get('text', ''))
         return ''.join(parts).strip()
+
+    async def reply(self, message, **kwargs):
+        """异步回复消息
+
+        Args:
+            message: 消息内容 (字符串或消息段列表)
+        """
+        if self._api is None:
+            return None
+        if isinstance(message, str):
+            message = [{'type': 'text', 'data': {'text': message}}]
+        if self.is_group:
+            return await self._api.send_group_msg(self.group_id, message, **kwargs)
+        else:
+            return await self._api.send_private_msg(self.user_id, message, **kwargs)
+
+    async def reply_text(self, text: str, **kwargs):
+        """回复纯文本"""
+        return await self.reply(text, **kwargs)
+
+    async def reply_image(self, file: str, **kwargs):
+        """回复图片"""
+        msg = [{'type': 'image', 'data': {'file': file}}]
+        return await self.reply(msg, **kwargs)
+
+    async def call_api(self, action: str, params: dict = None):
+        """调用 OneBot API"""
+        if self._api is None:
+            return None
+        return await self._api.call_api(action, params, self_id=str(self.self_id))
 
 
 class NoticeEvent(OneBotEvent):

@@ -45,8 +45,8 @@ def _collect(result, directory, label):
         fpath = os.path.join(directory, f)
         if f.endswith('.db') and os.path.isfile(fpath):
             result.append({
-                'appid': label or 'log',
-                'bot_name': label or '全局日志',
+                'bot_qq': label or 'log',
+                'label': label or '全局日志',
                 'name': f,
                 'path': fpath.replace('\\', '/'),
                 'size': os.path.getsize(fpath),

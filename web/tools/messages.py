@@ -35,7 +35,7 @@ def _primary_id():
 
 
 def _q(sql, params=None):
-    return _common.query_log('message', sql, params, appid=_primary_id())
+    return _common.query_log('message', sql, params, bot_qq=_primary_id())
 
 
 # ──────────── 昵称 ────────────
@@ -83,11 +83,11 @@ def _db_stats(chat_type):
 
 def _chat_from_stats(chat_type, stats, remarks):
     """OneBot 接口不可用时, 退化为仅根据消息日志构造会话列表"""
-    appid = _primary_id()
+    bot_qq = _primary_id()
     chats = []
     for cid, st in stats.items():
         item = {
-            'chat_id': cid, 'appid': appid, 'bot_name': appid,
+            'chat_id': cid, 'bot_qq': bot_qq,
             'last_id': st['last_id'], 'last_time': st['last_time'],
             'last_date': (st['last_time'] or '')[:10], 'msg_count': st['msg_count'],
             'remark': '', 'is_full_access': False,
@@ -105,7 +105,7 @@ def _chat_from_stats(chat_type, stats, remarks):
 
 async def _fetch_chats(chat_type):
     """群 / 好友列表统一从 OneBot 接口获取, 并合并消息日志的最近时间与计数"""
-    appid = _primary_id()
+    bot_qq = _primary_id()
     stats = await asyncio.get_running_loop().run_in_executor(None, _db_stats, chat_type)
     remarks = _load_remarks()
     api = _api()
@@ -135,7 +135,7 @@ async def _fetch_chats(chat_type):
             st = stats.get(uid, {})
             nick = f.get('remark') or f.get('nickname') or f'用户{uid[-6:]}'
             chats.append({
-                'chat_id': uid, 'appid': appid, 'bot_name': appid,
+                'chat_id': uid, 'bot_qq': bot_qq,
                 'nickname': nick, 'remark': f.get('remark', '') or '',
                 'last_id': st.get('last_id', 0), 'last_time': st.get('last_time', ''),
                 'last_date': (st.get('last_time', '') or '')[:10],
@@ -150,7 +150,7 @@ async def _fetch_chats(chat_type):
             rv = remarks.get(gid)
             name = _remark_name(rv) or g.get('group_name') or f'群{gid[-6:]}'
             chats.append({
-                'chat_id': gid, 'appid': appid, 'bot_name': appid,
+                'chat_id': gid, 'bot_qq': bot_qq,
                 'nickname': name, 'remark': _remark_name(rv),
                 'group_qq': _remark_qq(rv), 'is_full_access': False,
                 'last_id': st.get('last_id', 0), 'last_time': st.get('last_time', ''),
@@ -247,7 +247,7 @@ async def handle_get_chat_history(request: web.Request):
         if raw and raw.startswith('{'):
             with contextlib.suppress(Exception):
                 role = str(((json.loads(raw).get('sender') or {}).get('role')) or '')
-        appid = str(r.get('source', '') or '') if r.get('source') not in ('WebPanel', '') else _primary_id()
+        src_bot_qq = str(r.get('source', '') or '') if r.get('source') not in ('WebPanel', '') else _primary_id()
         if mid and not is_self:
             last_msg_id = mid
         nickname = meta.get('nickname') or nicks.get(uid, f'用户{uid[-6:]}' if uid else '未知用户')
@@ -256,8 +256,7 @@ async def handle_get_chat_history(request: web.Request):
             'message_id': mid,
             'reference_id': '',
             'user_id': uid,
-            'appid': appid,
-            'bot_qq': appid if is_self else '',
+            'bot_qq': src_bot_qq if is_self else '',
             'nickname': (_primary_id() or 'Bot') if is_self else nickname,
             'content': r.get('content', ''),
             'timestamp': r.get('timestamp', ''),
@@ -279,7 +278,7 @@ async def handle_get_chat_history(request: web.Request):
 
 def _log_sent(chat_type, chat_id, content, message_id):
     ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    appid = _primary_id()
+    bot_qq = _primary_id()
     svc = _common.log_service()
     if svc:
         svc.add('message', {
@@ -291,7 +290,7 @@ def _log_sent(chat_type, chat_id, content, message_id):
             'message_type': chat_type,
             'source': 'WebPanel',
             'extra': 'send',
-        }, appid=appid)
+        }, bot_qq=bot_qq)
     # 实时推送到 Web 面板
     from web.ws import push_log
     push_log('message', {
@@ -301,8 +300,7 @@ def _log_sent(chat_type, chat_id, content, message_id):
         'group_id': chat_id if chat_type == 'group' else '',
         'message_id': str(message_id or ''),
         'message_type': chat_type,
-        'appid': appid,
-        'bot_name': appid,
+        'bot_qq': bot_qq,
         'direction': 'send',
         'raw_message': '',
     })
@@ -394,7 +392,7 @@ def _mark_recalled(message_id):
         return
     with contextlib.suppress(Exception):
         svc.execute('message', "UPDATE log SET extra='recalled' WHERE message_id=?",
-                    (str(message_id),), appid=_primary_id())
+                    (str(message_id),), bot_qq=_primary_id())
 
 
 # ──────────── 群备注 ────────────
