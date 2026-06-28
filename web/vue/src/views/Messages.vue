@@ -73,10 +73,11 @@ function goBackToList() { mobileView.value = 'list'; current.value = null }
 function closeMobileTypeMenu() { mobileTypeOpen.value = false; mobileMediaOpen.value = false }
 function selectMobileMsgType(value) { msgType.value = value; closeMobileTypeMenu() }
 function selectMobileMediaType(value) { mediaFileType.value = value; closeMobileTypeMenu() }
-function avatarUrl(appid, uid) { return `https://q.qlogo.cn/qqapp/${appid}/${uid}/0` }
 function getBotAvatar(appid) { const bot = app.bots.find(b => b.appid === appid); return bot?.avatar || '' }
 function qqAvatar(qq) { return `http://q1.qlogo.cn/g?b=qq&nk=${qq}&s=100` }
-function groupQqAvatar(qq) { return `https://p.qlogo.cn/gh/${qq}/${qq}/100/` }
+function groupQqAvatar(qq) { return `http://p.qlogo.cn/gh/${qq}/${qq}/100/` }
+// OneBot 的 user_id 均为真实 QQ 号, 头像统一走 q1.qlogo.cn
+function avatarUrl(_appid, uid) { return qqAvatar(uid) }
 function openUrl(u) { const a = document.createElement('a'); a.href = u; a.target = '_blank'; a.rel = 'noreferrer noopener'; a.click() }
 const lightboxSrc = ref('')
 function previewImg(src) { lightboxSrc.value = src }
@@ -497,8 +498,8 @@ onUnmounted(() => { _unmounted = true; off('new_log', onNewLog); window.removeEv
         <div class="chat-items">
           <div v-for="c in chats" :key="c.chat_id" :class="['chat-item', { active: current?.chat_id === c.chat_id }]" @click="selectChat(c)">
             <div class="chat-avatar-wrap">
-              <img v-if="chatType === 'user' && c.appid && c.chat_id" class="chat-avatar" :src="avatarUrl(c.appid, c.chat_id)" loading="lazy" @error="e => e.target.style.display='none'" />
-              <img v-else-if="c.group_qq" class="chat-avatar" :src="groupQqAvatar(c.group_qq)" loading="lazy" @error="e => e.target.style.display='none'" />
+              <img v-if="chatType === 'user' && c.chat_id" class="chat-avatar" :src="qqAvatar(c.chat_id)" loading="lazy" @error="e => e.target.style.display='none'" />
+              <img v-else-if="chatType === 'group' && c.chat_id" class="chat-avatar" :src="groupQqAvatar(c.chat_id)" loading="lazy" @error="e => e.target.style.display='none'" />
               <img v-else-if="app.isAllBots && c.appid && getBotAvatar(c.appid)" class="chat-avatar" :src="getBotAvatar(c.appid)" loading="lazy" @error="e => e.target.style.display='none'" />
               <div v-else class="chat-avatar-fallback">{{ (c.nickname || c.chat_id || '?').charAt(0) }}</div>
               <span v-if="c.is_full_access" class="chat-avatar-badge">全</span>

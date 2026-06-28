@@ -23,6 +23,10 @@ class _WebPanelLogHandler(logging.Handler):
         try:
             from datetime import datetime
 
+            # 标记 web_skip 的记录(如消息内容)不进入框架日志面板, 它们另存于消息记录
+            if getattr(record, 'web_skip', False):
+                return
+
             msg = record.getMessage()
             entry = {
                 'timestamp': datetime.fromtimestamp(record.created).strftime('%Y-%m-%d %H:%M:%S'),
