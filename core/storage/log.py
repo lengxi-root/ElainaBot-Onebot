@@ -85,6 +85,18 @@ class LogService:
         """同步添加（等同于 add）"""
         self.add(log_type, entry)
 
+    def execute(self, log_type: str, sql: str, params=None) -> int:
+        """执行写操作（UPDATE/DELETE），返回受影响行数"""
+        try:
+            conn = self._get_conn(log_type)
+            with self._lock:
+                cursor = conn.execute(sql, params or [])
+                conn.commit()
+                return cursor.rowcount
+        except Exception as e:
+            log.warning(f'执行写操作失败 [{log_type}]: {e}')
+            return 0
+
     def query(self, log_type: str, sql: str, params=None) -> list:
         """查询日志"""
         try:

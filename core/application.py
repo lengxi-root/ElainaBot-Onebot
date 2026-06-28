@@ -237,6 +237,29 @@ class Application:
 
         elif isinstance(event, NoticeEvent):
             log.info(f'通知: {event.notice_type} | 群 {event.group_id} | 用户 {event.user_id}')
+            # 写入 lifecycle.db 供可视统计「事件统计」使用
+            if self._log_service and event.notice_type in (
+                'group_increase', 'group_decrease', 'friend_add', 'friend_del',
+                'group_recall', 'friend_recall',
+            ):
+                self._log_service.add('lifecycle', {
+                    'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'content': f'{event.notice_type} | 群{event.group_id or ""} | 用户{event.user_id}',
+                    'source': str(event.self_id or ''),
+                    'user_id': str(event.user_id or ''),
+                    'group_id': str(event.group_id or ''),
+                    'message_type': event.notice_type,
+                    'raw_data': json.dumps(event.raw_data, ensure_ascii=False),
+                })
+            # 撤回事件：标记对应消息为已撤回
+            if self._log_service and event.notice_type in ('group_recall', 'friend_recall'):
+                recalled_mid = str(event.raw_data.get('message_id', '') or '')
+                if recalled_mid:
+                    self._log_service.execute(
+                        'message',
+                        "UPDATE log SET extra = 'recalled' WHERE message_id = ?",
+                        (recalled_mid,),
+                    )
 
     def push_web_log(self, log_type: str, entry: dict):
         if self._web_log_cb:
