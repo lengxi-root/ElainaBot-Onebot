@@ -1,74 +1,43 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 
 const routes = [
   {
-    path: '/web/login',
+    path: '/login',
     name: 'Login',
     component: () => import('../views/Login.vue'),
+    meta: { guest: true },
   },
   {
-    path: '/web/',
-    component: () => import('../components/Layout.vue'),
+    path: '/',
+    component: () => import('../views/Layout.vue'),
+    meta: { auth: true },
     children: [
-      {
-        path: '',
-        name: 'Dashboard',
-        component: () => import('../views/Dashboard.vue'),
-      },
-      {
-        path: 'messages',
-        name: 'Messages',
-        component: () => import('../views/Messages.vue'),
-      },
-      {
-        path: 'statistics',
-        name: 'Statistics',
-        component: () => import('../views/Statistics.vue'),
-      },
-      {
-        path: 'plugins',
-        name: 'Plugins',
-        component: () => import('../views/Plugins.vue'),
-      },
-      {
-        path: 'modules',
-        name: 'Modules',
-        component: () => import('../views/Modules.vue'),
-      },
-      {
-        path: 'logs',
-        name: 'Logs',
-        component: () => import('../views/Logs.vue'),
-      },
-      {
-        path: 'config',
-        name: 'Config',
-        component: () => import('../views/Config.vue'),
-      },
-      {
-        path: 'database',
-        name: 'Database',
-        component: () => import('../views/Database.vue'),
-      },
+      { path: '', name: 'Dashboard', component: () => import('../views/Dashboard.vue') },
+      { path: 'logs', name: 'Logs', component: () => import('../views/Logs.vue') },
+      { path: 'plugins', name: 'Plugins', component: () => import('../views/Plugins.vue') },
+      { path: 'messages', name: 'Messages', component: () => import('../views/Messages.vue') },
+      { path: 'statistics', name: 'Statistics', component: () => import('../views/Statistics.vue') },
+      { path: 'market', name: 'Market', component: () => import('../views/Market.vue') },
+      { path: 'update', name: 'Update', component: () => import('../views/Update.vue') },
+      { path: 'database', name: 'Database', component: () => import('../views/Database.vue') },
+      { path: 'config', name: 'Config', component: () => import('../views/Config.vue') },
+      { path: 'custom/:key', name: 'CustomPage', component: () => import('../views/CustomPage.vue') },
     ],
   },
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory('/web/'),
   routes,
 })
 
 router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem('elaina_token')
-  const urlToken = new URLSearchParams(window.location.search).get('token')
-  if (urlToken) {
-    localStorage.setItem('elaina_token', urlToken)
-    next()
-    return
-  }
-  if (to.name !== 'Login' && !token) {
-    next({ name: 'Login' })
+  const auth = useAuthStore()
+  if (to.meta.auth && !auth.isLoggedIn) {
+    next({ name: 'Login', query: { redirect: to.fullPath } })
+  } else if (to.meta.guest && auth.isLoggedIn) {
+    next({ name: 'Dashboard' })
   } else {
     next()
   }
