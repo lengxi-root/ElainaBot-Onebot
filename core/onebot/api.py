@@ -30,13 +30,16 @@ class OneBotAPI:
         self._adapter = adapter or _adapter_ref
 
     async def call_api(self, action: str, params: dict = None, self_id: str = None) -> Optional[dict]:
-        """调用 OneBot API"""
+        """调用 OneBot API — 优先走 WebSocket, 无连接时回退到 HTTP 客户端"""
         if not self._adapter:
             return None
 
         ws = self._adapter.get_bot_ws(self_id)
         if not ws:
-            logger.warning(f'API 调用失败: 无可用 WebSocket 连接')
+            # 反向/正向 WS 都不可用时, 尝试 HTTP 客户端 (框架 -> OneBot HTTP API)
+            if getattr(self._adapter, 'http_clients', None):
+                return await self._adapter.http_call_action(action, params or {})
+            logger.warning('API 调用失败: 无可用 WebSocket / HTTP 连接')
             return None
 
         echo = str(uuid.uuid4())
@@ -50,7 +53,9 @@ class OneBotAPI:
         self._adapter.api_responses[echo] = future
 
         try:
-            await ws.send_text(json.dumps(payload, ensure_ascii=False))
+            # aiohttp 的 WebSocketResponse/ClientWebSocketResponse 使用 send_str
+            send = getattr(ws, 'send_str', None) or getattr(ws, 'send_text')
+            await send(json.dumps(payload, ensure_ascii=False))
             result = await asyncio.wait_for(future, timeout=30)
             return result
         except asyncio.TimeoutError:

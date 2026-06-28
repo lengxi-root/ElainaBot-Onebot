@@ -29,6 +29,7 @@ const NAV_ITEMS = [
   { label: '消息记录', key: 'Messages', icon: 'chatbubbles' },
   { label: '可视统计', key: 'Statistics', icon: 'stats-chart' },
   { label: '插件市场', key: 'Market', icon: 'storefront' },
+  { label: '网络配置', key: 'Network', icon: 'link' },
   { label: '框架配置', key: 'Config', icon: 'settings' },
   { label: '框架更新', key: 'Update', icon: 'cloud-download' },
 ]

@@ -21,6 +21,7 @@ const routes = [
       { path: 'market', name: 'Market', component: () => import('../views/Market.vue') },
       { path: 'update', name: 'Update', component: () => import('../views/Update.vue') },
       { path: 'database', name: 'Database', component: () => import('../views/Database.vue') },
+      { path: 'network', name: 'Network', component: () => import('../views/Network.vue') },
       { path: 'config', name: 'Config', component: () => import('../views/Config.vue') },
       { path: 'custom/:key', name: 'CustomPage', component: () => import('../views/CustomPage.vue') },
     ],

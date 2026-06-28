@@ -14,6 +14,7 @@ from core.module.hook import HookManager
 from core.module.manager import ModuleManager
 from core.onebot.adapter import OneBotAdapter
 from core.onebot.api import set_adapter, set_main_loop
+from core.onebot.connection import ConnectionManager
 from core.onebot.event import MessageEvent, NoticeEvent, MetaEvent
 from core.plugin.manager import PluginManager
 from core.server.http_server import HttpServer
@@ -41,6 +42,7 @@ class Application:
         self._http_server = None
         self._config_watcher = None
         self._adapter = None
+        self._connection_manager = None
         self._stop_event = None
         self._restart_requested = False
         self._web_log_cb = None
@@ -48,6 +50,15 @@ class Application:
     @property
     def adapter(self):
         return self._adapter
+
+    @property
+    def connection_manager(self):
+        return self._connection_manager
+
+    async def reload_connections(self):
+        """重新应用 OneBot 连接配置 (网络配置页面保存后调用)"""
+        if self._connection_manager:
+            await self._connection_manager.reload()
 
     @property
     def hook_manager(self):
@@ -115,6 +126,10 @@ class Application:
         # 8) 启动 HTTP 服务
         await self._http_server.start()
 
+        # 8.5) OneBot 连接管理器 (正向 WS 客户端 / HTTP 客户端 / 反向鉴权)
+        self._connection_manager = ConnectionManager(self)
+        await self._connection_manager.start()
+
         # 9) 配置监视
         self._config_watcher = ConfigWatcherService(interval=5.0)
         self._config_watcher.start()
@@ -149,6 +164,8 @@ class Application:
 
     async def shutdown(self):
         log.info('正在关闭...')
+        if self._connection_manager:
+            await self._connection_manager.stop()
         if self._config_watcher:
             self._config_watcher.stop()
         if self._module_manager:
