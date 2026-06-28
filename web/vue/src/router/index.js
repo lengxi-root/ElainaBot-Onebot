@@ -21,6 +21,11 @@ const routes = [
         component: () => import('../views/Messages.vue'),
       },
       {
+        path: 'statistics',
+        name: 'Statistics',
+        component: () => import('../views/Statistics.vue'),
+      },
+      {
         path: 'plugins',
         name: 'Plugins',
         component: () => import('../views/Plugins.vue'),
@@ -39,6 +44,11 @@ const routes = [
         path: 'config',
         name: 'Config',
         component: () => import('../views/Config.vue'),
+      },
+      {
+        path: 'database',
+        name: 'Database',
+        component: () => import('../views/Database.vue'),
       },
     ],
   },
