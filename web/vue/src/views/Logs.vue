@@ -99,7 +99,7 @@ onUnmounted(() => { off('new_log', onNewLog); off('init', onInit) })
         <!-- message -->
         <template v-if="tab === 'message'">
           <span class="t-time">{{ e.timestamp }}</span>
-          <span class="t-bot">[{{ e.bot_name || '?' }}({{ e.appid || '?' }})]</span>
+          <span v-if="e.bot_name" class="t-bot">[{{ e.bot_name }}]</span>
           <span v-if="e.direction === 'send'" class="t-dir t-dir-send">发送</span>
           <span v-else-if="e.direction === 'receive'" class="t-dir t-dir-recv">接收</span>
           <span v-if="e.user_id" class="t-uid">U:{{ e.user_id }}</span>
