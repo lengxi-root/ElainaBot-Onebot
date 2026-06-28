@@ -22,37 +22,64 @@ class OneBotAdapter:
         self.api_responses: Dict[str, asyncio.Future] = {}
         # HTTP 客户端: name -> {url, token} (框架主动调用 OneBot HTTP API)
         self.http_clients: Dict[str, Dict[str, str]] = {}
+        # 每个反向 WS / HTTP 上报连接的鉴权: (port, path) -> token/secret
+        # 鉴权必须按连接区分, 否则某条连接配的 token 会被错误地应用到其它连接
+        self.reverse_ws_tokens: Dict[tuple, str] = {}
+        self.reverse_http_secrets: Dict[tuple, str] = {}
 
-    def _check_signature(self, body: bytes, signature: Optional[str]) -> bool:
-        if not self.secret:
+    def expected_ws_token(self, port=None, path=None) -> str:
+        """返回指定 (端口, 路径) 反向 WS 入口应校验的 token; 找不到则回退全局配置"""
+        m = self.reverse_ws_tokens
+        if port is not None and (port, path) in m:
+            return m[(port, path)]
+        if port is not None:  # 同端口的别名路径 (如 /onebot/v11/ws) 复用该端口的 token
+            for (p, _pa), t in m.items():
+                if p == port:
+                    return t
+        return self.access_token or ''
+
+    def expected_http_secret(self, port=None, path=None) -> str:
+        m = self.reverse_http_secrets
+        if port is not None and (port, path) in m:
+            return m[(port, path)]
+        if port is not None:
+            for (p, _pa), s in m.items():
+                if p == port:
+                    return s
+        return self.secret or ''
+
+    def _check_signature(self, body: bytes, signature: Optional[str], secret: Optional[str] = None) -> bool:
+        secret = self.secret if secret is None else secret
+        if not secret:
             return True
         if not signature:
             return False
-        sig = hmac.new(self.secret.encode('utf-8'), body, 'sha1').hexdigest()
+        sig = hmac.new(secret.encode('utf-8'), body, 'sha1').hexdigest()
         return signature == "sha1=" + sig
 
-    def _check_access_token(self, auth_header: Optional[str]) -> bool:
-        if not self.access_token:
+    def _check_access_token(self, auth_header: Optional[str], token: Optional[str] = None) -> bool:
+        token = self.access_token if token is None else token
+        if not token:
             return True
         if not auth_header:
             return False
         parts = auth_header.split(' ', 1)
         if len(parts) != 2 or parts[0].lower() != 'bearer':
             return False
-        return parts[1] == self.access_token
+        return parts[1] == token
 
     def parse_event(self, data: dict) -> Optional[OneBotEvent]:
         """解析 OneBot 事件"""
         return parse_event(data)
 
-    def handle_http_callback(self, body: bytes, headers: dict) -> tuple:
+    def handle_http_callback(self, body: bytes, headers: dict, port=None, path=None) -> tuple:
         """处理 HTTP 回调"""
         self_id = headers.get("x-self-id") or headers.get("X-Self-ID")
         if not self_id:
             return False, None
 
         signature = headers.get("x-signature") or headers.get("X-Signature")
-        if not self._check_signature(body, signature):
+        if not self._check_signature(body, signature, self.expected_http_secret(port, path)):
             return False, None
 
         try:
@@ -70,14 +97,14 @@ class OneBotAdapter:
 
         return True, event
 
-    def validate_websocket_headers(self, headers: dict) -> tuple:
-        """验证 WebSocket 连接头"""
+    def validate_websocket_headers(self, headers: dict, port=None, path=None) -> tuple:
+        """验证 WebSocket 连接头 (按 端口+路径 选取该连接配置的 token)"""
         self_id = headers.get("x-self-id") or headers.get("X-Self-ID")
         if not self_id:
             return False, None, "Missing X-Self-ID"
 
         auth_header = headers.get("authorization") or headers.get("Authorization")
-        if not self._check_access_token(auth_header):
+        if not self._check_access_token(auth_header, self.expected_ws_token(port, path)):
             return False, self_id, "Unauthorized"
 
         return True, self_id, None

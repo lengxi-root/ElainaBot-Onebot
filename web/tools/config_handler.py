@@ -19,7 +19,7 @@ def _config_dir():
 
 async def handle_get_config(request: web.Request):
     cdir = _config_dir()
-    result = {'bot': '', 'settings': '', 'templates': ''}
+    result = {'settings': ''}
     for name in _ALLOWED:
         path = os.path.join(cdir, f'{name}.yaml')
         if os.path.exists(path):
