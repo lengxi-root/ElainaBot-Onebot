@@ -35,7 +35,7 @@ def _primary_id():
 
 
 def _q(sql, params=None):
-    return _common.query_log('message', sql, params)
+    return _common.query_log('message', sql, params, appid=_primary_id())
 
 
 # ──────────── 昵称 ────────────
@@ -285,7 +285,7 @@ def _log_sent(chat_type, chat_id, content, message_id):
         'message_type': chat_type,
         'source': 'WebPanel',
         'extra': 'send',
-    })
+    }, appid=_primary_id())
 
 
 async def handle_send_message(request: web.Request):
@@ -373,10 +373,8 @@ def _mark_recalled(message_id):
     if not svc:
         return
     with contextlib.suppress(Exception):
-        conn = svc._get_conn('message')
-        with svc._lock:
-            conn.execute("UPDATE log SET extra='recalled' WHERE message_id=?", (str(message_id),))
-            conn.commit()
+        svc.execute('message', "UPDATE log SET extra='recalled' WHERE message_id=?",
+                    (str(message_id),), appid=_primary_id())
 
 
 # ──────────── 群备注 ────────────

@@ -1,17 +1,19 @@
 """OneBot 连接管理器 — 按配置维护正向/反向 WebSocket 与 HTTP 连接
 
 连接类型 (框架视角):
-- ws_reverse  : 反向 WS, 框架作为服务器, OneBot 端连入 (复用 HTTP 服务器端口)
+- ws_reverse  : 反向 WS, 框架作为服务器, OneBot 端连入 (可自定义监听 host:port, 默认复用主服务端口)
 - ws_forward  : 正向 WS, 框架作为客户端, 主动连接 OneBot 端的 WS 服务器
-- http_server : HTTP 服务器, 框架接收 OneBot 事件上报 (复用 HTTP 服务器端口)
+- http_server : HTTP 服务器, 框架接收 OneBot 事件上报 (可自定义监听 host:port, 默认复用主服务端口)
 - http_client : HTTP 客户端, 框架通过 HTTP 调用 OneBot API
 """
 
 import asyncio
 import json
 import logging
+import uuid
 
 import aiohttp
+from aiohttp import web
 
 from core.base.config import cfg
 
@@ -21,29 +23,8 @@ CONN_TYPES = ('ws_reverse', 'ws_forward', 'http_server', 'http_client')
 
 
 def default_connections():
-    """配置缺省时, 依据旧版 onebot.access_token/secret 生成默认反向连接"""
-    token = cfg.get('settings', 'onebot.access_token', '') or ''
-    secret = cfg.get('settings', 'onebot.secret', '') or ''
-    host = cfg.get('settings', 'server.host', '0.0.0.0')
-    port = cfg.get('settings', 'server.port', 5201)
-    return [
-        {
-            'type': 'ws_reverse', 'name': '反向 WS', 'enable': True,
-            'host': host, 'port': port, 'path': '/OneBotv11', 'token': token,
-        },
-        {
-            'type': 'http_server', 'name': 'HTTP 上报', 'enable': False,
-            'host': host, 'port': port, 'path': '/', 'secret': secret,
-        },
-        {
-            'type': 'ws_forward', 'name': '正向 WS', 'enable': False,
-            'url': 'ws://127.0.0.1:3001', 'token': token, 'reconnect_interval': 5000,
-        },
-        {
-            'type': 'http_client', 'name': 'HTTP API', 'enable': False,
-            'url': 'http://127.0.0.1:3000', 'token': token,
-        },
-    ]
+    """默认不生成任何连接示例 (主服务端口始终提供 /OneBotv11 反向 WS 入口)"""
+    return []
 
 
 def normalize(conn: dict) -> dict:
@@ -63,7 +44,7 @@ def normalize(conn: dict) -> dict:
 
 
 class ConnectionManager:
-    """维护 OneBot 连接 (正向 WS 客户端 + HTTP 客户端 + 反向服务器鉴权)"""
+    """维护 OneBot 连接 (正向 WS 客户端 + HTTP 客户端 + 反向服务器鉴权 + 自定义端口监听)"""
 
     def __init__(self, app):
         self._app = app
@@ -74,6 +55,7 @@ class ConnectionManager:
         self._forward_ids = set()  # 正向连接占用的 self_id (含临时 id)
         self._configs = []
         self._stopping = False
+        self._sites = {}      # (host, port) -> (runner, site)
 
     # ── 配置 ──
     def load_configs(self):
@@ -87,6 +69,9 @@ class ConnectionManager:
     def configs(self):
         return self._configs
 
+    def _main_addr(self):
+        return (cfg.get('settings', 'server.host', '0.0.0.0'), int(cfg.get('settings', 'server.port', 5201)))
+
     # ── 启动 / 停止 ──
     async def start(self):
         self._loop = asyncio.get_running_loop()
@@ -94,19 +79,23 @@ class ConnectionManager:
         self.load_configs()
         self._apply_server_auth()
         self._register_http_clients()
+        await self._start_listeners()
         await self._start_forward_clients()
 
     async def stop(self):
         self._stopping = True
         await self._cancel_forward_clients()
+        await self._stop_listeners()
 
     async def reload(self):
-        """配置变更后重新应用 (重启正向客户端 + 刷新鉴权/HTTP 客户端)"""
+        """配置变更后重新应用 (重启正向客户端 / 自定义监听 + 刷新鉴权/HTTP 客户端)"""
         await self._cancel_forward_clients()
+        await self._stop_listeners()
         self.load_configs()
         self._apply_server_auth()
         self._register_http_clients()
         self._stopping = False
+        await self._start_listeners()
         await self._start_forward_clients()
 
     # ── 反向服务器鉴权 ──
@@ -129,6 +118,67 @@ class ConnectionManager:
         for c in self._configs:
             if c.get('enable') and c['type'] == 'http_client' and c.get('url'):
                 self._adapter.register_http_client(c['name'], c['url'], c.get('token', ''))
+
+    # ── 自定义端口监听 (反向 WS / HTTP 上报) ──
+    async def _start_listeners(self):
+        """为监听地址与主服务不同的反向 WS / HTTP 上报连接启动独立监听端口"""
+        http_server = getattr(self._app, '_http_server', None)
+        if not http_server:
+            return
+        main_host, main_port = self._main_addr()
+        # 按 (host, port) 分组, 同端口可挂多条路径
+        groups = {}
+        for c in self._configs:
+            if not c.get('enable') or c['type'] not in ('ws_reverse', 'http_server'):
+                continue
+            host = str(c.get('host') or main_host)
+            port = int(c.get('port') or main_port)
+            if (host, port) == (main_host, main_port):
+                # 主服务端口已内置 /OneBotv11 等路由, 无需重复监听
+                self._set_status(c['name'], connected=False, error='', self_id=None)
+                continue
+            groups.setdefault((host, port), []).append(c)
+
+        for (host, port), conns in groups.items():
+            try:
+                app = web.Application()
+                seen = set()
+                for c in conns:
+                    path = str(c.get('path') or '/') or '/'
+                    if c['type'] == 'ws_reverse':
+                        key = ('GET', path)
+                        if key not in seen:
+                            app.router.add_get(path, http_server._handle_onebot_ws)
+                            seen.add(key)
+                    else:  # http_server
+                        key = ('POST', path)
+                        if key not in seen:
+                            app.router.add_post(path, http_server._handle_onebot_http)
+                            seen.add(key)
+                runner = web.AppRunner(app)
+                await runner.setup()
+                site = web.TCPSite(runner, host, port)
+                await site.start()
+                self._sites[(host, port)] = (runner, site)
+                for c in conns:
+                    self._set_status(c['name'], connected=False, error='', self_id=None)
+                logger.info(f'OneBot 自定义监听启动: {host}:{port} ({", ".join(c["name"] for c in conns)})')
+            except Exception as e:
+                logger.warning(f'自定义监听启动失败 [{host}:{port}]: {e}')
+                for c in conns:
+                    self._set_status(c['name'], connected=False, error=f'监听失败: {e}', self_id=None)
+
+    async def _stop_listeners(self):
+        for runner, site in list(self._sites.values()):
+            try:
+                await site.stop()
+            except Exception:
+                pass
+            try:
+                await runner.cleanup()
+            except Exception:
+                pass
+        self._sites.clear()
 
     # ── 正向 WS 客户端 ──
     async def _start_forward_clients(self):
@@ -160,6 +210,7 @@ class ConnectionManager:
 
         while not self._stopping:
             conn['_self_id'] = None
+            probe_task = None
             try:
                 self._set_status(name, connected=False, error='连接中…')
                 timeout = aiohttp.ClientTimeout(total=None, sock_connect=10)
@@ -170,6 +221,8 @@ class ConnectionManager:
                         self._forward_ids.add(temp_id)
                         self._set_status(name, connected=True, error='', self_id=temp_id)
                         logger.info(f'正向 WS 已连接: {name} -> {url}')
+                        # 主动探测真实 self_id, 即便事件经其它通道(HTTP)上报也能正确归属
+                        probe_task = asyncio.create_task(self._probe_self_id(conn, ws))
                         await self._consume(ws, conn)
             except asyncio.CancelledError:
                 self._cleanup_forward(conn)
@@ -178,10 +231,30 @@ class ConnectionManager:
             except Exception as e:
                 logger.warning(f'正向 WS 连接异常 [{name}]: {e}')
                 self._set_status(name, connected=False, error=str(e))
+            finally:
+                if probe_task:
+                    probe_task.cancel()
             self._cleanup_forward(conn)
             if self._stopping:
                 break
             await asyncio.sleep(interval)
+
+    async def _probe_self_id(self, conn, ws):
+        """连接后调用 get_login_info 获取真实 QQ 并 rekey"""
+        adapter = self._adapter
+        echo = f'probe:{conn["name"]}:{uuid.uuid4().hex[:8]}'
+        fut = self._loop.create_future()
+        adapter.api_responses[echo] = fut
+        try:
+            send = getattr(ws, 'send_str', None) or getattr(ws, 'send_text')
+            await send(json.dumps({'action': 'get_login_info', 'params': {}, 'echo': echo}))
+            resp = await asyncio.wait_for(fut, 10)
+            uid = str(((resp or {}).get('data') or {}).get('user_id') or '')
+            if uid and conn.get('_self_id') != uid:
+                self._rekey_forward(conn, uid, ws)
+                self._set_status(conn['name'], connected=True, error='', self_id=uid)
+        except Exception:
+            adapter.api_responses.pop(echo, None)
 
     async def _consume(self, ws, conn):
         adapter = self._adapter
@@ -231,7 +304,6 @@ class ConnectionManager:
     def status(self):
         """返回各连接的运行状态"""
         result = []
-        server_connected = bool(self._adapter.websockets)
         for c in self._configs:
             name = c['name']
             ctype = c['type']
@@ -247,9 +319,11 @@ class ConnectionManager:
                                if not str(k).startswith('forward:') and k not in self._forward_ids]
                 entry['connected'] = c.get('enable', False) and bool(reverse_ids)
                 entry['self_id'] = reverse_ids[0] if reverse_ids else None
+                entry['error'] = self._status.get(name, {}).get('error', '')
             elif ctype == 'http_client':
                 entry['connected'] = c.get('enable', False) and (c['name'] in self._adapter.http_clients)
             elif ctype == 'http_server':
                 entry['connected'] = c.get('enable', False)
+                entry['error'] = self._status.get(name, {}).get('error', '')
             result.append(entry)
         return result

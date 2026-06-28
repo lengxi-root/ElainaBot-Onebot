@@ -239,7 +239,7 @@ class Application:
                     'message_type': event.message_type,
                     'raw_data': json.dumps(event.raw_data, ensure_ascii=False),
                     'extra': json.dumps({'nickname': nickname, 'self_id': str(event.self_id or '')}, ensure_ascii=False),
-                })
+                }, appid=str(event.self_id or ''))
 
             # 推送到 Web 面板
             if self._web_log_cb:
@@ -267,7 +267,7 @@ class Application:
                     'group_id': str(event.group_id or ''),
                     'message_type': event.notice_type,
                     'raw_data': json.dumps(event.raw_data, ensure_ascii=False),
-                })
+                }, appid=str(event.self_id or ''))
             # 撤回事件：标记对应消息为已撤回
             if self._log_service and event.notice_type in ('group_recall', 'friend_recall'):
                 recalled_mid = str(event.raw_data.get('message_id', '') or '')
@@ -276,6 +276,7 @@ class Application:
                         'message',
                         "UPDATE log SET extra = 'recalled' WHERE message_id = ?",
                         (recalled_mid,),
+                        appid=str(event.self_id or ''),
                     )
 
     def push_web_log(self, log_type: str, entry: dict):

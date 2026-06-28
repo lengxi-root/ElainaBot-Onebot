@@ -83,8 +83,11 @@ class OneBotAdapter:
         return True, self_id, None
 
     def register_bot(self, self_id: str, ws=None):
-        self.bots[self_id] = {"self_id": self_id, "type": "websocket" if ws else "http", "ws": ws}
-        if ws:
+        # 注意: aiohttp 的 WebSocketResponse 定义了 __len__→0, bool(ws) 为 False,
+        # 必须用 `is not None` 判断, 否则反向 WS 会被误判为 http 且不进入 websockets
+        is_ws = ws is not None
+        self.bots[self_id] = {"self_id": self_id, "type": "websocket" if is_ws else "http", "ws": ws}
+        if is_ws:
             self.websockets[self_id] = ws
 
     def unregister_bot(self, self_id: str):
