@@ -97,12 +97,17 @@ function formatRaw(m) {
 
 function quoteAuthor(m) { return m.is_self ? '我' : (m.nickname || m.user_id || '未知用户') }
 function buildQuotePreview(m) {
+  if (m._segments) {
+    const t = m._segments.map(s => s.kind === 'text' ? s.text : s.kind === 'at' ? atLabel(s) : s.kind === 'image' ? '[图片]' : s.kind === 'audio' ? '[语音]' : s.kind === 'video' ? '[视频]' : (s.text || '')).join('')
+    return t.replace(/\s+/g, ' ').trim() || '空消息'
+  }
   if (m._media) return [m._media.type ? `[${m._media.type}]` : '[媒体]', m._media.text, m._media.src].filter(Boolean).join(' ')
   return String(m.content || '').replace(/\n\[keyboard\] [\s\S]*$/, '').replace(/\s+/g, ' ').trim() || '空消息'
 }
 function quoteTargetText(q) { return q?.text || (q?.id ? `ID: ${q.id}` : '引用消息') }
 function prepareMessage(m) {
-  m._media = parseMedia(m.content)
+  m._segments = parseSegments(m)
+  m._media = m._segments ? null : parseMedia(m.content)
   m._recalled = !!m.recalled
   m._quote = parseMessageReference(m)
   return m
@@ -206,6 +211,31 @@ function renderContent(content) {
   h = h.replace(/\n/g, '<br>')
   return h + kbHtml
 }
+
+// 从 raw_message (OneBot 事件 JSON) 解析消息段, 用于富文本渲染 (@蓝标 / 图片 等)
+function parseSegments(m) {
+  if (!m.raw_message || typeof m.raw_message !== 'string' || m.raw_message[0] !== '{') return null
+  let arr
+  try { arr = JSON.parse(m.raw_message).message } catch { return null }
+  if (!Array.isArray(arr) || !arr.length) return null
+  const segs = []
+  for (const seg of arr) {
+    if (!seg || typeof seg !== 'object') continue
+    const d = seg.data || {}
+    switch (seg.type) {
+      case 'text': if ((d.text ?? '') !== '') segs.push({ kind: 'text', text: String(d.text) }); break
+      case 'at': segs.push({ kind: 'at', qq: String(d.qq ?? ''), name: d.name ? String(d.name) : '' }); break
+      case 'image': segs.push({ kind: 'image', src: String(d.url || d.file || '') }); break
+      case 'face': segs.push({ kind: 'tag', text: '[表情]' }); break
+      case 'record': segs.push({ kind: 'audio', src: String(d.url || d.file || '') }); break
+      case 'video': segs.push({ kind: 'video', src: String(d.url || d.file || '') }); break
+      case 'reply': break
+      default: segs.push({ kind: 'tag', text: `[${seg.type}]` })
+    }
+  }
+  return segs.length ? segs : null
+}
+function atLabel(seg) { return seg.qq === 'all' ? '@全体成员' : `@${seg.name || seg.qq}` }
 
 let _fetchTimer = null
 async function fetchChats() {
@@ -564,7 +594,20 @@ onUnmounted(() => { _unmounted = true; off('new_log', onNewLog); window.removeEv
                     <span v-if="m._recalled" class="recalled-tag">已撤回</span>
                     <span v-else-if="m._audit_rejected" class="recalled-tag audit-reject">审核未通过</span>
                     <span v-else-if="m.is_self && isAuditId(m.message_id)" class="audit-tag">审核中</span>
-                    <template v-if="m._media">
+                    <div v-if="m._segments" class="bubble-segs" style="word-break:break-all;overflow-wrap:anywhere;white-space:pre-wrap">
+                      <template v-for="(seg, si) in m._segments" :key="si">
+                        <span v-if="seg.kind === 'text'">{{ seg.text }}</span>
+                        <span v-else-if="seg.kind === 'at'" class="bubble-at">{{ atLabel(seg) }}</span>
+                        <template v-else-if="seg.kind === 'image'">
+                          <span v-if="isCostlyUrl(seg.src)" class="bubble-media-placeholder" :data-src="seg.src" @click="revealImg($event)">🖼 点击加载图片 (外部存储)</span>
+                          <img v-else :src="seg.src" class="bubble-media-img" style="max-width:160px;max-height:120px;width:auto;height:auto" referrerpolicy="no-referrer" @click="previewImg(seg.src)" @error="e => e.target.style.display='none'" loading="lazy" />
+                        </template>
+                        <audio v-else-if="seg.kind === 'audio'" :src="seg.src" controls preload="none" class="bubble-media-audio" />
+                        <video v-else-if="seg.kind === 'video'" :src="seg.src" controls preload="none" class="bubble-media-video" />
+                        <span v-else-if="seg.kind === 'tag'" class="bubble-media-text">{{ seg.text }}</span>
+                      </template>
+                    </div>
+                    <template v-else-if="m._media">
                       <span v-if="m._media.text" class="bubble-media-text">{{ m._media.text }}</span>
                       <template v-if="['图片','media'].includes(m._media.type)">
                         <span v-if="isCostlyUrl(m._media.src)" class="bubble-media-placeholder" :data-src="m._media.src" @click="revealImg($event)">🖼 点击加载图片 (外部存储)</span>
@@ -1189,6 +1232,14 @@ onUnmounted(() => { _unmounted = true; off('new_log', onNewLog); window.removeEv
   word-wrap:break-word;
   white-space:pre-wrap
 }
+.bubble-at {
+  color:#3b82f6;
+  font-weight:600;
+  background:#3b82f614;
+  border-radius:4px;
+  padding:0 3px;
+}
+.bubble-self .bubble-at { color:#dbeafe; background:#ffffff26; }
 :deep(.md-code) {
   background:#00000026;
   padding:1px 4px;

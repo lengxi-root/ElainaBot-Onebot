@@ -60,7 +60,7 @@ async def handle_get_bots(request: web.Request):
                 'appid': self_id,
                 'name': name,
                 'robot_qq': self_id,
-                'bot_id': self_id,
+                'qq': self_id,
                 'avatar': _avatar(self_id),
                 'connected': connected,
                 'connection_type': conn_type,
@@ -73,41 +73,4 @@ async def handle_toggle_bot(request: web.Request):
     return web.json_response({
         'success': False,
         'error': 'OneBot 连接由客户端主动发起，无法在面板侧开关，请在客户端侧操作。',
-    })
-
-
-async def handle_robot_info(request: web.Request):
-    ad = _common.adapter()
-    appid = request.query.get('appid', '')
-    ids = _common.connected_ids()
-    if not appid:
-        appid = ids[0] if ids else ''
-
-    conn_type = _conn_type(ad, appid) if ad else 'HTTP'
-    connected = bool(ad and (appid in ad.websockets or conn_type == 'WebSocket'))
-    conn_status = '已连接' if connected else '未连接'
-
-    base = {
-        'appid': appid,
-        'qq': appid,
-        'connection_type': conn_type,
-        'connection_status': conn_status,
-        'avatar': _avatar(appid),
-    }
-
-    if not appid:
-        return web.json_response({**base, 'success': False, 'name': '无连接的机器人',
-                                  'data_source': 'fallback', 'error': '当前没有 OneBot 客户端连接'})
-
-    info = await _login_info(appid)
-    name = info.get('nickname', '') or '未知'
-    return web.json_response({
-        **base,
-        'success': True,
-        'qq': str(info.get('user_id', appid) or appid),
-        'name': name,
-        'description': 'OneBot v11 协议机器人',
-        'status': '正常' if connected else '离线',
-        'data_source': 'onebot',
-        'commands_count': 0,
     })

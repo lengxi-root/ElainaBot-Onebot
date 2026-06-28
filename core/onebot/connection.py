@@ -98,19 +98,24 @@ class ConnectionManager:
         await self._start_listeners()
         await self._start_forward_clients()
 
-    # ── 反向服务器鉴权 ──
+    # ── 反向服务器鉴权 (按连接区分: 每条反向 WS/HTTP 上报各自的 token/secret) ──
     def _apply_server_auth(self):
-        token, secret = '', ''
+        main_host, main_port = self._main_addr()
+        ws_tokens, http_secrets = {}, {}
         for c in self._configs:
             if not c.get('enable'):
                 continue
-            if c['type'] == 'ws_reverse' and c.get('token'):
-                token = c['token']
-            if c['type'] == 'http_server' and c.get('secret'):
-                secret = c['secret']
-        # 回退到旧版全局配置
-        self._adapter.access_token = token or (cfg.get('settings', 'onebot.access_token', '') or '')
-        self._adapter.secret = secret or (cfg.get('settings', 'onebot.secret', '') or '')
+            port = int(c.get('port') or main_port)
+            path = str(c.get('path') or '/') or '/'
+            if c['type'] == 'ws_reverse':
+                ws_tokens[(port, path)] = c.get('token', '') or ''
+            elif c['type'] == 'http_server':
+                http_secrets[(port, path)] = c.get('secret', '') or ''
+        self._adapter.reverse_ws_tokens = ws_tokens
+        self._adapter.reverse_http_secrets = http_secrets
+        # 旧版全局配置仅作为找不到对应连接时的回退
+        self._adapter.access_token = cfg.get('settings', 'onebot.access_token', '') or ''
+        self._adapter.secret = cfg.get('settings', 'onebot.secret', '') or ''
 
     # ── HTTP 客户端 ──
     def _register_http_clients(self):

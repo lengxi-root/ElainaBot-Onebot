@@ -37,7 +37,6 @@ def get_routes() -> list:
         # ── 机器人 ──
         web.get('/api/bots', _(bots.handle_get_bots)),
         web.post('/api/bots/toggle', _(bots.handle_toggle_bot)),
-        web.get('/api/robot/info', _(bots.handle_robot_info)),
         # ── 系统信息 ──
         web.get('/api/system/info', _(system.handle_system_info)),
         # ── 日志 (具体路径必须在 {log_type} 之前) ──

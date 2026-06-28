@@ -43,10 +43,6 @@ const botOptions = computed(() => [
 // Bot detail modal
 const showBotDetail = ref(false)
 const detailBot = ref(null)
-const detailLoading = ref(false)
-const detailData = ref({})
-const detailSuccess = computed(() => detailData.value.success === true)
-const baseURL = axios.defaults.baseURL || ''
 const togglingBot = ref('')
 
 async function handleToggleBot(bot, enabled) {
@@ -86,50 +82,12 @@ function handleResize() { isMobile.value = window.innerWidth < 768 }
 function onWsOpen() { wsConnected.value = true }
 function onWsClose() { wsConnected.value = false }
 
-async function fetchBotDetail(bot) {
+function fetchBotDetail(bot) {
   detailBot.value = bot
-  detailData.value = {}
   showBotDetail.value = true
-  detailLoading.value = true
-  try {
-    const res = await axios.get('/api/robot/info', { params: { appid: bot.appid } })
-    detailData.value = res.data || {}
-  } catch (e) {
-    detailData.value = e.response?.data || {}
-  } finally {
-    detailLoading.value = false
-  }
 }
 
 function goConfig() { router.push({ name: 'Config' }) }
-function copyText(t) {
-  try {
-    if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(t); return }
-    const span = document.createElement('span')
-    span.textContent = t
-    span.style.cssText = 'position:fixed;left:-9999px;top:0;white-space:pre;user-select:all'
-    document.body.appendChild(span)
-    const sel = window.getSelection()
-    const range = document.createRange()
-    range.selectNodeContents(span)
-    sel.removeAllRanges()
-    sel.addRange(range)
-    document.execCommand('copy')
-    sel.removeAllRanges()
-    span.remove()
-  } catch {}
-}
-
-const webhookDisplayUrl = computed(() => {
-  if (!detailData.value.webhook_url) return ''
-  const proto = location.protocol
-  const host = location.hostname
-  const port = location.port || (proto === 'https:' ? '443' : '80')
-  const skipPort = (proto === 'https:' && port === '443') || (proto === 'http:' && port === '80')
-  return `${proto}//${host}${skipPort ? '' : ':' + port}/?appid=${detailData.value.appid || detailBot.value?.appid || ''}`
-})
-const webhookPortOk = computed(() => ['80','443','8080','8443'].includes(String(location.port || (location.protocol === 'https:' ? '443' : '80'))))
-const webhookIsHttps = computed(() => location.protocol === 'https:')
 
 async function checkDefaultPassword() {
   // 以后端实际配置为准, 避免本地缓存的弱密码标记导致"默认密码"误报
@@ -380,73 +338,30 @@ onUnmounted(() => {
     <!-- Bot detail modal -->
     <n-modal v-model:show="showBotDetail" preset="card" title="机器人详情"
       :style="{ width: isMobile ? '95vw' : '600px', maxWidth: '600px', background: 'var(--bg2)' }">
-      <n-spin :show="detailLoading">
-        <div v-if="detailBot" class="bot-detail">
-          <div class="bd-header">
-            <n-avatar v-if="(detailSuccess ? detailData.avatar : detailBot.avatar)"
-              :src="detailSuccess ? detailData.avatar : detailBot.avatar" :size="72" round />
-            <div v-else class="bd-avatar-placeholder">{{ (detailBot.name || detailBot.appid).charAt(0) }}</div>
-            <div class="bd-header-info">
-              <div class="bd-name">{{ detailSuccess ? detailData.name : detailBot.name || '未知机器人' }}</div>
-              <div class="bd-sub">AppID: {{ detailBot.appid }}</div>
-              <div v-if="detailData.qq" class="bd-sub">QQ: {{ detailData.qq }}</div>
-              <div v-if="detailBot.bot_id" class="bd-sub">Bot ID: {{ detailBot.bot_id }}</div>
-            </div>
-          </div>
-
-          <div v-if="detailSuccess && detailData.description" class="bd-desc">{{ detailData.description }}</div>
-          <div v-if="!detailLoading && !detailSuccess && detailData.error" class="bd-error">
-            机器人信息加载失败: {{ detailData.error }}
-          </div>
-
-          <n-descriptions :column="2" label-placement="left" size="small" class="bd-info">
-            <n-descriptions-item label="机器人开关">
-              <n-switch size="small" :value="detailBot.enabled !== false" :loading="togglingBot === detailBot.appid"
-                @update:value="v => handleToggleBot(detailBot, v)" />
-            </n-descriptions-item>
-            <n-descriptions-item label="状态">
-              <n-tag v-if="detailBot.enabled === false" type="warning" size="small">已关闭</n-tag>
-              <n-tag v-else :type="detailBot.connected ? 'success' : detailBot.connection_type === 'Webhook' ? 'info' : 'error'" size="small">
-                {{ detailBot.connected ? '已连接' : detailBot.connection_type === 'Webhook' ? '等待接收中' : '未连接' }}
-              </n-tag>
-            </n-descriptions-item>
-            <n-descriptions-item label="连接方式">{{ detailBot.enabled === false ? '-' : (detailBot.connection_type || 'WebSocket') }}</n-descriptions-item>
-            <n-descriptions-item v-if="detailData.webhook_url" label="Webhook 回调配置地址" :span="2">
-              <div style="display:flex;align-items:center;gap:6px">
-                <n-text code style="font-size:12px;word-break:break-all">{{ webhookDisplayUrl }}</n-text>
-                <n-button text size="tiny" @click="copyText(webhookDisplayUrl)">
-                  <template #icon><SvgIcon name="copy" :size="14" /></template>
-                </n-button>
-              </div>
-              <div style="margin-top:4px;font-size:11px;color:#999;line-height:1.5">
-                <div>Webhook 接收地址仅允许 80、443、8080、8443 端口<span v-if="!webhookPortOk" style="color:#e88080">（当前端口不在允许范围内，如果已反代请无视）</span></div>
-                <div v-if="!webhookIsHttps">当前为 HTTP 协议，需修改开放平台前端才可使用，具体请自行琢磨</div>
-              </div>
-            </n-descriptions-item>
-            <n-descriptions-item v-if="detailSuccess && detailData.developer" label="开发者">{{ detailData.developer }}</n-descriptions-item>
-            <n-descriptions-item v-if="detailSuccess && detailData.status" label="API状态">
-              <n-tag :type="detailData.status === '正常' ? 'success' : 'warning'" size="small">{{ detailData.status }}</n-tag>
-            </n-descriptions-item>
-            <n-descriptions-item v-if="detailSuccess && detailData.commands_count != null" label="指令数">{{ detailData.commands_count }}</n-descriptions-item>
-          </n-descriptions>
-
-          <div class="bd-qr-section">
-            <div class="bd-qr-title">二维码</div>
-            <div class="bd-qr-row">
-              <div v-if="detailData.qr_code_api" class="bd-qr-item">
-                <div class="bd-qr-label">群聊添加</div>
-                <img :src="baseURL + detailData.qr_code_api" class="bd-qr-img" alt="群聊二维码" />
-                <a v-if="detailData.link" :href="detailData.link" target="_blank" class="bd-qr-link">打开链接</a>
-              </div>
-              <div v-if="detailData.channel_qr_code_api" class="bd-qr-item">
-                <div class="bd-qr-label">频道添加</div>
-                <img :src="baseURL + detailData.channel_qr_code_api" class="bd-qr-img" alt="频道二维码" />
-                <a v-if="detailData.channel_link" :href="detailData.channel_link" target="_blank" class="bd-qr-link">打开链接</a>
-              </div>
-            </div>
+      <div v-if="detailBot" class="bot-detail">
+        <div class="bd-header">
+          <n-avatar v-if="detailBot.avatar" :src="detailBot.avatar" :size="72" round />
+          <div v-else class="bd-avatar-placeholder">{{ (detailBot.name || detailBot.appid).charAt(0) }}</div>
+          <div class="bd-header-info">
+            <div class="bd-name">{{ detailBot.name || '未知机器人' }}</div>
+            <div class="bd-sub">QQ: {{ detailBot.qq || detailBot.appid }}</div>
+            <div class="bd-sub">OneBot v11 协议机器人</div>
           </div>
         </div>
-      </n-spin>
+
+        <n-descriptions :column="2" label-placement="left" size="small" class="bd-info">
+          <n-descriptions-item label="机器人开关">
+            <n-switch size="small" :value="detailBot.enabled !== false" :loading="togglingBot === detailBot.appid"
+              @update:value="v => handleToggleBot(detailBot, v)" />
+          </n-descriptions-item>
+          <n-descriptions-item label="状态">
+            <n-tag :type="detailBot.connected ? 'success' : 'error'" size="small">
+              {{ detailBot.connected ? '已连接' : '未连接' }}
+            </n-tag>
+          </n-descriptions-item>
+          <n-descriptions-item label="连接方式">{{ detailBot.connection_type || 'WebSocket' }}</n-descriptions-item>
+        </n-descriptions>
+      </div>
     </n-modal>
   </div>
 </template>

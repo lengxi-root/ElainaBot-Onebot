@@ -13,6 +13,17 @@ from core.base.logger import SYSTEM, get_logger
 log = get_logger(SYSTEM, 'HTTP')
 
 
+def _local_port(request: web.Request):
+    """获取该请求实际进入的本地监听端口 (用于按连接区分鉴权)"""
+    try:
+        sock = request.transport.get_extra_info('sockname') if request.transport else None
+        if sock and len(sock) >= 2:
+            return int(sock[1])
+    except Exception:
+        pass
+    return request.url.port
+
+
 class HttpServer:
     """aiohttp HTTP 服务器"""
 
@@ -84,7 +95,8 @@ class HttpServer:
         if not body:
             return web.Response(status=400)
 
-        success, event = adapter.handle_http_callback(body, dict(request.headers))
+        port, path = _local_port(request), request.path
+        success, event = adapter.handle_http_callback(body, dict(request.headers), port=port, path=path)
         if event:
             asyncio.create_task(self._app_instance.process_event(event))
 
@@ -100,7 +112,8 @@ class HttpServer:
             return web.Response(status=503)
 
         headers = dict(request.headers)
-        valid, self_id, error = adapter.validate_websocket_headers(headers)
+        valid, self_id, error = adapter.validate_websocket_headers(
+            headers, port=_local_port(request), path=request.path)
         if not valid:
             return web.Response(status=401, text=error or 'Unauthorized')
 

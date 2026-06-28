@@ -240,7 +240,7 @@ class Application:
                     'message_id': str(event.message_id),
                     'message_type': event.message_type,
                     'raw_data': json.dumps(event.raw_data, ensure_ascii=False),
-                    'extra': json.dumps({'nickname': nickname, 'self_id': str(event.self_id or '')}, ensure_ascii=False),
+                    'extra': json.dumps({'nickname': nickname}, ensure_ascii=False),
                 }, appid=str(event.self_id or ''))
 
             # 推送到 Web 面板
