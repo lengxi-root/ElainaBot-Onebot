@@ -1,21 +1,19 @@
-"""会话管理与鉴权 — 基于 v2 架构"""
+"""会话管理与鉴权"""
 
+import asyncio
 import base64
 import hashlib
 import hmac
 import json
 import os
-import secrets
 import threading
 import time
+import uuid
 from datetime import datetime, timedelta
-from functools import wraps
 
 from aiohttp import web
 
-from core.base.config import cfg
-
-# Constants
+_COOKIE_SECRET = ''
 _BAN_DURATION = 43200
 _SESSION_CLEANUP_INTERVAL = 300
 _IP_CLEANUP_INTERVAL = 3600
@@ -26,33 +24,81 @@ _SESSION_DAYS = 7
 _TOKEN_EXPIRY = 86400 * 7
 _MAX_IP_RECORDS = 10000
 
-# State
-valid_sessions: dict = {}  # token -> info  (also used by ws.py)
-_sessions = valid_sessions  # alias
+valid_sessions: dict = {}
 ip_access_data: dict = {}
 _last_session_cleanup = 0
 _last_ip_cleanup = 0
 _data_dir = ''
 _ip_file = ''
 _session_file = ''
-_io_lock = threading.Lock()
+_secret_file = ''
+_io_lock = threading.Lock()  # 串行化文件写入, 避免内容交错损坏
 
-SESSION_EXPIRE = _TOKEN_EXPIRY
-
-
-# ==================== Init ====================
 
 def init(base_dir: str):
-    global _data_dir, _ip_file, _session_file
+    global _data_dir, _ip_file, _session_file, _secret_file, _COOKIE_SECRET
     _data_dir = os.path.join(base_dir, 'data', 'web')
     os.makedirs(_data_dir, exist_ok=True)
     _ip_file = os.path.join(_data_dir, 'ip.json')
     _session_file = os.path.join(_data_dir, 'sessions.json')
+    _secret_file = os.path.join(_data_dir, '.cookie_secret')
+    _COOKIE_SECRET = _load_or_create_secret()
     _load_ip_data()
     _load_session_data()
 
 
+def _load_or_create_secret() -> str:
+    """从文件加载 cookie secret, 不存在则随机生成并持久化"""
+    if os.path.exists(_secret_file):
+        try:
+            with open(_secret_file, encoding='utf-8') as f:
+                secret = f.read().strip()
+                if len(secret) >= 32:
+                    return secret
+        except Exception:
+            pass
+    secret = base64.urlsafe_b64encode(os.urandom(48)).decode()
+    try:
+        with open(_secret_file, 'w', encoding='utf-8') as f:
+            f.write(secret)
+    except Exception:
+        pass
+    return secret
+
+
+# ==================== 密码 hash ====================
+
+_PWD_HASH_PREFIX = 'sha256:'
+
+
+def hash_password(plain: str) -> str:
+    """SHA-256 加盐 hash"""
+    salt = os.urandom(16)
+    h = hashlib.sha256(salt + plain.encode('utf-8')).hexdigest()
+    return _PWD_HASH_PREFIX + base64.b64encode(salt).decode() + ':' + h
+
+
+def verify_password(plain: str, stored: str) -> bool:
+    """恒定时间比较, 兼容明文旧密码"""
+    if stored.startswith(_PWD_HASH_PREFIX):
+        try:
+            rest = stored[len(_PWD_HASH_PREFIX) :]
+            salt_b64, expected_hex = rest.split(':', 1)
+            salt = base64.b64decode(salt_b64)
+            actual_hex = hashlib.sha256(salt + plain.encode('utf-8')).hexdigest()
+            return hmac.compare_digest(actual_hex, expected_hex)
+        except Exception:
+            return False
+    # 明文回退 (旧配置兼容), 仍用恒定时间比较
+    return hmac.compare_digest(plain, stored)
+
+
+def is_hashed(stored: str) -> bool:
+    return stored.startswith(_PWD_HASH_PREFIX)
+
+
 # ==================== JSON IO ====================
+
 
 def _read_json(path, default=None):
     try:
@@ -65,6 +111,7 @@ def _read_json(path, default=None):
 
 
 def _write_text_sync(path, text):
+    """同步写入文本 (在 executor 中调用)"""
     with _io_lock:
         try:
             with open(path, 'w', encoding='utf-8') as f:
@@ -74,52 +121,20 @@ def _write_text_sync(path, text):
 
 
 def _write_json(path, data):
+    """异步友好的 JSON 写入: 主线程序列化 (一致性), executor 写盘 (不阻塞 loop)"""
     try:
         text = json.dumps(data, ensure_ascii=False, indent=2, default=str)
     except Exception:
         return
-    _write_text_sync(path, text)
-
-
-# ==================== Password ====================
-
-_PWD_HASH_PREFIX = 'sha256:'
-
-
-def hash_password(plain: str) -> str:
-    salt = os.urandom(16)
-    h = hashlib.sha256(salt + plain.encode('utf-8')).hexdigest()
-    return _PWD_HASH_PREFIX + base64.b64encode(salt).decode() + ':' + h
-
-
-def _is_legacy_hex_hash(s: str) -> bool:
-    """Check if stored value is old-style bare SHA-256 hex (64 hex chars)."""
-    return len(s) == 64 and all(c in '0123456789abcdef' for c in s)
-
-
-def verify_password(plain: str, stored: str) -> bool:
-    if stored.startswith(_PWD_HASH_PREFIX):
-        try:
-            rest = stored[len(_PWD_HASH_PREFIX):]
-            salt_b64, expected_hex = rest.split(':', 1)
-            salt = base64.b64decode(salt_b64)
-            actual_hex = hashlib.sha256(salt + plain.encode('utf-8')).hexdigest()
-            return hmac.compare_digest(actual_hex, expected_hex)
-        except Exception:
-            return False
-    # legacy bare SHA-256 hex (old framework format)
-    if _is_legacy_hex_hash(stored):
-        actual_hex = hashlib.sha256(plain.encode('utf-8')).hexdigest()
-        return hmac.compare_digest(actual_hex, stored)
-    # plain text fallback
-    return hmac.compare_digest(plain, stored)
-
-
-def is_hashed(stored: str) -> bool:
-    return stored.startswith(_PWD_HASH_PREFIX) or _is_legacy_hex_hash(stored)
+    try:
+        loop = asyncio.get_running_loop()
+        loop.run_in_executor(None, _write_text_sync, path, text)
+    except RuntimeError:
+        _write_text_sync(path, text)
 
 
 # ==================== IP ====================
+
 
 def _load_ip_data():
     global ip_access_data
@@ -130,14 +145,17 @@ def _save_ip_data():
     _write_json(_ip_file, ip_access_data)
 
 
-def get_real_ip(request) -> str:
+def get_real_ip(request: web.Request) -> str:
     forwarded = request.headers.get('X-Forwarded-For')
     if forwarded:
         return forwarded.split(',')[0].strip()
     real_ip = request.headers.get('X-Real-IP')
     if real_ip:
         return real_ip.strip()
-    return request.remote or '127.0.0.1'
+    if request.transport is None:
+        return '127.0.0.1'
+    peername = request.transport.get_extra_info('peername')
+    return peername[0] if peername else '127.0.0.1'
 
 
 def record_ip_access(ip, access_type='success'):
@@ -157,10 +175,7 @@ def record_ip_access(ip, access_type='success'):
         d['fail_count'] = d.get('fail_count', 0) + 1
         d.setdefault('fail_times', []).append(now_iso)
         now = datetime.now()
-        d['fail_times'] = [
-            t for t in d['fail_times']
-            if (now - datetime.fromisoformat(t)).total_seconds() < _FAIL_WINDOW
-        ]
+        d['fail_times'] = [t for t in d['fail_times'] if (now - datetime.fromisoformat(t)).total_seconds() < _FAIL_WINDOW]
         if len(d['fail_times']) >= _MAX_FAIL_COUNT:
             d['is_banned'] = True
             d['ban_time'] = now_iso
@@ -187,29 +202,179 @@ def is_ip_banned(ip) -> bool:
 
 
 def get_remaining_attempts(ip) -> int:
+    """返回该 IP 剩余登录尝试次数"""
     d = ip_access_data.get(ip)
     if not d:
         return _MAX_FAIL_COUNT
     now = datetime.now()
-    recent = [
-        t for t in d.get('fail_times', [])
-        if (now - datetime.fromisoformat(t)).total_seconds() < _FAIL_WINDOW
-    ]
+    recent = [t for t in d.get('fail_times', []) if (now - datetime.fromisoformat(t)).total_seconds() < _FAIL_WINDOW]
     return max(0, _MAX_FAIL_COUNT - len(recent))
+
+
+def cleanup_expired_ip_bans():
+    global _last_ip_cleanup
+    now = time.time()
+    if now - _last_ip_cleanup < _IP_CLEANUP_INTERVAL:
+        return
+    _last_ip_cleanup = now
+    now_dt = datetime.now()
+    for _ip, d in list(ip_access_data.items()):
+        if d.get('is_banned') and d.get('ban_time'):
+            try:
+                if (now_dt - datetime.fromisoformat(d['ban_time'])).total_seconds() >= _BAN_DURATION:
+                    d['is_banned'] = False
+                    d['ban_time'] = None
+                    d['fail_times'] = []
+            except Exception:
+                pass
+    # 超限时淘汰最旧的无封禁记录
+    if len(ip_access_data) > _MAX_IP_RECORDS:
+        unbanned = sorted(
+            ((k, v) for k, v in ip_access_data.items() if not v.get('is_banned')),
+            key=lambda x: x[1].get('last_access', ''),
+        )
+        for k, _ in unbanned[: len(ip_access_data) - _MAX_IP_RECORDS]:
+            del ip_access_data[k]
+    _save_ip_data()
+
+
+# ==================== Token ====================
+
+
+def _generate_token() -> str:
+    return base64.urlsafe_b64encode(uuid.uuid4().bytes + uuid.uuid4().bytes).decode().rstrip('=')
+
+
+def _sign(value) -> str:
+    sig = hmac.new(_COOKIE_SECRET.encode(), value.encode(), hashlib.sha256).hexdigest()
+    return f'{value}.{sig}'
+
+
+def _verify_sig(signed) -> tuple:
+    try:
+        value, sig = signed.rsplit('.', 1)
+        expected = hmac.new(_COOKIE_SECRET.encode(), value.encode(), hashlib.sha256).hexdigest()
+        return hmac.compare_digest(sig, expected), value
+    except Exception:
+        return False, None
+
+
+# ==================== Session ====================
+
+
+def _load_session_data():
+    global valid_sessions
+    raw = _read_json(_session_file, {})
+    now = datetime.now()
+    for token, info in raw.items():
+        try:
+            info['created'] = datetime.fromisoformat(info['created'])
+            info['expires'] = datetime.fromisoformat(info['expires'])
+            if now < info['expires']:
+                valid_sessions[token] = info
+        except Exception:
+            pass
+
+
+def _save_session_data():
+    data = {}
+    for t, info in valid_sessions.items():
+        data[t] = {
+            'created': info['created'].isoformat(),
+            'expires': info['expires'].isoformat(),
+            'ip': info.get('ip', ''),
+        }
+    _write_json(_session_file, data)
+
+
+def _cleanup_sessions():
+    global _last_session_cleanup
+    now_t = time.time()
+    if now_t - _last_session_cleanup < _SESSION_CLEANUP_INTERVAL:
+        return
+    _last_session_cleanup = now_t
+    now = datetime.now()
+    expired = [t for t, info in valid_sessions.items() if now >= info['expires']]
+    for t in expired:
+        del valid_sessions[t]
+    if expired:
+        _save_session_data()
+
+
+def create_session(request: web.Request) -> str:
+    """创建会话并返回 bearer token"""
+    _cleanup_sessions()
+    if len(valid_sessions) > _MAX_SESSIONS:
+        oldest = sorted(valid_sessions, key=lambda t: valid_sessions[t]['created'])
+        for t in oldest[: len(valid_sessions) - _MAX_SESSIONS]:
+            valid_sessions.pop(t)
+
+    ip = get_real_ip(request)
+    now = datetime.now()
+    token = _generate_token()
+    valid_sessions[token] = {
+        'created': now,
+        'expires': now + timedelta(days=_SESSION_DAYS),
+        'ip': ip,
+    }
+    _save_session_data()
+    return token
+
+
+def validate_token(request: web.Request) -> bool:
+    """验证 Authorization: Bearer <token> 或 ?token= 查询参数"""
+    _cleanup_sessions()
+    # 优先从 Authorization 头获取
+    token = ''
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        token = auth_header[7:]
+    # 回退: 从 query 参数获取 (iframe/导航请求无法带 header)
+    if not token:
+        token = request.query.get('token', '')
+    if not token or token not in valid_sessions:
+        return False
+    info = valid_sessions[token]
+    if datetime.now() >= info['expires']:
+        valid_sessions.pop(token, None)
+        _save_session_data()
+        return False
+    return True
+
+
+# ==================== 中间件 ====================
+
+
+def require_auth(handler):
+    """aiohttp 路由装饰器: 要求 Bearer token"""
+
+    async def wrapped(request):
+        if not validate_token(request):
+            return web.json_response({'success': False, 'error': '未登录或会话已过期'}, status=401)
+        return await handler(request)
+
+    wrapped.__name__ = handler.__name__
+    wrapped.__qualname__ = handler.__qualname__
+    return wrapped
+
+
+# ==================== 登录日志查询 ====================
 
 
 def get_login_logs() -> list:
     raw = _read_json(_ip_file, {})
     logs = []
     for ip, d in raw.items():
-        logs.append({
-            'ip': ip,
-            'first_access': d.get('first_access', ''),
-            'last_access': d.get('last_access', ''),
-            'fail_count': d.get('fail_count', 0),
-            'is_banned': d.get('is_banned', False),
-            'ban_time': d.get('ban_time', ''),
-        })
+        logs.append(
+            {
+                'ip': ip,
+                'first_access': d.get('first_access', ''),
+                'last_access': d.get('last_access', ''),
+                'fail_count': d.get('fail_count', 0),
+                'is_banned': d.get('is_banned', False),
+                'ban_time': d.get('ban_time', ''),
+            }
+        )
     logs.sort(key=lambda x: x['last_access'] or '', reverse=True)
     return logs
 
@@ -225,102 +390,11 @@ def unban_ip(ip) -> bool:
     return False
 
 
-# ==================== Session ====================
-
-def _load_session_data():
-    global valid_sessions, _sessions
-    raw = _read_json(_session_file, {})
-    now = time.time()
-    for token, info in raw.items():
-        try:
-            created = info.get('created', 0)
-            if isinstance(created, str):
-                created = datetime.fromisoformat(created).timestamp()
-            if now - created < _TOKEN_EXPIRY:
-                valid_sessions[token] = {
-                    'created': created,
-                    'ip': info.get('ip', ''),
-                }
-        except Exception:
-            pass
-    _sessions = valid_sessions
-
-
-def _save_session_data():
-    data = {}
-    for t, info in valid_sessions.items():
-        data[t] = {
-            'created': info.get('created', 0),
-            'ip': info.get('ip', ''),
-        }
-    _write_json(_session_file, data)
-
-
-def _cleanup_sessions():
-    global _last_session_cleanup
-    now = time.time()
-    if now - _last_session_cleanup < _SESSION_CLEANUP_INTERVAL:
-        return
-    _last_session_cleanup = now
-    expired = [t for t, info in valid_sessions.items() if now - info.get('created', 0) >= _TOKEN_EXPIRY]
-    for t in expired:
-        del valid_sessions[t]
-    if expired:
-        _save_session_data()
-
-
-def create_session(request) -> str:
-    _cleanup_sessions()
-    if len(valid_sessions) > _MAX_SESSIONS:
-        oldest = sorted(valid_sessions, key=lambda t: valid_sessions[t].get('created', 0))
-        for t in oldest[:len(valid_sessions) - _MAX_SESSIONS]:
-            valid_sessions.pop(t)
-
-    ip = get_real_ip(request)
-    token = secrets.token_hex(32)
-    valid_sessions[token] = {
-        'created': time.time(),
-        'ip': ip,
-    }
-    _save_session_data()
-    return token
-
-
-def verify_session(request) -> bool:
-    _cleanup_sessions()
-
-    # URL token: check against access_token from config
-    url_token = request.query.get('token', '')
-    access_token = cfg.get('settings', 'web.access_token', '')
-    if url_token and access_token and url_token == access_token:
+def delete_ip_record(ip) -> bool:
+    raw = _read_json(_ip_file, {})
+    if ip in raw:
+        del raw[ip]
+        _write_json(_ip_file, raw)
+        ip_access_data.pop(ip, None)
         return True
-
-    # URL token: check against session store (for WebSocket)
-    if url_token and url_token in valid_sessions:
-        session = valid_sessions[url_token]
-        if (time.time() - session.get('created', 0)) < _TOKEN_EXPIRY:
-            return True
-
-    # Authorization header
-    auth_header = request.headers.get('Authorization', '')
-    if auth_header.startswith('Bearer '):
-        token = auth_header[7:]
-        if token in valid_sessions:
-            session = valid_sessions[token]
-            if (time.time() - session.get('created', 0)) < _TOKEN_EXPIRY:
-                return True
     return False
-
-
-# ==================== Middleware ====================
-
-def require_auth(handler):
-    """鉴权装饰器"""
-    @wraps(handler)
-    async def wrapper(request: web.Request):
-        if not verify_session(request):
-            return web.json_response({'success': False, 'error': '未登录或会话已过期'}, status=401)
-        return await handler(request)
-    wrapper.__name__ = handler.__name__
-    wrapper.__qualname__ = handler.__qualname__
-    return wrapper

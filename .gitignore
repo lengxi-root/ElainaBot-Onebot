@@ -11,10 +11,16 @@ venv/
 .vscode/
 *.swp
 
-# Data
+# Data (运行时数据)
 data/*.db
 data/log/
 data/media/
+data/web/
+data/group_remarks.json
+data/market_mirror.json
+data/mirror_cache.json
+plugins/plugins_disabled.json
+modules/modules_enabled.json
 
 # Config (keep examples only)
 config/settings.yaml

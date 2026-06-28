@@ -1,10 +1,9 @@
-"""WebSocket/SSE 实时推送 — 面板日志广播"""
+"""WebSocket 管理 — 实时推送日志/系统状态"""
 
 import asyncio
 import contextlib
 import json
 import logging
-import time
 from datetime import datetime
 
 from aiohttp import WSMsgType, web
@@ -14,8 +13,11 @@ import web.auth as auth
 log = logging.getLogger('ElainaBot.web.ws')
 
 
+# ==================== WSBroadcast ====================
+
+
 class WSBroadcast:
-    """WebSocket/SSE 广播管理"""
+    """WebSocket/SSE 广播管理 (封装模块级全局状态)"""
 
     def __init__(self):
         self._clients: set = set()
@@ -33,9 +35,11 @@ class WSBroadcast:
         return bool(self._clients or self._sse_queues)
 
     async def broadcast(self, msg_type: str, data: dict):
+        """向所有连接的面板客户端广播消息 (WS + SSE)"""
         if not self.has_clients():
             return
         payload = json.dumps({'type': msg_type, 'data': data}, ensure_ascii=False, default=str)
+        # WebSocket
         dead = set()
         for ws in list(self._clients):
             try:
@@ -43,25 +47,39 @@ class WSBroadcast:
             except Exception:
                 dead.add(ws)
         self._clients.difference_update(dead)
+        # SSE
         for q in list(self._sse_queues):
             with contextlib.suppress(Exception):
                 q.put_nowait(payload)
 
     def schedule_broadcast(self, msg_type: str, data: dict):
+        """安全调度广播任务 (无事件循环时静默忽略)"""
         if not self.has_clients():
             return
         with contextlib.suppress(RuntimeError):
             asyncio.get_running_loop().create_task(self.broadcast(msg_type, data))
 
     def push_log(self, log_type: str, entry: dict):
+        """实时推送日志到面板 (不缓存, 仅广播)"""
         if 'timestamp' not in entry:
             entry['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.schedule_broadcast('new_log', {'log_type': log_type, **entry})
 
     def push_system_info(self, data: dict):
+        """推送系统信息更新"""
         self.schedule_broadcast('system_info', data)
 
+    def clear(self):
+        """清理所有连接 (用于测试隔离)"""
+        self._clients.clear()
+        self._sse_queues.clear()
+
     def shutdown(self):
+        """服务器关闭时主动断开所有面板连接，避免阻塞 aiohttp runner.shutdown()
+
+        WebSocket: 发送 Close Frame (code=1001 Going Away)
+        SSE: 清空队列集合（handler 在下一次 queue 操作时自然退出）
+        """
         for ws in list(self._clients):
             with contextlib.suppress(Exception, RuntimeError):
                 asyncio.get_running_loop().create_task(
@@ -71,82 +89,106 @@ class WSBroadcast:
         self._sse_queues.clear()
 
 
+# 模块级单例
 _broadcast = WSBroadcast()
 
 
 def get_broadcast() -> WSBroadcast:
+    """获取广播管理器单例"""
     return _broadcast
 
 
-# Module-level compat
+def reset_broadcast():
+    """重置广播管理器 (用于测试)"""
+    global _broadcast
+    _broadcast.clear()
+    _broadcast = WSBroadcast()
+    return _broadcast
+
+
+# ==================== 模块级兼容函数 ====================
+
+
 async def broadcast(msg_type: str, data: dict):
+    """向所有连接的面板客户端广播消息 (WS + SSE)"""
     await _broadcast.broadcast(msg_type, data)
 
 
 def push_log(log_type: str, entry: dict):
+    """实时推送日志到面板"""
     _broadcast.push_log(log_type, entry)
 
 
 def push_system_info(data: dict):
+    """推送系统信息更新"""
     _broadcast.push_system_info(data)
 
 
-# ==================== WebSocket ====================
+# ==================== WebSocket 处理器 ====================
+
 
 async def handle_ws(request: web.Request) -> web.WebSocketResponse:
     """WebSocket 端点: /ws/panel?token=xxx"""
-    if not auth.verify_session(request):
-        return web.Response(status=401, text='Unauthorized')
+    # 验证 token
+    token = request.query.get('token', '')
+    if not token or token not in auth.valid_sessions:
+        return web.Response(status=401, text='Unauthorized')  # type: ignore[return-value]  # auth failure before WS upgrade
 
     ws = web.WebSocketResponse(heartbeat=30)
     await ws.prepare(request)
     _broadcast.clients.add(ws)
-    log.debug(f'WebSocket connected ({len(_broadcast.clients)} clients)')
+    log.debug(f'面板 WebSocket 已连接 ({len(_broadcast.clients)} clients)')
 
     try:
+        # 通知前端已连接, 初始数据由前端通过 API 获取
         await ws.send_json({'type': 'init', 'data': {}})
 
         async for msg in ws:
             if msg.type == WSMsgType.TEXT:
-                if msg.data == 'ping':
-                    await ws.send_str('pong')
-                else:
-                    try:
-                        data = json.loads(msg.data)
-                        await _handle_client_msg(ws, data)
-                    except json.JSONDecodeError:
-                        pass
+                try:
+                    data = json.loads(msg.data)
+                    await _handle_client_msg(ws, data)
+                except json.JSONDecodeError:
+                    pass
             elif msg.type in (WSMsgType.ERROR, WSMsgType.CLOSE):
                 break
     finally:
         _broadcast.clients.discard(ws)
-        log.debug(f'WebSocket disconnected ({len(_broadcast.clients)} clients)')
+        log.debug(f'面板 WebSocket 已断开 ({len(_broadcast.clients)} clients)')
 
     return ws
 
 
 async def _handle_client_msg(ws: web.WebSocketResponse, data: dict):
+    """处理客户端发来的消息"""
     pass
 
 
-# ==================== SSE ====================
+# ==================== SSE 降级通道 ====================
+
 
 async def handle_sse(request: web.Request) -> web.StreamResponse:
-    """SSE 端点: /api/sse/panel?token=xxx — WebSocket 不可用时的降级方案"""
-    if not auth.verify_session(request):
+    """SSE 端点: /api/sse/panel?token=xxx
+
+    当 WebSocket 因 Nginx 未配置 upgrade 等原因不可用时,
+    前端自动降级到 SSE, 走普通 HTTP 无需特殊代理配置。
+    """
+    token = request.query.get('token', '')
+    if not token or token not in auth.valid_sessions:
         return web.Response(status=401, text='Unauthorized')
 
     resp = web.StreamResponse()
     resp.headers['Content-Type'] = 'text/event-stream'
     resp.headers['Cache-Control'] = 'no-cache'
-    resp.headers['X-Accel-Buffering'] = 'no'
+    resp.headers['X-Accel-Buffering'] = 'no'  # 禁止 Nginx 缓冲
     await resp.prepare(request)
 
     queue: asyncio.Queue[str] = asyncio.Queue(maxsize=256)
     _broadcast.sse_queues.add(queue)
-    log.debug(f'SSE connected (WS:{len(_broadcast.clients)} SSE:{len(_broadcast.sse_queues)})')
+    log.debug(f'SSE 客户端已连接 (WS:{len(_broadcast.clients)} SSE:{len(_broadcast.sse_queues)})')
 
     try:
+        # 发送初始连接确认
         await resp.write(b'data: {"type":"init","data":{}}\n\n')
         while True:
             try:
@@ -158,6 +200,6 @@ async def handle_sse(request: web.Request) -> web.StreamResponse:
         pass
     finally:
         _broadcast.sse_queues.discard(queue)
-        log.debug(f'SSE disconnected (WS:{len(_broadcast.clients)} SSE:{len(_broadcast.sse_queues)})')
+        log.debug(f'SSE 客户端已断开 (WS:{len(_broadcast.clients)} SSE:{len(_broadcast.sse_queues)})')
 
     return resp
