@@ -1,131 +1,116 @@
 <template>
-  <div class="dashboard">
-    <header class="page-header">
-      <h1>仪表盘</h1>
-      <p class="subtitle">系统运行状态概览</p>
-    </header>
+  <div class="dash">
+    <!-- Banner -->
+    <div class="banner">
+      <h2>{{ frameworkName }} 管理面板</h2>
+      <p>运行时长: {{ uptimeStr }} | {{ platformStr }}</p>
+    </div>
 
-    <div class="stats-grid">
-      <div class="stat-card card" v-for="stat in statCards" :key="stat.label">
-        <div class="stat-icon" :style="{ background: stat.bg, color: stat.color }">
-          <span v-html="stat.icon"></span>
+    <!-- Stat Grid (4 columns) -->
+    <div class="stat-grid">
+      <div class="stat-card" v-for="s in stats" :key="s.label">
+        <div class="stat-icon">
+          <SvgIcon :name="s.icon" :size="22" :color="s.color" />
         </div>
-        <div class="stat-content">
-          <span class="stat-value">{{ stat.value }}</span>
-          <span class="stat-label">{{ stat.label }}</span>
-        </div>
+        <div class="stat-value">{{ s.value }}</div>
+        <div class="stat-label">{{ s.label }}</div>
       </div>
     </div>
 
+    <!-- Main Row: sys-col (2x2) + chart-col -->
     <div class="main-row">
       <div class="sys-col">
         <!-- CPU -->
-        <div class="card res-card">
-          <div class="res-header">CPU</div>
+        <div class="res-card">
+          <div class="res-header">
+            <span>CPU</span>
+            <span class="res-sub" :title="info.cpu_model || ''">{{ info.cpu_model || '-' }}</span>
+          </div>
           <div class="res-body">
             <div class="progress-ring">
               <svg viewBox="0 0 72 72">
-                <circle cx="36" cy="36" r="30" fill="none" stroke="#e5e7eb" stroke-width="6"/>
-                <circle cx="36" cy="36" r="30" fill="none" stroke="var(--color-primary)" stroke-width="6"
-                  stroke-linecap="round"
-                  :stroke-dasharray="188.5"
-                  :stroke-dashoffset="188.5 - 188.5 * (info?.cpu_percent || 0) / 100"
-                  transform="rotate(-90 36 36)"/>
+                <circle cx="36" cy="36" r="28" stroke="var(--border)" stroke-width="6" fill="none"/>
+                <circle cx="36" cy="36" r="28" :stroke="ringColor(info.cpu_percent)" stroke-width="6" fill="none"
+                  stroke-linecap="round" :stroke-dasharray="175.93" :stroke-dashoffset="175.93 - (175.93 * (info.cpu_percent||0) / 100)"
+                  style="transform: rotate(-90deg); transform-origin: center;" />
               </svg>
-              <span class="ring-text">{{ info?.cpu_percent || 0 }}%</span>
+              <span class="ring-text">{{ info.cpu_percent || 0 }}%</span>
             </div>
             <div class="res-info">
-              <span>{{ info?.cpu_cores || '-' }} 核</span>
-              <span class="res-sub">{{ info?.cpu_model || '-' }}</span>
+              <div>核心: <b>{{ info.cpu_cores || '-' }}</b></div>
             </div>
           </div>
         </div>
 
         <!-- Memory -->
-        <div class="card res-card">
-          <div class="res-header">内存</div>
+        <div class="res-card">
+          <div class="res-header">
+            <span>内存</span>
+            <span class="res-sub">{{ info.memory_used || '-' }} / {{ info.memory_total || '-' }}</span>
+          </div>
           <div class="res-body">
             <div class="progress-ring">
               <svg viewBox="0 0 72 72">
-                <circle cx="36" cy="36" r="30" fill="none" stroke="#e5e7eb" stroke-width="6"/>
-                <circle cx="36" cy="36" r="30" fill="none" stroke="var(--color-success)" stroke-width="6"
-                  stroke-linecap="round"
-                  :stroke-dasharray="188.5"
-                  :stroke-dashoffset="188.5 - 188.5 * (info?.memory_percent || 0) / 100"
-                  transform="rotate(-90 36 36)"/>
+                <circle cx="36" cy="36" r="28" stroke="var(--border)" stroke-width="6" fill="none"/>
+                <circle cx="36" cy="36" r="28" :stroke="ringColor(info.memory_percent)" stroke-width="6" fill="none"
+                  stroke-linecap="round" :stroke-dasharray="175.93" :stroke-dashoffset="175.93 - (175.93 * (info.memory_percent||0) / 100)"
+                  style="transform: rotate(-90deg); transform-origin: center;" />
               </svg>
-              <span class="ring-text">{{ info?.memory_percent || 0 }}%</span>
+              <span class="ring-text">{{ info.memory_percent || 0 }}%</span>
             </div>
             <div class="res-info">
-              <span>{{ fmtMB(info?.memory_used) }} / {{ fmtMB(info?.memory_total) }}</span>
-              <span class="res-sub">框架: {{ fmtMB(info?.framework_memory_total) }}</span>
+              <div>使用率: <b>{{ info.memory_percent || 0 }}%</b></div>
             </div>
           </div>
         </div>
 
         <!-- Disk -->
-        <div class="card res-card" v-if="info?.disk_info">
-          <div class="res-header">磁盘</div>
-          <div class="res-body">
+        <div class="res-card">
+          <div class="res-header">
+            <span>磁盘</span>
+            <span class="res-sub">{{ diskUsed }} / {{ diskTotal }}</span>
+          </div>
+          <div class="res-body" v-if="diskPercent >= 0">
             <div class="progress-ring">
               <svg viewBox="0 0 72 72">
-                <circle cx="36" cy="36" r="30" fill="none" stroke="#e5e7eb" stroke-width="6"/>
-                <circle cx="36" cy="36" r="30" fill="none" stroke="var(--color-warning)" stroke-width="6"
-                  stroke-linecap="round"
-                  :stroke-dasharray="188.5"
-                  :stroke-dashoffset="188.5 - 188.5 * (info?.disk_info?.percent || 0) / 100"
-                  transform="rotate(-90 36 36)"/>
+                <circle cx="36" cy="36" r="28" stroke="var(--border)" stroke-width="6" fill="none"/>
+                <circle cx="36" cy="36" r="28" :stroke="ringColor(diskPercent)" stroke-width="6" fill="none"
+                  stroke-linecap="round" :stroke-dasharray="175.93" :stroke-dashoffset="175.93 - (175.93 * diskPercent / 100)"
+                  style="transform: rotate(-90deg); transform-origin: center;" />
               </svg>
-              <span class="ring-text">{{ info?.disk_info?.percent || 0 }}%</span>
+              <span class="ring-text">{{ diskPercent }}%</span>
             </div>
             <div class="res-info">
-              <span>{{ fmtBytes(info?.disk_info?.used) }} / {{ fmtBytes(info?.disk_info?.total) }}</span>
-              <span class="res-sub">可用: {{ fmtBytes(info?.disk_info?.free) }}</span>
+              <div>可用: <b>{{ diskFree }}</b></div>
             </div>
           </div>
         </div>
 
         <!-- Uptime -->
-        <div class="card res-card">
-          <div class="res-header">运行信息</div>
+        <div class="res-card">
+          <div class="res-header"><span>运行信息</span></div>
           <div class="res-info-full">
-            <div class="info-row"><span>框架运行</span><span>{{ fmtDuration(info?.uptime) }}</span></div>
-            <div class="info-row"><span>系统运行</span><span>{{ fmtDuration(info?.system_uptime) }}</span></div>
-            <div class="info-row"><span>启动时间</span><span>{{ info?.start_time || '-' }}</span></div>
-            <div class="info-row"><span>平台</span><span>{{ info?.platform || '-' }}</span></div>
-            <div class="info-row"><span>Python</span><span>{{ info?.python_version || '-' }}</span></div>
+            <div>框架运行: <b>{{ uptimeStr }}</b></div>
+            <div>系统运行: <b>{{ fmtUptime(info.system_uptime) }}</b></div>
+            <div>启动时间: <b>{{ info.start_time || '-' }}</b></div>
+            <div>Python: <b>{{ info.python_version || '-' }}</b></div>
           </div>
         </div>
       </div>
 
-      <!-- Bots -->
-      <div class="bots-col">
-        <div class="card bots-card">
-          <div class="res-header">Bot 连接</div>
-          <div v-if="store.bots.length" class="bot-list">
-            <div v-for="bot in store.bots" :key="bot.self_id" class="bot-row">
-              <div class="bot-avatar">{{ (bot.name || 'B')[0] }}</div>
-              <div class="bot-info">
-                <span class="bot-name">{{ bot.name || `Bot ${bot.self_id}` }}</span>
-                <span class="bot-id">ID: {{ bot.self_id || bot.appid }}</span>
+      <!-- Chart Column: hourly distribution -->
+      <div class="chart-col">
+        <div class="res-card chart-card">
+          <div class="res-header"><span>24小时消息分布</span></div>
+          <div class="chart-wrap">
+            <div class="bar-chart" v-if="hourlyData.length">
+              <div class="bar-item" v-for="(count, idx) in hourlyData" :key="idx">
+                <div class="bar-fill" :style="{ height: barHeight(count) + '%' }"></div>
+                <span class="bar-label">{{ idx }}</span>
               </div>
-              <span class="badge badge-success">{{ bot.status || 'online' }}</span>
             </div>
+            <div class="chart-empty" v-else>暂无数据</div>
           </div>
-          <p v-else class="empty-text">暂无 Bot 连接</p>
-        </div>
-
-        <!-- Recent messages -->
-        <div class="card bots-card">
-          <div class="res-header">最近消息</div>
-          <div v-if="recentMessages.length" class="msg-list">
-            <div v-for="msg in recentMessages" :key="msg.id" class="msg-row">
-              <span class="msg-time">{{ (msg.timestamp || '').slice(11, 16) }}</span>
-              <span class="msg-sender">{{ msg.user_id }}</span>
-              <span class="msg-content">{{ msg.content }}</span>
-            </div>
-          </div>
-          <p v-else class="empty-text">暂无消息</p>
         </div>
       </div>
     </div>
@@ -133,140 +118,178 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAppStore } from '../stores/app'
+import SvgIcon from '../components/SvgIcon.vue'
 
 const store = useAppStore()
-const info = computed(() => store.systemInfo)
-const recentMessages = ref([])
-let timer = null
+const hourlyData = ref([])
 
-const statCards = computed(() => {
-  const s = info.value || {}
-  return [
-    { label: '今日消息', value: s.today_messages || 0, bg: '#eef0ff', color: 'var(--color-primary)', icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' },
-    { label: 'Bot 连接', value: s.bot_count || 0, bg: '#dcfce7', color: '#166534', icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>' },
-    { label: '插件', value: s.plugin_count || 0, bg: '#fef3c7', color: '#92400e', icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>' },
-    { label: '模块', value: s.module_count || 0, bg: '#ede9fe', color: '#5b21b6', icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M7 2v20M17 2v20M2 12h20"/></svg>' },
-  ]
+const info = computed(() => store.systemInfo || {})
+const frameworkName = computed(() => info.value.framework_name || 'Elaina')
+const platformStr = computed(() => info.value.platform || '-')
+const uptimeStr = computed(() => {
+  const s = info.value.uptime
+  if (!s && s !== 0) return '-'
+  const d = Math.floor(s / 86400)
+  const h = Math.floor((s % 86400) / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  if (d > 0) return `${d}天${h}时${m}分`
+  if (h > 0) return `${h}时${m}分`
+  return `${m}分`
 })
 
-function fmtMB(mb) {
-  if (!mb && mb !== 0) return '-'
-  if (mb > 1024) return (mb / 1024).toFixed(1) + ' GB'
-  return Math.round(mb) + ' MB'
-}
-
+const diskInfo = computed(() => info.value.disk_info || {})
 function fmtBytes(bytes) {
   if (!bytes) return '-'
   const gb = bytes / (1024 ** 3)
-  if (gb >= 1) return gb.toFixed(1) + ' GB'
-  return (bytes / (1024 ** 2)).toFixed(0) + ' MB'
+  return gb >= 1 ? gb.toFixed(1) + ' GB' : (bytes / (1024 ** 2)).toFixed(0) + ' MB'
 }
+const diskUsed = computed(() => fmtBytes(diskInfo.value.used))
+const diskTotal = computed(() => fmtBytes(diskInfo.value.total))
+const diskFree = computed(() => fmtBytes(diskInfo.value.free))
+const diskPercent = computed(() => diskInfo.value.percent ?? -1)
 
-function fmtDuration(seconds) {
-  if (!seconds && seconds !== 0) return '-'
-  const d = Math.floor(seconds / 86400)
-  const h = Math.floor((seconds % 86400) / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  if (d > 0) return `${d}天 ${h}时 ${m}分`
-  if (h > 0) return `${h}时 ${m}分`
+const stats = computed(() => [
+  { label: '今日消息', value: info.value.today_messages || 0, icon: 'chatbubbles', color: 'var(--accent)' },
+  { label: '机器人', value: info.value.bot_count || 0, icon: 'server', color: 'var(--success)' },
+  { label: '插件', value: info.value.plugin_count || 0, icon: 'extension-puzzle', color: 'var(--warning)' },
+  { label: '模块', value: info.value.module_count || 0, icon: 'cog', color: 'var(--info)' },
+])
+
+function fmtUptime(s) {
+  if (!s && s !== 0) return '-'
+  const d = Math.floor(s / 86400)
+  const h = Math.floor((s % 86400) / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  if (d > 0) return `${d}天${h}时${m}分`
+  if (h > 0) return `${h}时${m}分`
   return `${m}分`
 }
 
-async function loadRecent() {
-  const res = await store.fetchApi('/messages/recent')
+function ringColor(percent) {
+  if (percent > 80) return 'var(--danger)'
+  if (percent > 60) return 'var(--warning)'
+  return 'var(--accent)'
+}
+
+function barHeight(count) {
+  const max = Math.max(...hourlyData.value, 1)
+  return max > 0 ? (count / max) * 100 : 0
+}
+
+async function loadHourly() {
+  const res = await store.fetchApi('/statistics')
   if (res && res.success) {
-    recentMessages.value = (res.data || []).slice(0, 10)
+    hourlyData.value = res.hourly || []
   }
 }
 
 onMounted(() => {
-  store.loadSystemInfo()
-  store.fetchBots()
-  loadRecent()
-  timer = setInterval(() => {
-    store.loadSystemInfo()
-    store.fetchBots()
-  }, 10000)
-})
-
-onUnmounted(() => {
-  if (timer) clearInterval(timer)
+  loadHourly()
 })
 </script>
 
 <style scoped>
-.page-header { margin-bottom: 20px; }
-.page-header h1 { font-size: 22px; font-weight: 700; }
-.subtitle { color: var(--color-text-muted); font-size: 13px; margin-top: 2px; }
+.dash { width: 100%; }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
+.banner {
+  background: linear-gradient(135deg, var(--accent), var(--accent-light));
+  border-radius: 12px;
+  padding: 24px 28px;
   margin-bottom: 20px;
 }
+.banner h2 { color: #fff; font-size: 20px; font-weight: 700; margin: 0 0 4px; }
+.banner p { color: rgba(255,255,255,0.7); font-size: 13px; margin: 0; }
 
-.stat-card { padding: 16px; display: flex; align-items: center; gap: 12px; }
-.stat-icon {
-  width: 40px; height: 40px; border-radius: var(--radius-sm);
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
 }
-.stat-content { display: flex; flex-direction: column; }
-.stat-value { font-size: 20px; font-weight: 700; line-height: 1.2; }
-.stat-label { font-size: 12px; color: var(--color-text-muted); }
+.stat-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+}
+.stat-icon { margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; }
+.stat-value { color: var(--text); font-size: 24px; font-weight: 700; }
+.stat-label { color: var(--text2); font-size: 12px; margin-top: 2px; }
 
-.main-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.main-row { display: flex; gap: 12px; align-items: start; }
+.sys-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 520px; flex-shrink: 0; }
+.chart-col { flex: 1; min-width: 0; }
 
-.sys-col, .bots-col { display: flex; flex-direction: column; gap: 12px; }
-
-.res-card { padding: 16px; }
-.res-header { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--color-text); }
-.res-body { display: flex; align-items: center; gap: 16px; }
-.res-sub { font-size: 11px; color: var(--color-text-muted); display: block; margin-top: 2px; }
-
-.progress-ring { position: relative; width: 72px; height: 72px; flex-shrink: 0; }
+.res-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+.res-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.res-header span:first-child { color: var(--text); font-weight: 600; font-size: 14px; }
+.res-sub {
+  color: var(--text3);
+  font-size: 11px;
+  max-width: 60%;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.res-body { display: flex; align-items: center; gap: 12px; }
+.progress-ring { position: relative; width: 56px; height: 56px; flex-shrink: 0; }
 .progress-ring svg { width: 100%; height: 100%; }
 .ring-text {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 600;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
 }
-.res-info { font-size: 13px; }
+.res-info { font-size: 12px; color: var(--text2); line-height: 1.7; }
+.res-info b { color: var(--text); }
+.res-info-full { font-size: 12px; color: var(--text2); line-height: 1.9; }
+.res-info-full b { color: var(--text); }
 
-.res-info-full { display: flex; flex-direction: column; gap: 6px; }
-.info-row {
-  display: flex; justify-content: space-between; align-items: center;
-  font-size: 13px; padding: 2px 0;
+.chart-card { height: 100%; display: flex; flex-direction: column; }
+.chart-wrap { flex: 1; min-height: 200px; display: flex; align-items: flex-end; }
+.chart-empty { color: var(--text3); text-align: center; width: 100%; padding: 40px 0; font-size: 13px; }
+
+.bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  width: 100%;
+  height: 160px;
+  padding-top: 8px;
 }
-.info-row span:first-child { color: var(--color-text-muted); }
-.info-row span:last-child { font-weight: 500; }
-
-.bots-card { padding: 16px; }
-.bot-list { display: flex; flex-direction: column; gap: 8px; }
-.bot-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px; background: var(--color-bg-secondary); border-radius: var(--radius-sm);
+.bar-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
 }
-.bot-avatar {
-  width: 32px; height: 32px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--color-primary), #7c3aed);
-  color: white; display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 600; flex-shrink: 0;
+.bar-fill {
+  width: 100%;
+  max-width: 20px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-light));
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+  transition: height 0.3s;
 }
-.bot-info { flex: 1; display: flex; flex-direction: column; }
-.bot-name { font-size: 13px; font-weight: 600; }
-.bot-id { font-size: 11px; color: var(--color-text-muted); font-family: var(--font-mono); }
-
-.msg-list { display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow-y: auto; }
-.msg-row { display: flex; gap: 8px; font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--color-border-light); }
-.msg-time { color: var(--color-text-muted); flex-shrink: 0; font-family: var(--font-mono); }
-.msg-sender { color: var(--color-primary); flex-shrink: 0; max-width: 80px; overflow: hidden; text-overflow: ellipsis; }
-.msg-content { color: var(--color-text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-.empty-text { color: var(--color-text-muted); font-size: 13px; text-align: center; padding: 20px; }
-
-@media (max-width: 900px) {
-  .main-row { grid-template-columns: 1fr; }
-}
+.bar-label { font-size: 10px; color: var(--text3); margin-top: 4px; }
 </style>
