@@ -1,119 +1,384 @@
-"""消息浏览"""
+"""消息管理 — 聊天列表 / 历史 / 发送 / 撤回 (OneBot 适配)"""
 
-import logging
+import asyncio
+import contextlib
+import json
+import os
+import time
 from datetime import datetime
 
 from aiohttp import web
 
-log = logging.getLogger('ElainaBot.web.messages')
+from web.tools import _common
 
-_bot_manager = None
-
-
-def set_context(bot_manager):
-    global _bot_manager
-    _bot_manager = bot_manager
+_base_dir = ''
+_chat_cache: dict = {}
+_CHAT_TTL = 30
 
 
-def _ls():
-    if _bot_manager and _bot_manager.log_service:
-        return _bot_manager.log_service
-    return None
+def set_context(app_instance, base_dir=''):
+    global _base_dir
+    _common.set_app(app_instance)
+    if base_dir:
+        _base_dir = base_dir
 
 
-async def handle_recent_messages(request: web.Request):
-    ls = _ls()
-    if not ls:
-        return web.json_response({'success': True, 'data': []})
+def _api():
+    from core.onebot.api import get_api
 
-    data = ls.query('message', 'SELECT * FROM log ORDER BY id DESC LIMIT 50')
-    return web.json_response({'success': True, 'data': data})
+    return get_api()
 
 
-async def handle_chat_list(request: web.Request):
-    ls = _ls()
-    if not ls:
-        return web.json_response({'success': True, 'chats': []})
-
-    search = request.query.get('search', '')
-    msg_type = request.query.get('type', '')
-
-    try:
-        if msg_type == 'private':
-            rows = ls.query(
-                'message',
-                "SELECT user_id, message_type, COUNT(*) as msg_count, MAX(timestamp) as last_time "
-                "FROM log WHERE message_type='private' GROUP BY user_id ORDER BY last_time DESC LIMIT 200"
-            )
-        elif msg_type == 'group':
-            rows = ls.query(
-                'message',
-                "SELECT group_id, message_type, COUNT(*) as msg_count, MAX(timestamp) as last_time "
-                "FROM log WHERE message_type='group' AND group_id != '' GROUP BY group_id ORDER BY last_time DESC LIMIT 200"
-            )
-        else:
-            sql = (
-                "SELECT "
-                "CASE WHEN message_type='group' THEN group_id ELSE user_id END as chat_id, "
-                "message_type, "
-                "COUNT(*) as msg_count, "
-                "MAX(timestamp) as last_time "
-                "FROM log GROUP BY chat_id, message_type ORDER BY last_time DESC LIMIT 200"
-            )
-            rows = ls.query('message', sql)
-
-        chats = []
-        for r in (rows or []):
-            chat = {
-                'chat_id': r.get('chat_id') or r.get('group_id') or r.get('user_id', ''),
-                'type': r.get('message_type', 'unknown'),
-                'msg_count': r.get('msg_count', 0),
-                'last_time': r.get('last_time', ''),
-                'nickname': '',
-            }
-            if search and search.lower() not in str(chat['chat_id']).lower():
-                continue
-            chats.append(chat)
-
-        return web.json_response({'success': True, 'chats': chats})
-    except Exception as e:
-        return web.json_response({'success': True, 'chats': [], 'error': str(e)})
+def _primary_id():
+    ids = _common.connected_ids()
+    return ids[0] if ids else ''
 
 
-async def handle_chat_history(request: web.Request):
-    ls = _ls()
-    if not ls:
-        return web.json_response({'success': True, 'messages': []})
+def _q(sql, params=None):
+    return _common.query_log('message', sql, params)
 
+
+# ──────────── 昵称 ────────────
+
+async def handle_get_nickname(request: web.Request):
     body = await request.json()
-    chat_id = body.get('chat_id', '')
-    chat_type = body.get('type', '')
-    page = int(body.get('page', 1))
-    limit = min(int(body.get('limit', 50)), 200)
-    offset = (page - 1) * limit
+    uid = str(body.get('user_id', ''))
+    if not uid:
+        return web.json_response({'success': False, 'message': '缺少用户ID'}, status=400)
+    nick = await _common.get_nickname(uid)
+    return web.json_response({'success': True, 'data': {'user_id': uid, 'nickname': nick}})
 
-    if not chat_id:
-        return web.json_response({'success': False, 'error': 'missing chat_id'}, status=400)
 
-    try:
-        if chat_type == 'group':
-            where = f"WHERE group_id='{chat_id}'"
-        else:
-            where = f"WHERE user_id='{chat_id}' AND (message_type='private' OR group_id='')"
+async def handle_get_nicknames_batch(request: web.Request):
+    body = await request.json()
+    uids = body.get('user_ids', [])
+    if not isinstance(uids, list) or not uids:
+        return web.json_response({'success': False, 'message': '缺少用户ID列表'}, status=400)
+    result = await _common.batch_nicknames(uids)
+    return web.json_response({'success': True, 'data': {'nicknames': result}})
 
-        count_rows = ls.query('message', f"SELECT COUNT(*) as cnt FROM log {where}")
-        total = count_rows[0]['cnt'] if count_rows else 0
 
-        messages = ls.query(
-            'message',
-            f"SELECT * FROM log {where} ORDER BY id DESC LIMIT {limit} OFFSET {offset}"
-        )
+# ──────────── 聊天列表 ────────────
 
-        return web.json_response({
-            'success': True,
-            'messages': messages or [],
-            'total': total,
-            'page': page,
+def _aggregate_chats(chat_type):
+    if chat_type == 'user':
+        sql = ("SELECT user_id AS chat_id, MAX(id) AS last_id, MAX(timestamp) AS last_time, "
+               "COUNT(*) AS msg_count FROM log WHERE user_id != '' AND group_id = '' GROUP BY user_id")
+    else:
+        # group / full_access / remark 均按群聊聚合 (OneBot 无官方全量群概念)
+        sql = ("SELECT group_id AS chat_id, MAX(id) AS last_id, MAX(timestamp) AS last_time, "
+               "COUNT(*) AS msg_count FROM log WHERE group_id != '' GROUP BY group_id")
+    rows = _q(sql)
+    appid = _primary_id()
+    chats = []
+    for r in rows:
+        cid = str(r.get('chat_id', ''))
+        if not cid:
+            continue
+        chats.append({
+            'chat_id': cid,
+            'appid': appid,
+            'bot_name': appid,
+            'last_id': r.get('last_id', 0) or 0,
+            'last_time': r.get('last_time', '') or '',
+            'last_date': (r.get('last_time', '') or '')[:10],
+            'msg_count': r.get('msg_count', 0) or 0,
         })
+    chats.sort(key=lambda c: c['last_time'], reverse=True)
+    return chats
+
+
+async def handle_get_chats(request: web.Request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    chat_type = body.get('type', 'group')
+    search = body.get('search', '').lower()
+    page = max(int(body.get('page', 1)), 1)
+    page_size = min(int(body.get('page_size', 50)), 100)
+
+    now = time.time()
+    c = _chat_cache.get(chat_type)
+    if c and now - c[0] < _CHAT_TTL:
+        chats = c[1]
+    else:
+        chats = await asyncio.get_running_loop().run_in_executor(None, _aggregate_chats, chat_type)
+        remarks = _load_remarks()
+        if chat_type == 'user':
+            ids = [ch['chat_id'] for ch in chats]
+            nicks = await _common.batch_nicknames(ids)
+            for ch in chats:
+                ch['nickname'] = nicks.get(ch['chat_id'], f'用户{ch["chat_id"][-6:]}')
+                ch['remark'] = ''
+        else:
+            for ch in chats:
+                rv = remarks.get(ch['chat_id'])
+                ch['nickname'] = _remark_name(rv) or f'群{ch["chat_id"][-6:]}'
+                ch['remark'] = _remark_name(rv)
+                ch['group_qq'] = _remark_qq(rv)
+                ch['is_full_access'] = False
+            if chat_type == 'remark':
+                chats = [ch for ch in chats if ch['chat_id'] in remarks]
+        _chat_cache[chat_type] = (now, chats)
+
+    if search:
+        chats = [c for c in chats if search in c['chat_id'].lower() or search in c.get('nickname', '').lower()]
+
+    total = len(chats)
+    start = (page - 1) * page_size
+    return web.json_response({
+        'success': True,
+        'data': {'chats': chats[start:start + page_size], 'total': total, 'page': page, 'page_size': page_size},
+    })
+
+
+# ──────────── 历史消息 ────────────
+
+def _query_messages(chat_type, chat_id, limit=300):
+    if chat_type == 'group':
+        sql = f"SELECT * FROM log WHERE group_id = ? ORDER BY id DESC LIMIT {limit}"
+        params = (chat_id,)
+    else:
+        sql = f"SELECT * FROM log WHERE user_id = ? AND group_id = '' ORDER BY id DESC LIMIT {limit}"
+        params = (chat_id,)
+    rows = _q(sql, params)
+    rows.reverse()
+    return rows
+
+
+async def handle_get_chat_history(request: web.Request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    chat_type = body.get('chat_type', 'group')
+    chat_id = str(body.get('chat_id', ''))
+    if not chat_id:
+        return web.json_response({'success': True, 'data': {'messages': [], 'has_more': False}})
+
+    rows = await asyncio.get_running_loop().run_in_executor(None, _query_messages, chat_type, chat_id, 300)
+
+    uid_set = {str(r.get('user_id', '')) for r in rows if r.get('extra') != 'send' and r.get('user_id')}
+    nicks = await _common.batch_nicknames(list(uid_set)) if uid_set else {}
+    appid = _primary_id()
+
+    messages = []
+    last_msg_id = ''
+    for r in rows:
+        is_self = r.get('extra') == 'send'
+        uid = str(r.get('user_id', ''))
+        raw = r.get('raw_data', '')
+        recalled = r.get('extra') == 'recalled'
+        mid = str(r.get('message_id', ''))
+        if mid and not is_self:
+            last_msg_id = mid
+        messages.append({
+            'id': r.get('id', len(messages)),
+            'message_id': mid,
+            'reference_id': '',
+            'user_id': uid,
+            'appid': appid,
+            'bot_qq': appid if is_self else '',
+            'nickname': (appid or 'Bot') if is_self else nicks.get(uid, f'用户{uid[-6:]}' if uid else '未知用户'),
+            'content': r.get('content', ''),
+            'timestamp': r.get('timestamp', ''),
+            'is_self': is_self,
+            'source': 'web_panel' if r.get('source') == 'WebPanel' else 'onebot',
+            'raw_message': raw if not recalled else '',
+            'recalled': recalled,
+        })
+
+    return web.json_response({
+        'success': True,
+        'data': {'messages': messages, 'last_msg_id': last_msg_id,
+                 'oldest_date': datetime.now().strftime('%Y-%m-%d'), 'has_more': False},
+    })
+
+
+# ──────────── 发送 / 撤回 ────────────
+
+def _log_sent(chat_type, chat_id, content, message_id):
+    svc = _common.log_service()
+    if not svc:
+        return
+    svc.add('message', {
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'content': content,
+        'user_id': '' if chat_type == 'group' else chat_id,
+        'group_id': chat_id if chat_type == 'group' else '',
+        'message_id': str(message_id or ''),
+        'message_type': chat_type,
+        'source': 'WebPanel',
+        'extra': 'send',
+    })
+
+
+async def handle_send_message(request: web.Request):
+    try:
+        if request.content_type and 'multipart' in request.content_type:
+            reader = await request.multipart()
+            fields, image_data = {}, None
+            while True:
+                part = await reader.next()
+                if part is None:
+                    break
+                if part.name == 'image':
+                    image_data = await part.read()
+                else:
+                    fields[part.name] = (await part.read()).decode('utf-8', errors='replace')
+        else:
+            fields = await request.json()
+            image_data = None
+
+        chat_type = fields.get('chat_type', '')
+        chat_id = str(fields.get('chat_id', ''))
+        msg_type = fields.get('msg_type', 'text')
+        content = (fields.get('content', '') or '').strip()
+
+        if not chat_type or not chat_id:
+            return web.json_response({'success': False, 'message': '缺少 chat_type/chat_id'}, status=400)
+        if not content and not image_data:
+            return web.json_response({'success': False, 'message': '消息内容为空'}, status=400)
+        if not _common.connected_ids():
+            return web.json_response({'success': False, 'message': '无可用机器人连接'}, status=400)
+
+        # 构造 OneBot 消息段
+        segments = []
+        if content:
+            if msg_type == 'media':
+                segments.append({'type': 'image', 'data': {'file': content}})
+            else:
+                segments.append({'type': 'text', 'data': {'text': content}})
+        if image_data:
+            import base64
+            b64 = base64.b64encode(image_data).decode()
+            segments.append({'type': 'image', 'data': {'file': f'base64://{b64}'}})
+
+        api = _api()
+        if chat_type == 'group':
+            resp = await api.send_group_msg(chat_id, segments)
+        else:
+            resp = await api.send_private_msg(chat_id, segments)
+
+        if resp and resp.get('retcode') == 0:
+            mid = (resp.get('data') or {}).get('message_id', '')
+            display = content or '[图片]'
+            _log_sent(chat_type, chat_id, display, mid)
+            return web.json_response({'success': True, 'message': '发送成功'})
+        err = (resp or {}).get('message') or (resp or {}).get('wording') or '发送失败'
+        return web.json_response({'success': False, 'message': str(err)})
     except Exception as e:
-        return web.json_response({'success': True, 'messages': [], 'error': str(e)})
+        import traceback
+
+        traceback.print_exc()
+        return web.json_response({'success': False, 'message': str(e)}, status=500)
+
+
+async def handle_recall_message(request: web.Request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    message_id = body.get('message_id', '')
+    if not message_id:
+        return web.json_response({'success': False, 'message': '参数缺失'}, status=400)
+    try:
+        resp = await _api().delete_msg(message_id)
+    except Exception as e:
+        return web.json_response({'success': False, 'message': str(e)}, status=500)
+    if resp and resp.get('retcode') == 0:
+        with contextlib.suppress(Exception):
+            _mark_recalled(message_id)
+        return web.json_response({'success': True})
+    return web.json_response({'success': False, 'message': '撤回失败'})
+
+
+def _mark_recalled(message_id):
+    svc = _common.log_service()
+    if not svc:
+        return
+    with contextlib.suppress(Exception):
+        conn = svc._get_conn('message')
+        with svc._lock:
+            conn.execute("UPDATE log SET extra='recalled' WHERE message_id=?", (str(message_id),))
+            conn.commit()
+
+
+# ──────────── 群备注 ────────────
+
+_remarks_cache = None
+_remarks_ts = 0.0
+
+
+def _remarks_path():
+    return os.path.join(_base_dir, 'data', 'group_remarks.json')
+
+
+def _remark_name(val):
+    if isinstance(val, dict):
+        return val.get('name', '')
+    return str(val) if val else ''
+
+
+def _remark_qq(val):
+    return val.get('qq', '') if isinstance(val, dict) else ''
+
+
+def _load_remarks() -> dict:
+    global _remarks_cache, _remarks_ts
+    now = time.time()
+    if _remarks_cache is not None and now - _remarks_ts < 60:
+        return _remarks_cache
+    path = _remarks_path()
+    data = {}
+    if os.path.isfile(path):
+        with contextlib.suppress(Exception), open(path, encoding='utf-8') as f:
+            d = json.load(f)
+            data = d if isinstance(d, dict) else {}
+    _remarks_cache = data
+    _remarks_ts = now
+    return data
+
+
+def _save_remarks(remarks):
+    global _remarks_cache, _remarks_ts
+    path = _remarks_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(remarks, f, ensure_ascii=False, indent=2)
+    _remarks_cache = remarks
+    _remarks_ts = time.time()
+
+
+async def handle_get_remarks(request: web.Request):
+    return web.json_response({'success': True, 'data': _load_remarks()})
+
+
+async def handle_set_remark(request: web.Request):
+    body = await request.json()
+    gid = str(body.get('group_id', '') or body.get('chat_id', ''))
+    name = body.get('name', '') or body.get('remark', '')
+    qq = body.get('qq', '')
+    if not gid:
+        return web.json_response({'success': False, 'message': '缺少群号'}, status=400)
+    remarks = dict(_load_remarks())
+    remarks[gid] = {'name': name, 'qq': qq}
+    _save_remarks(remarks)
+    _chat_cache.clear()
+    return web.json_response({'success': True})
+
+
+async def handle_delete_remark(request: web.Request):
+    body = await request.json()
+    gid = str(body.get('group_id', '') or body.get('chat_id', ''))
+    remarks = dict(_load_remarks())
+    if gid in remarks:
+        del remarks[gid]
+        _save_remarks(remarks)
+        _chat_cache.clear()
+    return web.json_response({'success': True})
+
+
+async def handle_get_group_roles(request: web.Request):
+    return web.json_response({'success': True, 'data': {}})

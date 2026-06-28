@@ -11,6 +11,92 @@ import web.ws as _ws
 
 log = logging.getLogger('ElainaBot.web')
 
+
+class _WebPanelLogHandler(logging.Handler):
+    """将 Python logging 记录推送到 web 面板 + 持久化到 SQLite"""
+
+    def __init__(self, app_instance):
+        super().__init__()
+        self._app = app_instance
+
+    def emit(self, record):
+        try:
+            from datetime import datetime
+
+            msg = record.getMessage()
+            entry = {
+                'timestamp': datetime.fromtimestamp(record.created).strftime('%Y-%m-%d %H:%M:%S'),
+                'content': msg,
+                'source': record.name,
+                'level': record.levelname,
+            }
+            _ws.push_log('framework', entry)
+            svc = getattr(self._app, '_log_service', None)
+            if svc:
+                svc.add('framework', entry)
+        except Exception:
+            pass
+
+
+def setup_web(app: web.Application, bot_manager, base_dir: str):
+    """将 Web 面板挂载到 aiohttp 应用 (bot_manager 即 Application 实例)"""
+    _auth.init(base_dir)
+    _panel_api.set_context(bot_manager, base_dir)
+
+    # 注入日志/错误实时推送
+    try:
+        from core.base.logger import on_error
+
+        bot_manager._web_log_cb = _ws.push_log
+
+        def _push_error(error_data):
+            _ws.push_log('error', {
+                'timestamp': error_data.get('timestamp', ''),
+                'module_type': error_data.get('module_type', ''),
+                'module_name': error_data.get('module_name', ''),
+                'content': error_data.get('content', ''),
+                'traceback': error_data.get('traceback', ''),
+            })
+            svc = getattr(bot_manager, '_log_service', None)
+            if svc:
+                svc.add('error', {
+                    'timestamp': error_data.get('timestamp', ''),
+                    'source': f"{error_data.get('module_type', '')}.{error_data.get('module_name', '')}",
+                    'level': 'ERROR',
+                    'content': error_data.get('content', ''),
+                    'extra': error_data.get('traceback', ''),
+                })
+
+        on_error(_push_error)
+
+        _handler = _WebPanelLogHandler(bot_manager)
+        _handler.setLevel(logging.INFO)
+        logging.getLogger('ElainaBot').addHandler(_handler)
+    except Exception as e:
+        log.warning(f'日志推送注入失败: {e}')
+
+    # API 路由
+    app.router.add_routes(_panel_api.get_routes())
+
+    # 媒体静态目录
+    media_dir = os.path.join(base_dir, 'data', 'media')
+    os.makedirs(media_dir, exist_ok=True)
+    app.router.add_static('/api/media/', media_dir)
+
+    # dist 目录
+    _web_dir = os.path.dirname(__file__)
+    dist_dir = os.path.join(_web_dir, 'dist')
+
+    app.router.add_get('/web', _redirect_to_web)
+
+    if os.path.isdir(dist_dir):
+        app.router.add_get('/web/{path:.*}', _make_spa_handler(dist_dir))
+        log.info(f'Web 面板已挂载 (dist: {dist_dir})')
+    else:
+        app.router.add_get('/web/{path:.*}', _dev_placeholder)
+        log.warning(f'Web 面板未找到编译产物 (期望: {dist_dir})')
+
+
 _MIME = {
     '.js': 'application/javascript',
     '.css': 'text/css',
@@ -22,32 +108,6 @@ _MIME = {
     '.woff': 'font/woff',
     '.woff2': 'font/woff2',
 }
-
-
-def setup_web(app: web.Application, bot_manager, base_dir: str):
-    """将 Web 面板挂载到 aiohttp 应用"""
-    _auth.init(base_dir)
-    _panel_api.set_context(bot_manager, base_dir)
-
-    # 注入日志推送
-    bot_manager._web_log_cb = _ws.push_log
-
-    # API 路由
-    app.router.add_routes(_panel_api.get_routes())
-
-    # dist 目录
-    _web_dir = os.path.dirname(__file__)
-    dist_dir = os.path.join(_web_dir, 'dist')
-
-    # /web → 重定向到 /web/
-    app.router.add_get('/web', _redirect_to_web)
-
-    if os.path.isdir(dist_dir):
-        app.router.add_get('/web/{path:.*}', _make_spa_handler(dist_dir))
-        log.info(f'Web 面板已挂载 (dist: {dist_dir})')
-    else:
-        app.router.add_get('/web/{path:.*}', _dev_placeholder)
-        log.warning(f'Web 面板未找到编译产物 (期望: {dist_dir})')
 
 
 def _make_spa_handler(dist_dir: str):
@@ -79,10 +139,9 @@ async def _redirect_to_web(request: web.Request):
 async def _dev_placeholder(request: web.Request):
     html = """<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Elaina Panel</title></head>
-<body style="background:#fff;color:#333;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+<body style="background:#fff;color:#333;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
 <div style="text-align:center">
 <h1 style="color:#5865f2">Elaina 管理面板</h1>
-<p style="color:#666">未找到 <code>web/dist/</code> 目录，请先编译前端。</p>
-<pre style="background:#f5f5f5;padding:16px;border-radius:8px;color:#333">cd web/vue && npm install && npm run build</pre>
+<p style="color:#666">未找到 <code>web/dist/</code> 目录。</p>
 </div></body></html>"""
     return web.Response(text=html, content_type='text/html')
