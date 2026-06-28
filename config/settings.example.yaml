@@ -4,7 +4,7 @@
 # HTTP 服务器
 server:
   host: "0.0.0.0"
-  port: 5003
+  port: 5201
 
 # Web 面板
 web:
