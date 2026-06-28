@@ -137,14 +137,14 @@ async def handle_get_chats(request: web.Request):
             friends = await _fetch_onebot_friends()
             for ch in chats:
                 cid = ch['chat_id']
-                ch['nickname'] = friends.get(cid) or f'\u7528\u6237{cid[-6:]}'
+                ch['nickname'] = friends.get(cid) or f'用户{cid[-6:]}'
                 ch['remark'] = ''
             for uid, nick in friends.items():
                 if uid not in log_ids:
                     chats.append({
                         'chat_id': uid, 'appid': appid, 'bot_name': appid,
                         'last_id': 0, 'last_time': '', 'last_date': '',
-                        'msg_count': 0, 'nickname': nick or f'\u7528\u6237{uid[-6:]}', 'remark': '',
+                        'msg_count': 0, 'nickname': nick or f'用户{uid[-6:]}', 'remark': '',
                     })
         else:
             groups = await _fetch_onebot_groups()
@@ -152,7 +152,7 @@ async def handle_get_chats(request: web.Request):
                 cid = ch['chat_id']
                 rv = remarks.get(cid)
                 group_name = groups.get(cid, '')
-                ch['nickname'] = _remark_name(rv) or group_name or f'\u7fa4{cid[-6:]}'
+                ch['nickname'] = _remark_name(rv) or group_name or f'群{cid[-6:]}'
                 ch['remark'] = _remark_name(rv)
                 ch['group_qq'] = _remark_qq(rv) or cid
             for gid, gname in groups.items():
@@ -162,7 +162,7 @@ async def handle_get_chats(request: web.Request):
                         'chat_id': gid, 'appid': appid, 'bot_name': appid,
                         'last_id': 0, 'last_time': '', 'last_date': '',
                         'msg_count': 0,
-                        'nickname': _remark_name(rv) or gname or f'\u7fa4{gid[-6:]}',
+                        'nickname': _remark_name(rv) or gname or f'群{gid[-6:]}',
                         'remark': _remark_name(rv), 'group_qq': _remark_qq(rv) or gid,
                     })
 
