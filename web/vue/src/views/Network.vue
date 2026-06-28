@@ -38,8 +38,10 @@ function statusOf(conn) {
 function endpointOf(conn) {
   if (TYPES[conn.type].mode === 'client') return conn.url
   const scheme = conn.type === 'ws_reverse' ? 'ws' : 'http'
-  const host = server.host === '0.0.0.0' ? '127.0.0.1' : server.host
-  return `${scheme}://${host}:${server.port}${conn.path || '/'}`
+  const rawHost = conn.host || server.host
+  const host = rawHost === '0.0.0.0' ? '127.0.0.1' : rawHost
+  const port = conn.port || server.port
+  return `${scheme}://${host}:${port}${conn.path || '/'}`
 }
 
 async function fetchData() {
@@ -218,9 +220,13 @@ onMounted(fetchData)
         </template>
 
         <template v-else>
-          <n-form-item label="监听地址（由框架 server 决定，仅供查看）">
-            <n-input :value="`${form.host}:${form.port}`" disabled />
+          <n-form-item label="监听地址 (host)">
+            <n-input v-model:value="form.host" placeholder="0.0.0.0" />
           </n-form-item>
+          <n-form-item label="监听端口 (port)">
+            <n-input-number v-model:value="form.port" :min="1" :max="65535" style="width:100%" />
+          </n-form-item>
+          <p class="net-form-desc">与面板端口 ({{ server.port }}) 相同时复用主服务；填写不同端口则独立监听 (适用于容器部署)。</p>
           <n-form-item label="路径">
             <n-input v-model:value="form.path" placeholder="/OneBotv11" />
           </n-form-item>

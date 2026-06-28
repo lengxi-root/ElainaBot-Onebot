@@ -23,8 +23,8 @@ class LogService:
         self._wal_mode = wal_mode
         self._insert_interval = insert_interval
         self._retention_days = retention_days
-        self._queues = {}  # {log_type: deque}
-        self._connections = {}  # {log_type: sqlite3.Connection}
+        self._queues = {}  # {(log_type, appid): deque}
+        self._connections = {}  # {(log_type, appid): sqlite3.Connection}
         self._lock = threading.Lock()
         self._running = False
         self._flush_task = None
@@ -45,10 +45,17 @@ class LogService:
             conn.close()
         self._connections.clear()
 
-    def _get_conn(self, log_type: str) -> sqlite3.Connection:
-        if log_type in self._connections:
-            return self._connections[log_type]
-        db_path = os.path.join(self._base_dir, f'{log_type}.db')
+    def _get_conn(self, log_type: str, appid: str = '') -> sqlite3.Connection:
+        key = (log_type, appid or '')
+        if key in self._connections:
+            return self._connections[key]
+        # appid 不为空时, 按机器人 QQ 分目录存储 (data/log/<qq>/<type>.db)
+        if appid:
+            db_dir = os.path.join(self._base_dir, str(appid))
+            os.makedirs(db_dir, exist_ok=True)
+            db_path = os.path.join(db_dir, f'{log_type}.db')
+        else:
+            db_path = os.path.join(self._base_dir, f'{log_type}.db')
         conn = sqlite3.connect(db_path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         if self._wal_mode:
@@ -72,23 +79,24 @@ class LogService:
         conn.execute('CREATE INDEX IF NOT EXISTS idx_log_group ON log(group_id)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_log_user ON log(user_id, group_id)')
         conn.commit()
-        self._connections[log_type] = conn
+        self._connections[key] = conn
         return conn
 
-    def add(self, log_type: str, entry: dict):
-        """添加日志条目到队列"""
-        if log_type not in self._queues:
-            self._queues[log_type] = deque()
-        self._queues[log_type].append(entry)
+    def add(self, log_type: str, entry: dict, appid: str = ''):
+        """添加日志条目到队列 (appid 不为空时按机器人 QQ 分库)"""
+        key = (log_type, appid or '')
+        if key not in self._queues:
+            self._queues[key] = deque()
+        self._queues[key].append(entry)
 
-    def add_sync(self, log_type: str, entry: dict):
+    def add_sync(self, log_type: str, entry: dict, appid: str = ''):
         """同步添加（等同于 add）"""
-        self.add(log_type, entry)
+        self.add(log_type, entry, appid)
 
-    def execute(self, log_type: str, sql: str, params=None) -> int:
+    def execute(self, log_type: str, sql: str, params=None, appid: str = '') -> int:
         """执行写操作（UPDATE/DELETE），返回受影响行数"""
         try:
-            conn = self._get_conn(log_type)
+            conn = self._get_conn(log_type, appid)
             with self._lock:
                 cursor = conn.execute(sql, params or [])
                 conn.commit()
@@ -97,10 +105,10 @@ class LogService:
             log.warning(f'执行写操作失败 [{log_type}]: {e}')
             return 0
 
-    def query(self, log_type: str, sql: str, params=None) -> list:
+    def query(self, log_type: str, sql: str, params=None, appid: str = '') -> list:
         """查询日志"""
         try:
-            conn = self._get_conn(log_type)
+            conn = self._get_conn(log_type, appid)
             with self._lock:
                 cursor = conn.execute(sql, params or [])
                 rows = cursor.fetchall()
@@ -115,8 +123,8 @@ class LogService:
             self._flush_all()
 
     def _flush_all(self):
-        for log_type in list(self._queues.keys()):
-            queue = self._queues.get(log_type)
+        for key in list(self._queues.keys()):
+            queue = self._queues.get(key)
             if not queue:
                 continue
             entries = []
@@ -124,8 +132,9 @@ class LogService:
                 entries.append(queue.popleft())
             if not entries:
                 continue
+            log_type, appid = key
             try:
-                conn = self._get_conn(log_type)
+                conn = self._get_conn(log_type, appid)
                 with self._lock:
                     for entry in entries:
                         conn.execute(
@@ -153,7 +162,7 @@ class LogService:
         if self._retention_days <= 0:
             return
         cutoff = (datetime.datetime.now() - datetime.timedelta(days=self._retention_days)).strftime('%Y-%m-%d %H:%M:%S')
-        for log_type, conn in self._connections.items():
+        for (log_type, _appid), conn in self._connections.items():
             try:
                 with self._lock:
                     conn.execute('DELETE FROM log WHERE timestamp < ?', (cutoff,))

@@ -35,7 +35,7 @@ class OneBotAPI:
             return None
 
         ws = self._adapter.get_bot_ws(self_id)
-        if not ws:
+        if ws is None:  # WebSocketResponse 的 bool() 为 False, 必须用 is None 判空
             # 反向/正向 WS 都不可用时, 尝试 HTTP 客户端 (框架 -> OneBot HTTP API)
             if getattr(self._adapter, 'http_clients', None):
                 return await self._adapter.http_call_action(action, params or {})

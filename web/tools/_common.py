@@ -30,19 +30,26 @@ def log_service():
 
 
 def connected_ids() -> list:
-    """已连接的 self_id 列表 (即机器人 QQ)"""
+    """已连接的 self_id 列表 (即机器人 QQ); 过滤正向连接的临时占位 id"""
     ad = adapter()
     if not ad:
         return []
     ids = set(ad.websockets.keys()) | set(ad.bots.keys())
+    ids = {i for i in ids if not str(i).startswith('forward:')}
     return sorted(ids)
 
 
-def query_log(log_type: str, sql: str, params=None) -> list:
+def primary_appid() -> str:
+    """当前主要连接的机器人 QQ (用于按 QQ 分库的消息/事件记录)"""
+    ids = connected_ids()
+    return ids[0] if ids else ''
+
+
+def query_log(log_type: str, sql: str, params=None, appid: str = '') -> list:
     svc = log_service()
     if not svc:
         return []
-    return svc.query(log_type, sql, params)
+    return svc.query(log_type, sql, params, appid=appid)
 
 
 # ── 昵称缓存 (通过 OneBot get_stranger_info) ──

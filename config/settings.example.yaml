@@ -17,34 +17,11 @@ web:
 onebot:
   access_token: ""                         # 默认鉴权 token（连接未单独配置时使用）
   secret: ""                               # 默认 HTTP 上报签名密钥（可选）
-  # 网络连接（可在「网络配置」页面可视化管理，支持多条）
+  # 网络连接（在「网络配置」页面点「新建」可视化管理，支持多条，默认不预置任何连接）
+  # 主服务端口 (server.port) 始终内置 /OneBotv11 反向 WS 入口, 可直接用作反向 WS 连接
   # type: ws_reverse(反向WS) / ws_forward(正向WS) / http_server(HTTP上报) / http_client(HTTP调用)
-  connections:
-    - type: ws_reverse                     # 反向 WS：框架监听, OneBot 端连入（复用 server 端口）
-      name: "反向 WS"
-      enable: true
-      host: "0.0.0.0"
-      port: 5201
-      path: "/OneBotv11"
-      token: ""
-    - type: ws_forward                     # 正向 WS：框架主动连接 OneBot 端 WS 服务器
-      name: "正向 WS"
-      enable: false
-      url: "ws://127.0.0.1:3001"
-      token: ""
-      reconnect_interval: 5000             # 重连间隔(毫秒)
-    - type: http_server                    # HTTP 上报：框架接收 OneBot 事件上报
-      name: "HTTP 上报"
-      enable: false
-      host: "0.0.0.0"
-      port: 5201
-      path: "/"
-      secret: ""
-    - type: http_client                    # HTTP 调用：框架通过 HTTP 调用 OneBot API
-      name: "HTTP API"
-      enable: false
-      url: "http://127.0.0.1:3000"
-      token: ""
+  # 反向 WS / HTTP 上报可设独立监听 host:port (容器部署), 与主端口相同则复用主服务
+  connections: []
 
 # 主人配置
 owner:
