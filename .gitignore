@@ -2,7 +2,6 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
-dist/
 build/
 .venv/
 venv/
@@ -23,7 +22,7 @@ config/bot.yaml
 
 # Node
 web/vue/node_modules/
-web/dist/
+# web/dist/ is committed (compiled Vue panel)
 
 # OS
 .DS_Store

@@ -56,7 +56,7 @@ class HttpServer:
     async def start(self):
         """启动 HTTP 服务器"""
         host = cfg.get('settings', 'server.host', '0.0.0.0')
-        port = cfg.get('settings', 'server.port', 5003)
+        port = cfg.get('settings', 'server.port', 5201)
 
         self._runner = web.AppRunner(self._app)
         await self._runner.setup()
