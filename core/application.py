@@ -222,7 +222,9 @@ class Application:
 
             content = ''.join(parts) or "[空消息]"
             display = content[:100] + "..." if len(content) > 100 else content
-            log.info(f'{msg_type} | {location} | {sender}: {display}')
+            # 消息内容属于「消息记录」(按 QQ 分库), 不应混入「框架日志」: web_skip=True
+            log.info(f'[{event.self_id}] {msg_type} | {location} | {sender}: {display}',
+                     extra={'web_skip': True})
 
             # 写入 SQLite
             if self._log_service:

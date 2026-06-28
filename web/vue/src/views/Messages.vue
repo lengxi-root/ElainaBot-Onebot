@@ -20,7 +20,7 @@ const total = ref(0)
 const current = ref(null)
 const history = ref([])
 const historyRef = ref(null)
-const msgType = ref('markdown')
+const msgType = ref('text')
 const msgText = ref('')
 const imgFile = ref(null)
 const sending = ref(false)
@@ -33,17 +33,12 @@ const oldestDate = ref('')
 const hasMore = ref(true)
 const loadingOlder = ref(false)
 const mediaFileType = ref('1')
-const arkTpl = ref('23')
-const arkFields = ref({})
-const arkList = ref('')
 const imgPreview = ref('')
 const mobileTypeOpen = ref(false)
 const mobileMediaOpen = ref(false)
 const msgTypeOptions = [
-  { value: 'markdown', label: 'MD' },
-  { value: 'text', label: '文本' },
-  { value: 'media', label: '媒体' },
-  { value: 'ark', label: 'ARK' },
+  { value: 'text', label: '普通消息' },
+  { value: 'media', label: '富媒体' },
 ]
 const mediaTypeOptions = [
   { value: '1', label: '图片' },
@@ -62,7 +57,7 @@ const addRemarkModalVisible = ref(false)
 const addRemarkOpenid = ref('')
 const addRemarkName = ref('')
 const addRemarkQq = ref('')
-const placeholder = computed(() => msgType.value === 'markdown' ? '输入 Markdown 内容... (Ctrl+Enter 发送)' : msgType.value === 'media' ? '输入资源 URL... (Ctrl+Enter 发送)' : '输入消息内容... (Ctrl+Enter 发送)')
+const placeholder = computed(() => msgType.value === 'media' ? '输入资源 URL... (Ctrl+Enter 发送)' : '输入消息内容... (Ctrl+Enter 发送)')
 const quotedPreview = computed(() => quotedMsg.value ? buildQuotePreview(quotedMsg.value) : '')
 const mobileMsgTypeLabel = computed(() => msgTypeOptions.find(o => o.value === msgType.value)?.label || 'MD')
 const mobileMediaTypeLabel = computed(() => mediaTypeOptions.find(o => o.value === mediaFileType.value)?.label || '图片')
@@ -73,10 +68,11 @@ function goBackToList() { mobileView.value = 'list'; current.value = null }
 function closeMobileTypeMenu() { mobileTypeOpen.value = false; mobileMediaOpen.value = false }
 function selectMobileMsgType(value) { msgType.value = value; closeMobileTypeMenu() }
 function selectMobileMediaType(value) { mediaFileType.value = value; closeMobileTypeMenu() }
-function avatarUrl(appid, uid) { return `https://q.qlogo.cn/qqapp/${appid}/${uid}/0` }
 function getBotAvatar(appid) { const bot = app.bots.find(b => b.appid === appid); return bot?.avatar || '' }
 function qqAvatar(qq) { return `http://q1.qlogo.cn/g?b=qq&nk=${qq}&s=100` }
-function groupQqAvatar(qq) { return `https://p.qlogo.cn/gh/${qq}/${qq}/100/` }
+function groupQqAvatar(qq) { return `http://p.qlogo.cn/gh/${qq}/${qq}/100/` }
+// OneBot 的 user_id 均为真实 QQ 号, 头像统一走 q1.qlogo.cn
+function avatarUrl(_appid, uid) { return qqAvatar(uid) }
 function openUrl(u) { const a = document.createElement('a'); a.href = u; a.target = '_blank'; a.rel = 'noreferrer noopener'; a.click() }
 const lightboxSrc = ref('')
 function previewImg(src) { lightboxSrc.value = src }
@@ -211,22 +207,6 @@ function renderContent(content) {
   return h + kbHtml
 }
 
-function buildArkKv() {
-  const tpl = arkTpl.value, f = arkFields.value, kv = []
-  if (tpl === '24') { for (const k of ['#DESC#','#PROMPT#','#TITLE#','#METADESC#','#IMG#','#LINK#','#SUBTITLE#']) if (f[k]) kv.push({ key: k, value: f[k] }) }
-  else if (tpl === '37') { for (const k of ['#PROMPT#','#METATITLE#','#METASUBTITLE#','#METACOVER#','#METAURL#']) if (f[k]) kv.push({ key: k, value: f[k] }) }
-  else {
-    if (f['#DESC#']) kv.push({ key: '#DESC#', value: f['#DESC#'] })
-    if (f['#PROMPT#']) kv.push({ key: '#PROMPT#', value: f['#PROMPT#'] })
-    const lines = arkList.value.trim().split('\n').filter(Boolean)
-    if (lines.length) {
-      const objs = lines.map(l => { const [desc, link] = l.split('|', 2); const arr = []; if (desc?.trim()) arr.push({ key: 'desc', value: desc.trim() }); if (link?.trim()) arr.push({ key: 'link', value: link.trim() }); return arr.length ? { obj_kv: arr } : null }).filter(Boolean)
-      if (objs.length) kv.push({ key: '#LIST#', obj: objs })
-    }
-  }
-  return kv
-}
-
 let _fetchTimer = null
 async function fetchChats() {
   if (_unmounted) return
@@ -239,20 +219,29 @@ async function fetchChats() {
 }
 
 function memberInfo(uid) { return groupRoles.value[uid] || {} }
-function roleLabel(uid) {
-  const r = String(memberInfo(uid).role || '')
+// 优先用消息自带的 sender.role (OneBot 群消息携带), 退回成员列表
+function msgRole(m) { return String(m.role || memberInfo(m.user_id).role || '') }
+function roleLabel(r) {
   if (r === 'owner') return '群主'
   if (r === 'admin') return '管理'
   if (r) return '群员'
   return ''
 }
-function roleClass(uid) {
-  const r = String(memberInfo(uid).role || '')
+function roleClass(r) {
   if (r === 'owner') return 'role-owner'
   if (r === 'admin') return 'role-admin'
   return 'role-member'
 }
-function isBot(uid) { return !!memberInfo(uid).is_bot }
+// 机器人 QQ 号段判定 (这些号段/号码为机器人账号)
+function isBotQq(uid) {
+  const n = Number(uid)
+  if (!n) return false
+  return (n >= 2854000000 && n <= 2855000000) ||
+    (n >= 3889000000 && n <= 3890000000) ||
+    (n >= 4010000000 && n <= 4019999999) ||
+    n === 3328144510 || n === 66600000
+}
+function isBot(uid) { return !!memberInfo(uid).is_bot || isBotQq(uid) }
 
 const _rolesCache = {}
 const _ROLES_CACHE_TTL = 120000
@@ -446,9 +435,8 @@ async function sendMsg() {
   if (sending.value || !current.value) return
   sending.value = true; sendErr.value = ''
   try {
-    let content = ''
-    if (msgType.value === 'ark') { const kv = buildArkKv(); if (!kv.length) { sendErr.value = '请至少填写一个字段'; sending.value = false; return }; content = JSON.stringify(kv) }
-    else { content = msgText.value.trim(); if (!content && !imgFile.value) { sending.value = false; return } }
+    const content = msgText.value.trim()
+    if (!content && !imgFile.value) { sending.value = false; return }
     const fd = new FormData()
     fd.append('chat_type', apiChatType.value); fd.append('chat_id', current.value.chat_id)
     fd.append('appid', app.currentBotId || current.value.appid || '')
@@ -459,9 +447,8 @@ async function sendMsg() {
     }
     if (imgFile.value && msgType.value === 'text') fd.append('image', imgFile.value)
     if (msgType.value === 'media') fd.append('media_file_type', mediaFileType.value)
-    if (msgType.value === 'ark') fd.append('ark_template_id', arkTpl.value)
     const res = await axios.post('/api/message/send', fd)
-    if (res.data?.success) { msgText.value = ''; clearImg(); clearQuote(); if (msgType.value === 'ark') { arkFields.value = {}; arkList.value = '' } }
+    if (res.data?.success) { msgText.value = ''; clearImg(); clearQuote() }
     else sendErr.value = res.data?.message || '发送失败'
   } catch (e) { sendErr.value = e.response?.data?.message || e.message || '发送失败' }
   finally { sending.value = false }
@@ -497,8 +484,8 @@ onUnmounted(() => { _unmounted = true; off('new_log', onNewLog); window.removeEv
         <div class="chat-items">
           <div v-for="c in chats" :key="c.chat_id" :class="['chat-item', { active: current?.chat_id === c.chat_id }]" @click="selectChat(c)">
             <div class="chat-avatar-wrap">
-              <img v-if="chatType === 'user' && c.appid && c.chat_id" class="chat-avatar" :src="avatarUrl(c.appid, c.chat_id)" loading="lazy" @error="e => e.target.style.display='none'" />
-              <img v-else-if="c.group_qq" class="chat-avatar" :src="groupQqAvatar(c.group_qq)" loading="lazy" @error="e => e.target.style.display='none'" />
+              <img v-if="chatType === 'user' && c.chat_id" class="chat-avatar" :src="qqAvatar(c.chat_id)" loading="lazy" @error="e => e.target.style.display='none'" />
+              <img v-else-if="chatType === 'group' && c.chat_id" class="chat-avatar" :src="groupQqAvatar(c.chat_id)" loading="lazy" @error="e => e.target.style.display='none'" />
               <img v-else-if="app.isAllBots && c.appid && getBotAvatar(c.appid)" class="chat-avatar" :src="getBotAvatar(c.appid)" loading="lazy" @error="e => e.target.style.display='none'" />
               <div v-else class="chat-avatar-fallback">{{ (c.nickname || c.chat_id || '?').charAt(0) }}</div>
               <span v-if="c.is_full_access" class="chat-avatar-badge">全</span>
@@ -564,8 +551,7 @@ onUnmounted(() => { _unmounted = true; off('new_log', onNewLog); window.removeEv
                 <div class="bubble-name">
                   {{ m.nickname }}
                   <span v-if="m.source === 'web_panel'" class="bubble-src-tag">Web</span>
-                  <span v-else-if="m.source === 'onebot'" class="bubble-src-tag ob-tag">OneBot</span>
-                  <span v-if="roleLabel(m.user_id) && !m.is_self && apiChatType === 'group'" :class="['bubble-role-tag', roleClass(m.user_id)]">{{ roleLabel(m.user_id) }}</span>
+                  <span v-if="msgRole(m) && !m.is_self && apiChatType === 'group'" :class="['bubble-role-tag', roleClass(msgRole(m))]">{{ roleLabel(msgRole(m)) }}</span>
                   <span v-if="isBot(m.user_id) && !m.is_self && apiChatType === 'group'" class="bubble-role-tag role-bot">Bot</span>
                   <span v-if="m.user_id && !m.is_self" class="bubble-uid">{{ m.user_id }}</span>
                 </div>
@@ -616,7 +602,7 @@ onUnmounted(() => { _unmounted = true; off('new_log', onNewLog); window.removeEv
               <button class="quote-clear" title="取消引用" @click="clearQuote">×</button>
             </div>
             <div class="send-toolbar">
-              <select v-model="msgType" class="send-type-select"><option value="markdown">Markdown</option><option value="text">普通消息</option><option value="media">富媒体</option><option value="ark">ARK</option></select>
+              <select v-model="msgType" class="send-type-select"><option value="text">普通消息</option><option value="media">富媒体</option></select>
               <select v-if="msgType === 'media'" v-model="mediaFileType" class="send-type-select"><option value="1">图片</option><option value="2">视频</option><option value="3">语音</option><option value="4">文件</option></select>
               <label v-if="msgType === 'text'" class="send-img-label" title="选择图片">
                 <input type="file" accept="image/*" @change="onImgSelect" hidden />
@@ -626,50 +612,10 @@ onUnmounted(() => { _unmounted = true; off('new_log', onNewLog); window.removeEv
                 <img v-if="imgPreview" :src="imgPreview" class="send-img-preview" /> {{ imgFile.name }}
                 <span class="send-img-remove" @click="clearImg">×</span>
               </span>
-              <select v-if="msgType === 'ark'" v-model="arkTpl" class="send-type-select"><option value="23">23 - 链接卡片</option><option value="24">24 - 文本卡片</option><option value="37">37 - 大图卡片</option></select>
-            </div>
-
-            <!-- ARK form -->
-            <div v-if="msgType === 'ark'" class="ark-form">
-              <div class="mobile-type-menu ark-mobile-select" @click.stop>
-                <button type="button" class="mobile-type-trigger" @click="mobileTypeOpen = !mobileTypeOpen">
-                  <span>{{ mobileMsgTypeLabel }}</span><span class="mobile-type-caret"></span>
-                </button>
-                <div v-if="mobileTypeOpen" class="mobile-type-options">
-                  <button v-for="opt in msgTypeOptions" :key="opt.value" type="button" :class="{ active: msgType === opt.value }" @click="selectMobileMsgType(opt.value)">{{ opt.label }}</button>
-                </div>
-              </div>
-              <div class="ark-grid">
-                <template v-if="arkTpl === '24'">
-                  <div class="ark-field"><label>#DESC#</label><input v-model="arkFields['#DESC#']" placeholder="描述" /></div>
-                  <div class="ark-field"><label>#PROMPT#</label><input v-model="arkFields['#PROMPT#']" placeholder="提示" /></div>
-                  <div class="ark-field"><label>#TITLE#</label><input v-model="arkFields['#TITLE#']" placeholder="标题" /></div>
-                  <div class="ark-field"><label>#METADESC#</label><input v-model="arkFields['#METADESC#']" placeholder="详情" /></div>
-                  <div class="ark-field"><label>#IMG#</label><input v-model="arkFields['#IMG#']" placeholder="图片URL" /></div>
-                  <div class="ark-field"><label>#LINK#</label><input v-model="arkFields['#LINK#']" placeholder="跳转URL" /></div>
-                  <div class="ark-field"><label>#SUBTITLE#</label><input v-model="arkFields['#SUBTITLE#']" placeholder="副标题" /></div>
-                </template>
-                <template v-else-if="arkTpl === '37'">
-                  <div class="ark-field"><label>#PROMPT#</label><input v-model="arkFields['#PROMPT#']" placeholder="提示" /></div>
-                  <div class="ark-field"><label>#METATITLE#</label><input v-model="arkFields['#METATITLE#']" placeholder="标题" /></div>
-                  <div class="ark-field"><label>#METASUBTITLE#</label><input v-model="arkFields['#METASUBTITLE#']" placeholder="副标题" /></div>
-                  <div class="ark-field"><label>#METACOVER#</label><input v-model="arkFields['#METACOVER#']" placeholder="封面URL" /></div>
-                  <div class="ark-field"><label>#METAURL#</label><input v-model="arkFields['#METAURL#']" placeholder="跳转URL" /></div>
-                </template>
-                <template v-else>
-                  <div class="ark-field"><label>#DESC#</label><input v-model="arkFields['#DESC#']" placeholder="描述" /></div>
-                  <div class="ark-field"><label>#PROMPT#</label><input v-model="arkFields['#PROMPT#']" placeholder="提示" /></div>
-                </template>
-              </div>
-              <template v-if="arkTpl === '23'">
-                <div class="ark-hint">链接列表 (每行一条: 文字|链接URL)</div>
-                <textarea v-model="arkList" class="send-input" rows="2" placeholder="描述1|https://example.com&#10;描述2|https://example.com" />
-              </template>
-              <button class="send-btn ark-send-btn" @click="sendMsg" :disabled="sending">{{ sending ? '...' : '发送 ARK' }}</button>
             </div>
 
             <!-- Normal send -->
-            <div v-if="msgType !== 'ark'" class="send-input-row">
+            <div class="send-input-row">
               <div class="mobile-type-menu" @click.stop>
                 <button type="button" class="mobile-type-trigger" @click="mobileTypeOpen = !mobileTypeOpen">
                   <span>{{ mobileMsgTypeLabel }}</span><span class="mobile-type-caret"></span>
@@ -707,17 +653,15 @@ onUnmounted(() => { _unmounted = true; off('new_log', onNewLog); window.removeEv
 
     <n-modal v-model:show="remarkModalVisible" preset="dialog" title="群备注" positive-text="保存" negative-text="取消" @positive-click="setRemark" @negative-click="cancelRemark" style="width:380px">
       <div style="padding:8px 0">
-        <div style="margin-bottom:8px;font-size:13px;color:var(--text2)">群 OpenID: {{ remarkEditing }}</div>
-        <n-input v-model:value="remarkInput" placeholder="备注名称（留空则清除备注）" style="margin-bottom:8px" />
-        <n-input v-model:value="remarkQqInput" placeholder="群号（可选，填写后显示群头像）" @keydown.enter="setRemark(); remarkModalVisible = false" />
+        <div style="margin-bottom:8px;font-size:13px;color:var(--text2)">群号: {{ remarkEditing }}</div>
+        <n-input v-model:value="remarkInput" placeholder="备注名称（留空则清除备注）" @keydown.enter="setRemark(); remarkModalVisible = false" />
       </div>
     </n-modal>
 
     <n-modal v-model:show="addRemarkModalVisible" preset="dialog" title="添加群备注" positive-text="保存" negative-text="取消" @positive-click="submitAddRemark" @negative-click="cancelAddRemark" style="width:380px">
       <div style="padding:8px 0">
-        <n-input v-model:value="addRemarkOpenid" placeholder="群 OpenID" style="margin-bottom:8px" autofocus />
-        <n-input v-model:value="addRemarkName" placeholder="备注名称" style="margin-bottom:8px" />
-        <n-input v-model:value="addRemarkQq" placeholder="群号（可选，填写后显示群头像）" @keydown.enter="submitAddRemark(); addRemarkModalVisible = false" />
+        <n-input v-model:value="addRemarkOpenid" placeholder="群号" style="margin-bottom:8px" autofocus />
+        <n-input v-model:value="addRemarkName" placeholder="备注名称" @keydown.enter="submitAddRemark(); addRemarkModalVisible = false" />
       </div>
     </n-modal>
   </div>

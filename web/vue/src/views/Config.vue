@@ -9,16 +9,14 @@ const message = useMessage()
 const loading = ref(false)
 const saving = ref(false)
 const dirty = ref(false)
-const activeFile = ref('bot')
+const activeFile = ref('settings')
 const viewMode = ref('visual')
 const raw = reactive({ bot: '', settings: '', templates: '' })
 const botIndex = ref(0)
 const buttonTexts = reactive({})
 
 const TABS = [
-  { key: 'bot', label: 'bot.yaml' },
   { key: 'settings', label: 'settings.yaml' },
-  { key: 'templates', label: 'templates.yaml' },
 ]
 
 const VARIABLES = ['{user_id}', '{user_count}', '{reason}', '{error_code}', '{error_message}', '{appid}', '{group_id}']
@@ -148,6 +146,13 @@ function updateSettingBool(section, key, event) {
   const d = parse(raw.settings)
   if (!d[section]) d[section] = {}
   d[section][key] = event.target.checked
+  raw.settings = dump(d); dirty.value = true
+}
+
+function updateSettingList(section, key, event) {
+  const d = parse(raw.settings)
+  if (!d[section]) d[section] = {}
+  d[section][key] = event.target.value.split(',').map(s => s.trim()).filter(Boolean)
   raw.settings = dump(d); dirty.value = true
 }
 
@@ -326,7 +331,17 @@ onMounted(fetchConfig)
           <div class="vis-card-title">HTTP 服务器</div>
           <div class="vis-grid">
             <div class="vis-field"><label>监听地址</label><input :value="settings.server?.host || '0.0.0.0'" @input="updateSetting('server', 'host', $event)" /></div>
-            <div class="vis-field"><label>端口</label><input type="number" :value="settings.server?.port || 5001" @input="updateSettingNum('server', 'port', $event)" /></div>
+            <div class="vis-field"><label>端口</label><input type="number" :value="settings.server?.port || 5201" @input="updateSettingNum('server', 'port', $event)" /></div>
+          </div>
+          <div class="vis-card-title" style="margin-top:14px">主人配置</div>
+          <div class="vis-grid">
+            <div class="vis-field full"><label>主人 QQ 号</label><input :value="(settings.owner?.ids || []).join(',')" @input="updateSettingList('owner', 'ids', $event)" placeholder="多个用逗号分隔" /></div>
+          </div>
+          <div class="vis-card-title" style="margin-top:14px">OneBot 协议</div>
+          <div class="vis-grid">
+            <div class="vis-field"><label>默认鉴权 Token</label><input :value="settings.onebot?.access_token || ''" @input="updateSetting('onebot', 'access_token', $event)" placeholder="连接未单独配置时使用" /></div>
+            <div class="vis-field"><label>HTTP 上报签名密钥</label><input :value="settings.onebot?.secret || ''" @input="updateSetting('onebot', 'secret', $event)" placeholder="可选" /></div>
+            <div class="vis-field full" style="font-size:12px;color:var(--text-secondary)">网络连接（正向/反向 WS、HTTP）请在「网络配置」页面管理</div>
           </div>
           <div class="vis-card-title" style="margin-top:14px">Web 面板</div>
           <div class="vis-grid">
