@@ -65,6 +65,7 @@ def _aggregate_chats(chat_type):
         sql = ("SELECT user_id AS chat_id, MAX(id) AS last_id, MAX(timestamp) AS last_time, "
                "COUNT(*) AS msg_count FROM log WHERE user_id != '' AND group_id = '' GROUP BY user_id")
     else:
+        # group / full_access / remark 均按群聊聚合 (OneBot 无官方全量群概念)
         sql = ("SELECT group_id AS chat_id, MAX(id) AS last_id, MAX(timestamp) AS last_time, "
                "COUNT(*) AS msg_count FROM log WHERE group_id != '' GROUP BY group_id")
     rows = _q(sql)
@@ -87,32 +88,6 @@ def _aggregate_chats(chat_type):
     return chats
 
 
-async def _fetch_onebot_groups() -> dict:
-    """从 OneBot 接口获取群列表, 返回 {group_id: group_name}"""
-    try:
-        resp = await _api().get_group_list()
-        if not resp:
-            return {}
-        data = resp.get('data') or (resp if isinstance(resp, list) else [])
-        return {str(g.get('group_id', '')): g.get('group_name', '') for g in data if g.get('group_id')}
-    except Exception:
-        pass
-    return {}
-
-
-async def _fetch_onebot_friends() -> dict:
-    """从 OneBot 接口获取好友列表, 返回 {user_id: nickname}"""
-    try:
-        resp = await _api().get_friend_list()
-        if not resp:
-            return {}
-        data = resp.get('data') or (resp if isinstance(resp, list) else [])
-        return {str(f.get('user_id', '')): f.get('nickname', '') or f.get('remark', '') for f in data if f.get('user_id')}
-    except Exception:
-        pass
-    return {}
-
-
 async def handle_get_chats(request: web.Request):
     try:
         body = await request.json()
@@ -129,13 +104,12 @@ async def handle_get_chats(request: web.Request):
         chats = c[1]
     else:
         chats = await asyncio.get_running_loop().run_in_executor(None, _aggregate_chats, chat_type)
-        log_ids = {ch['chat_id'] for ch in chats}
         remarks = _load_remarks()
-        appid = _primary_id()
-
         if chat_type == 'user':
-            friends = await _fetch_onebot_friends()
+            ids = [ch['chat_id'] for ch in chats]
+            nicks = await _common.batch_nicknames(ids)
             for ch in chats:
+<<<<<<< HEAD
                 cid = ch['chat_id']
                 ch['nickname'] = friends.get(cid) or f'用户{cid[-6:]}'
                 ch['remark'] = ''
@@ -146,9 +120,13 @@ async def handle_get_chats(request: web.Request):
                         'last_id': 0, 'last_time': '', 'last_date': '',
                         'msg_count': 0, 'nickname': nick or f'用户{uid[-6:]}', 'remark': '',
                     })
+=======
+                ch['nickname'] = nicks.get(ch['chat_id'], f'用户{ch["chat_id"][-6:]}')
+                ch['remark'] = ''
+>>>>>>> parent of 7ffdcd2 (fix: web面板修复与优化 (#8))
         else:
-            groups = await _fetch_onebot_groups()
             for ch in chats:
+<<<<<<< HEAD
                 cid = ch['chat_id']
                 rv = remarks.get(cid)
                 group_name = groups.get(cid, '')
@@ -167,6 +145,15 @@ async def handle_get_chats(request: web.Request):
                     })
 
         chats.sort(key=lambda c: c['last_time'], reverse=True)
+=======
+                rv = remarks.get(ch['chat_id'])
+                ch['nickname'] = _remark_name(rv) or f'群{ch["chat_id"][-6:]}'
+                ch['remark'] = _remark_name(rv)
+                ch['group_qq'] = _remark_qq(rv)
+                ch['is_full_access'] = False
+            if chat_type == 'remark':
+                chats = [ch for ch in chats if ch['chat_id'] in remarks]
+>>>>>>> parent of 7ffdcd2 (fix: web面板修复与优化 (#8))
         _chat_cache[chat_type] = (now, chats)
 
     if search:
