@@ -157,10 +157,4 @@ def get_api() -> OneBotAPI:
     return OneBotAPI(_adapter_ref)
 
 
-def run_async_api(coro):
-    """在同步上下文中调用异步 API"""
-    loop = _main_loop
-    if loop and loop.is_running():
-        future = asyncio.run_coroutine_threadsafe(coro, loop)
-        return future.result(timeout=30)
-    return asyncio.run(coro)
+

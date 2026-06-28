@@ -89,10 +89,8 @@ class Application:
         setup_logger(framework_name=fw_name)
         log.info(f'{"=" * 5} {fw_name} OneBot 启动中 {"=" * 5}')
 
-        # 2) OneBot 适配器
-        access_token = cfg.get('settings', 'onebot.access_token', '')
-        secret = cfg.get('settings', 'onebot.secret', '')
-        self._adapter = OneBotAdapter(access_token=access_token, secret=secret)
+        # 2) OneBot 适配器 (每条连接自带 token/secret, 无需全局配置)
+        self._adapter = OneBotAdapter()
         set_adapter(self._adapter)
         set_main_loop(asyncio.get_running_loop())
 
@@ -194,12 +192,12 @@ class Application:
         await self._hook_manager.emit('on_raw_event', event)
 
         # 日志记录
-        self._log_event(event)
+        await self._log_event(event)
 
         # 异步分发到插件 (消息事件 + 通知/请求事件)
         await self._plugin_manager.dispatch(event)
 
-    def _log_event(self, event):
+    async def _log_event(self, event):
         """记录事件日志"""
         if isinstance(event, MessageEvent):
             msg_type = "群聊" if event.is_group else "私聊"
@@ -239,7 +237,7 @@ class Application:
                 nickname = ''
                 if isinstance(event.sender, dict):
                     nickname = event.sender.get('card') or event.sender.get('nickname') or ''
-                self._log_service.add('message', {
+                await self._log_service.add('message', {
                     'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'content': content,
                     'source': str(event.self_id or ''),
@@ -273,7 +271,7 @@ class Application:
                 'group_increase', 'group_decrease', 'friend_add', 'friend_del',
                 'group_recall', 'friend_recall',
             ):
-                self._log_service.add('lifecycle', {
+                await self._log_service.add('lifecycle', {
                     'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'content': f'{event.notice_type} | 群{event.group_id or ""} | 用户{event.user_id}',
                     'source': str(event.self_id or ''),
@@ -286,7 +284,7 @@ class Application:
             if self._log_service and event.notice_type in ('group_recall', 'friend_recall'):
                 recalled_mid = str(event.raw_data.get('message_id', '') or '')
                 if recalled_mid:
-                    self._log_service.execute(
+                    await self._log_service.execute(
                         'message',
                         "UPDATE log SET extra = 'recalled' WHERE message_id = ?",
                         (recalled_mid,),

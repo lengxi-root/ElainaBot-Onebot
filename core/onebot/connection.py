@@ -59,7 +59,7 @@ class ConnectionManager:
 
     # ── 配置 ──
     def load_configs(self):
-        conns = cfg.get('settings', 'onebot.connections', None)
+        conns = cfg.get('connections', 'connections', None)
         if not conns or not isinstance(conns, list):
             conns = default_connections()
         self._configs = [normalize(c) for c in conns if isinstance(c, dict)]
@@ -113,9 +113,6 @@ class ConnectionManager:
                 http_secrets[(port, path)] = c.get('secret', '') or ''
         self._adapter.reverse_ws_tokens = ws_tokens
         self._adapter.reverse_http_secrets = http_secrets
-        # 旧版全局配置仅作为找不到对应连接时的回退
-        self._adapter.access_token = cfg.get('settings', 'onebot.access_token', '') or ''
-        self._adapter.secret = cfg.get('settings', 'onebot.secret', '') or ''
 
     # ── HTTP 客户端 ──
     def _register_http_clients(self):

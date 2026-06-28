@@ -1,4 +1,4 @@
-"""OneBot 网络连接配置 — 读取/保存 onebot.connections, 查询连接状态"""
+"""OneBot 网络连接配置 — 读取/保存 connections.yaml, 查询连接状态"""
 
 import logging
 
@@ -18,7 +18,7 @@ def set_context(app_instance):
 
 
 def _current_connections():
-    conns = cfg.get('settings', 'onebot.connections', None)
+    conns = cfg.get('connections', 'connections', None)
     if not conns or not isinstance(conns, list):
         conns = default_connections()
     return [normalize(c) for c in conns if isinstance(c, dict)]
@@ -91,7 +91,7 @@ async def handle_save_connections(request: web.Request):
         names.add(name)
         cleaned.append(item)
 
-    cfg.set_value('settings', 'onebot.connections', cleaned)
+    cfg.set_value('connections', 'connections', cleaned)
 
     if _app:
         try:

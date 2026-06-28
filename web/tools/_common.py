@@ -39,22 +39,17 @@ def connected_ids() -> list:
     return sorted(ids)
 
 
-def primary_appid() -> str:
+def primary_bot_qq() -> str:
     """当前主要连接的机器人 QQ (用于按 QQ 分库的消息/事件记录)"""
     ids = connected_ids()
     return ids[0] if ids else ''
 
 
-def primary_bot_qq() -> str:
-    """primary_appid 的别名"""
-    return primary_appid()
-
-
-def query_log(log_type: str, sql: str, params=None, bot_qq: str = '') -> list:
+async def query_log(log_type: str, sql: str, params=None, bot_qq: str = '') -> list:
     svc = log_service()
     if not svc:
         return []
-    return svc.query(log_type, sql, params, bot_qq=bot_qq)
+    return await svc.query(log_type, sql, params, bot_qq=bot_qq)
 
 
 # ── 昵称缓存 (通过 OneBot get_stranger_info) ──

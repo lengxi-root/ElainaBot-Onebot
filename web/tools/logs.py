@@ -1,6 +1,4 @@
-"""日志查询 — 最近日志 / 分页 / 登录日志"""
-
-import asyncio
+"""日志查询 — 最近日志 / 分页 / 登录日志 (异步架构)"""
 
 from aiohttp import web
 
@@ -15,8 +13,8 @@ def set_context(app_instance):
     _common.set_app(app_instance)
 
 
-def _query_recent(log_type: str, bot_qq: str = '') -> list:
-    rows = _common.query_log(log_type, _LOG_SQL, bot_qq=bot_qq)
+async def _query_recent(log_type: str, bot_qq: str = '') -> list:
+    rows = await _common.query_log(log_type, _LOG_SQL, bot_qq=bot_qq)
     rows.reverse()  # 升序: 旧 → 新
     return rows
 
@@ -42,31 +40,16 @@ def _transform_message_rows(rows: list, bot_qq: str = '') -> list:
     return result
 
 
-def _gather_recent_sync():
-    bot_qq = _common.primary_appid()
-    msg_rows = _query_recent('message', bot_qq=bot_qq)
-    return {
-        'message': _transform_message_rows(msg_rows, bot_qq),
-        'framework': _query_recent('framework'),
-        'error': _query_recent('error'),
-        'lifecycle': _query_recent('lifecycle', bot_qq=bot_qq),
-    }
-
-
 async def handle_recent_logs(request: web.Request):
-    loop = asyncio.get_running_loop()
-    payload = await loop.run_in_executor(None, _gather_recent_sync)
+    bot_qq = _common.primary_bot_qq()
+    msg_rows = await _query_recent('message', bot_qq=bot_qq)
+    payload = {
+        'message': _transform_message_rows(msg_rows, bot_qq),
+        'framework': await _query_recent('framework'),
+        'error': await _query_recent('error'),
+        'lifecycle': await _query_recent('lifecycle', bot_qq=bot_qq),
+    }
     return web.json_response(payload)
-
-
-def _query_logs_sync(log_type, page_size, offset):
-    rows = _common.query_log(
-        log_type,
-        f'SELECT * FROM log ORDER BY id DESC LIMIT {page_size} OFFSET {offset}',
-    )
-    total_rows = _common.query_log(log_type, 'SELECT MAX(id) AS cnt FROM log')
-    total = (total_rows[0].get('cnt') or 0) if total_rows else 0
-    return rows, total
 
 
 async def handle_get_logs(request: web.Request):
@@ -78,8 +61,12 @@ async def handle_get_logs(request: web.Request):
     page_size = int(request.query.get('size', '50'))
     offset = (page - 1) * page_size
 
-    loop = asyncio.get_running_loop()
-    rows, total = await loop.run_in_executor(None, _query_logs_sync, log_type, page_size, offset)
+    rows = await _common.query_log(
+        log_type,
+        f'SELECT * FROM log ORDER BY id DESC LIMIT {page_size} OFFSET {offset}',
+    )
+    total_rows = await _common.query_log(log_type, 'SELECT MAX(id) AS cnt FROM log')
+    total = (total_rows[0].get('cnt') or 0) if total_rows else 0
     return web.json_response({
         'logs': rows,
         'total': total,

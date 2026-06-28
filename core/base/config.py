@@ -28,7 +28,7 @@ class Config:
 
     def _ensure_defaults(self):
         """如果配置文件不存在，从 example 复制"""
-        for name in ('settings',):
+        for name in ('settings', 'connections'):
             target = os.path.join(self._config_dir, f'{name}.yaml')
             if not os.path.isfile(target):
                 example = os.path.join(self._config_dir, f'{name}.example.yaml')
