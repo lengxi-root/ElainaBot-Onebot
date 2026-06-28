@@ -77,8 +77,8 @@ const chartOptions = {
 async function fetchChart() {
   chartLoading.value = true
   try {
-    const appid = app.currentBotId || ''
-    const data = (await axios.get(`/api/statistics/hourly?appid=${appid}`)).data?.data || {}
+    const bot_qq = app.currentBotId || ''
+    const data = (await axios.get(`/api/statistics/hourly?bot_qq=${bot_qq}`)).data?.data || {}
     if (data.today_hourly_distribution?.length) todayHourly.value = data.today_hourly_distribution
     if (data.yesterday_hourly_distribution?.length) { yesterdayHourly.value = data.yesterday_hourly_distribution }
   } catch {

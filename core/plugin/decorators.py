@@ -1,51 +1,86 @@
-"""插件装饰器"""
+"""插件装饰器: handler / on_load / on_unload / interceptor"""
 
+import asyncio
 import re
-from typing import Callable, Optional
+
+# 临时注册表 (加载插件时收集, 由 PluginManager.load 消费)
+_pending_handlers: list = []
+_pending_on_load: list = []
+_pending_on_unload: list = []
+_pending_interceptors: list = []
 
 
-def on_command(command: str, aliases: list = None):
-    """命令匹配装饰器"""
-    patterns = [re.escape(command)]
-    if aliases:
-        patterns.extend(re.escape(a) for a in aliases)
-    pattern = f'^({"|".join(patterns)})(\\s+.*)?$'
+def handler(
+    pattern,
+    *,
+    name='',
+    desc='',
+    priority=0,
+    owner_only=False,
+    group_only=False,
+    private_only=False,
+    event_types=None,
+    cooldown=0,
+):
+    """注册消息处理器
 
-    def decorator(func: Callable):
-        if not hasattr(func, '__plugin_handlers__'):
-            func.__plugin_handlers__ = []
-        func.__plugin_handlers__.append({
-            'type': 'command',
-            'pattern': pattern,
-            'handler': func,
-        })
+    Args:
+        pattern: 正则匹配模式
+        name: 处理器名称 (默认取函数名)
+        desc: 描述信息
+        priority: 优先级 (数值越大越先匹配)
+        owner_only: 仅主人可用
+        group_only: 仅群聊可用
+        private_only: 仅私聊可用
+        event_types: 限定事件类型集合 (如 {'message', 'notice'})
+        cooldown: 冷却时间 (秒)
+    """
+
+    def decorator(func):
+        _pending_handlers.append(
+            {
+                'func': func,
+                'is_coro': asyncio.iscoroutinefunction(func),
+                'pattern': pattern,
+                'compiled': re.compile(pattern, re.DOTALL),
+                'name': name or func.__name__,
+                'desc': desc,
+                'priority': priority,
+                'owner_only': owner_only,
+                'group_only': group_only,
+                'private_only': private_only,
+                'event_types': frozenset(event_types) if event_types else None,
+                'cooldown': cooldown,
+            }
+        )
         return func
+
     return decorator
 
 
-def on_regex(pattern: str):
-    """正则匹配装饰器"""
-    def decorator(func: Callable):
-        if not hasattr(func, '__plugin_handlers__'):
-            func.__plugin_handlers__ = []
-        func.__plugin_handlers__.append({
-            'type': 'regex',
-            'pattern': pattern,
-            'handler': func,
-        })
-        return func
-    return decorator
+def on_load(func):
+    """插件加载时执行 (支持 async/sync)"""
+    _pending_on_load.append((func, asyncio.iscoroutinefunction(func)))
+    return func
 
 
-def on_event(event_type: str = '*'):
-    """事件监听装饰器"""
-    def decorator(func: Callable):
-        if not hasattr(func, '__event_handlers__'):
-            func.__event_handlers__ = []
-        func.__event_handlers__.append({
-            'type': 'event',
-            'event_type': event_type,
-            'handler': func,
-        })
+def on_unload(func):
+    """插件卸载时执行 (支持 async/sync)"""
+    _pending_on_unload.append((func, asyncio.iscoroutinefunction(func)))
+    return func
+
+
+def interceptor(priority=100):
+    """消息拦截器: 返回 True 则阻止后续处理"""
+
+    def decorator(func):
+        _pending_interceptors.append(
+            {
+                'func': func,
+                'is_coro': asyncio.iscoroutinefunction(func),
+                'priority': priority,
+            }
+        )
         return func
+
     return decorator

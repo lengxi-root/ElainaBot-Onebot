@@ -22,11 +22,11 @@ def set_context(app_instance, base_dir=''):
 
 
 def _q(sql, params=None):
-    return _common.query_log('message', sql, params, appid=_common.primary_appid())
+    return _common.query_log('message', sql, params, bot_qq=_common.primary_appid())
 
 
 def _ql(sql, params=None):
-    return _common.query_log('lifecycle', sql, params, appid=_common.primary_appid())
+    return _common.query_log('lifecycle', sql, params, bot_qq=_common.primary_appid())
 
 
 def _today():

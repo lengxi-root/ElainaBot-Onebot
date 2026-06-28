@@ -63,8 +63,8 @@ const lineOpts = { responsive: true, maintainAspectRatio: false, interaction: { 
 const barOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false }, datalabels: { display: false } }, scales: { x: { ticks: { color: '#484f58', maxRotation: 0 }, grid: { display: false } }, y: { beginAtZero: true, ticks: { color: '#484f58', precision: 0 }, grid: { color: 'rgba(48,54,61,0.6)' } } } }
 
 async function fetchStats() {
-  const appid = app.currentBotId || ''
-  const q = `appid=${appid}`
+  const bot_qq = app.currentBotId || ''
+  const q = `bot_qq=${bot_qq}`
   // 并行请求所有拆分接口, 各自独立更新 — 先到先渲染
   const tasks = [
     axios.get(`/api/statistics/summary?${q}`).then(r => { summary.value = r.data?.data || {} }).catch(() => {}),
@@ -79,7 +79,7 @@ async function fetchStats() {
   ]
   await Promise.all(tasks)
 }
-async function fetchChart() { try { const r = await axios.get(`/api/statistics/chart?days=${days.value}&appid=${app.currentBotId || ''}`); chartData.value = r.data?.data || null; hasChart.value = !!chartData.value } catch {} }
+async function fetchChart() { try { const r = await axios.get(`/api/statistics/chart?days=${days.value}&bot_qq=${app.currentBotId || ''}`); chartData.value = r.data?.data || null; hasChart.value = !!chartData.value } catch {} }
 async function refresh() { loading.value = true; await Promise.all([fetchStats(), fetchChart()]); loading.value = false }
 
 // 等待机器人列表加载完成 (单机器人会被自动选中) 后再发起首次统计请求,

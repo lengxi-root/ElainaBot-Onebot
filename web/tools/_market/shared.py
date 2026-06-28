@@ -20,7 +20,7 @@ _FALLBACK_MIRROR_PREFIXES = [
 _base_dir = ''
 
 
-def set_context(base_dir: str, appid: str = '', robot_qq: str = ''):
+def set_context(base_dir: str, bot_qq: str = ''):
     global _base_dir
     _base_dir = base_dir
 

@@ -62,8 +62,8 @@ function recomputeHeight() {
 const treeData = computed(() => {
   const map = {}
   for (const db of databases.value) {
-    const k = db.appid
-    if (!map[k]) map[k] = { label: db.bot_name, appid: db.appid, children: [] }
+    const k = db.bot_qq
+    if (!map[k]) map[k] = { label: db.label || db.bot_qq, bot_qq: db.bot_qq, children: [] }
     const name = db.date ? `${db.date}/${db.name}` : db.name
     const size = (db.size / 1024).toFixed(1)
     map[k].children.push({ key: db.path, label: name, suffix: () => h(NTag, { size: 'tiny', round: true, bordered: false }, { default: () => `${size}KB` }) })

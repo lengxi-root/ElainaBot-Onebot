@@ -282,7 +282,7 @@ class FrameworkUpdater:
             )
             skip_contains = ('.git', '__pycache__', 'node_modules')
 
-            # 日志目录中仅备份的文件 (每个 appid 子目录下的)
+            # 日志目录中仅备份的文件 (每个 bot_qq 子目录下的)
             log_keep_names = frozenset({'data.db', 'dau.db'})
 
             with zipfile.ZipFile(backup_file, 'w', zipfile.ZIP_DEFLATED) as zf:
@@ -300,11 +300,11 @@ class FrameworkUpdater:
                 # 单独收集日志目录中的 data.db / dau.db
                 log_abs = self.base_dir / 'data' / log_dir_name
                 if log_abs.is_dir():
-                    for appid_dir in log_abs.iterdir():
-                        if not appid_dir.is_dir():
+                    for qq_dir in log_abs.iterdir():
+                        if not qq_dir.is_dir():
                             continue
                         for db_name in log_keep_names:
-                            db_file = appid_dir / db_name
+                            db_file = qq_dir / db_name
                             if db_file.is_file():
                                 zf.write(
                                     str(db_file),

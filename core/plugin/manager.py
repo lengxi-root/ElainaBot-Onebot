@@ -1,215 +1,164 @@
-"""插件管理器"""
+"""插件管理器 — 加载/卸载/分发/热重载 (v2 异步架构)"""
 
-import importlib
-import importlib.util
+import asyncio
 import json
 import os
-import sys
+from collections import OrderedDict
 
-from core.base.logger import PLUGIN, get_logger, report_error
+from core.base.logger import PLUGIN, get_logger
+from core.plugin._dispatch import _DispatchMixin
+from core.plugin._loader import _LoaderMixin
+from core.plugin._watcher import _WatcherMixin
 
 log = get_logger(PLUGIN, '管理器')
 
 
-class PluginManager:
-    """插件管理器 — 发现/加载/分发"""
+class PluginManager(_LoaderMixin, _WatcherMixin, _DispatchMixin):
+    """插件管理器 — 通过 Mixin 组合加载/分发/监视能力"""
 
     def __init__(self, plugins_dir: str):
         self._dir = os.path.abspath(plugins_dir)
-        self._plugins = {}  # {name: module}
-        self._handlers = []  # [(pattern, handler, plugin_name)]
-        self._event_handlers = []  # [(event_type, handler, plugin_name)]
-        self._disabled_file = os.path.join(self._dir, 'plugins_disabled.json')
-        self._disabled = self._load_disabled()
+        self._plugins = OrderedDict()
+        self._all_handlers = []
+        self._all_interceptors = []
+        self._disabled_plugins = set()
+        self._cooldowns = {}  # {handler_key: last_trigger_time}
+        self._lock = asyncio.Lock()
+        self._file_mtimes = {}
+        self._watcher_task = None
+        self._watcher_running = False
+        self._owner_ids = []
+        self._load_disabled_plugins()
 
     @property
     def plugins(self) -> dict:
-        return self._plugins
+        return dict(self._plugins)
 
     @property
     def handler_count(self) -> int:
-        return len(self._handlers) + len(self._event_handlers)
+        return len(self._all_handlers)
 
-    # ── 禁用状态持久化 ──
+    # ==================== 索引构建 ====================
 
-    def _load_disabled(self) -> set:
-        try:
-            if os.path.isfile(self._disabled_file):
-                with open(self._disabled_file, encoding='utf-8') as f:
-                    data = json.load(f)
-                if isinstance(data, list):
-                    return set(data)
-        except Exception:
-            pass
-        return set()
+    def _rebuild_handler_list(self):
+        handlers, intercepts = [], []
+        for plugin in self._plugins.values():
+            if not plugin.enabled:
+                continue
+            for h in plugin.handlers:
+                h['_plugin'] = plugin.name
+                handlers.append(h)
+            for ic in plugin.interceptors:
+                ic['_plugin'] = plugin.name
+                intercepts.append(ic)
+        self._all_handlers = handlers
+        self._all_interceptors = intercepts
+        self._build_dispatch_index()
 
-    def _save_disabled(self):
-        try:
-            with open(self._disabled_file, 'w', encoding='utf-8') as f:
-                json.dump(sorted(self._disabled), f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            log.warning(f'保存插件禁用状态失败: {e}')
+    # ==================== 权限 ====================
 
-    def get_disabled_plugins(self) -> set:
-        return set(self._disabled)
+    def set_owner_ids(self, owner_ids: list):
+        self._owner_ids = [str(uid) for uid in owner_ids]
+
+    def _is_owner(self, event) -> bool:
+        uid = str(getattr(event, 'user_id', '') or '')
+        return uid in self._owner_ids if self._owner_ids else False
+
+    # ==================== 管理接口 ====================
+
+    def enable_plugin(self, name):
+        changed = name in self._disabled_plugins
+        self._disabled_plugins.discard(name)
+        if changed:
+            self._save_disabled_plugins()
+        if name in self._plugins:
+            self._plugins[name].enabled = True
+            self._rebuild_handler_list()
+            return True
+        return changed
+
+    def disable_plugin(self, name):
+        changed = name not in self._disabled_plugins
+        self._disabled_plugins.add(name)
+        if changed:
+            self._save_disabled_plugins()
+        if name in self._plugins:
+            self._plugins[name].enabled = False
+            self._rebuild_handler_list()
+            return True
+        return changed
 
     def is_disabled(self, name: str) -> bool:
-        return name in self._disabled
+        return name in self._disabled_plugins
 
-    def enable_plugin(self, key: str):
-        name = key.split('/')[0]
-        self._disabled.discard(name)
-        self._disabled.discard(key)
-        self._save_disabled()
+    def get_disabled_plugins(self) -> set:
+        return set(self._disabled_plugins)
 
-    def disable_plugin(self, key: str):
-        name = key.split('/')[0]
-        self._disabled.add(name)
-        self._save_disabled()
+    def get_plugin_list(self):
+        return [
+            {
+                'name': p.name,
+                'enabled': p.enabled,
+                'disabled_persist': p.name in self._disabled_plugins,
+                'handlers': [h['name'] for h in p.handlers],
+                'handler_count': len(p.handlers),
+                'load_time': round(p.load_time, 3),
+                'error': p.error,
+                'is_large': p.is_large,
+            }
+            for p in self._plugins.values()
+        ]
+
+    def get_command_list(self):
+        return [
+            {
+                'name': h['name'],
+                'pattern': h['pattern'],
+                'desc': h['desc'],
+                'plugin': h.get('_plugin', ''),
+                'owner_only': h['owner_only'],
+                'priority': h['priority'],
+            }
+            for h in self._all_handlers
+        ]
 
     def get_web_plugin_info(self) -> dict:
         """构建 {目录名: {commands, description, meta}}"""
-        info = {}
-        for name, module in self._plugins.items():
-            commands = []
-            for pattern, _h, n in self._handlers:
-                if n == name and pattern:
-                    # Web 面板期望命令为对象 {pattern, name, desc, owner_only, group_only}
-                    commands.append({
-                        'pattern': pattern,
-                        'name': '',
-                        'desc': '',
-                        'owner_only': False,
-                        'group_only': False,
-                    })
-            meta = getattr(module, '__plugin_meta__', {}) or {}
-            info[name] = {
-                'commands': commands,
-                'description': meta.get('description', '') if isinstance(meta, dict) else '',
-                'meta': meta if isinstance(meta, dict) else {},
-            }
-        return info
-
-    async def load_all(self):
-        """加载所有插件"""
-        if not os.path.isdir(self._dir):
-            os.makedirs(self._dir, exist_ok=True)
-            return
-
-        for name in sorted(os.listdir(self._dir)):
-            plugin_dir = os.path.join(self._dir, name)
-            if not os.path.isdir(plugin_dir) or name.startswith('_'):
-                continue
-            if name in self._disabled:
-                continue
-            await self._load_plugin(name, plugin_dir)
-
-        log.info(f'加载插件: {len(self._plugins)} 个, {self.handler_count} 个处理器')
-
-    async def _load_plugin(self, name: str, plugin_dir: str):
-        """加载单个插件"""
-        # 查找入口文件
-        entry = None
-        for fname in (f'{name}.py', 'main.py', '__init__.py'):
-            path = os.path.join(plugin_dir, fname)
-            if os.path.isfile(path):
-                entry = path
-                break
-
-        if not entry:
-            return
-
-        try:
-            mod_name = f'plugins.{name}'
-            spec = importlib.util.spec_from_file_location(
-                mod_name, entry, submodule_search_locations=[plugin_dir]
-            )
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[mod_name] = module
-            spec.loader.exec_module(module)
-            self._plugins[name] = module
-
-            # 注册处理器
-            handlers = getattr(module, '__handlers__', [])
-            for h in handlers:
-                self._handlers.append((h.get('pattern'), h.get('handler'), name))
-
-            event_handlers = getattr(module, '__event_handlers__', [])
-            for h in event_handlers:
-                self._event_handlers.append((h.get('event_type'), h.get('handler'), name))
-
-        except Exception as e:
-            report_error(PLUGIN, name, e)
-
-    async def reload_plugin(self, name: str) -> bool:
-        """重载插件"""
-        plugin_dir = os.path.join(self._dir, name)
-        if not os.path.isdir(plugin_dir):
-            return False
-
-        # 移除旧处理器
-        self._handlers = [(p, h, n) for p, h, n in self._handlers if n != name]
-        self._event_handlers = [(e, h, n) for e, h, n in self._event_handlers if n != name]
-        self._plugins.pop(name, None)
-        sys.modules.pop(f'plugins.{name}', None)
-
-        await self._load_plugin(name, plugin_dir)
-        return name in self._plugins
-
-    def dispatch(self, event):
-        """分发事件到插件"""
-        # 消息事件 — 匹配 pattern
-        if event.post_type == 'message':
-            content = event.content
-            for pattern, handler, plugin_name in self._handlers:
-                try:
-                    import re
-                    if pattern and re.match(pattern, content):
-                        handler(event)
-                except Exception as e:
-                    report_error(PLUGIN, plugin_name, e)
-
-        # 通用事件处理
-        event_type = f'{event.post_type}'
-        if hasattr(event, 'notice_type'):
-            event_type = f'notice.{event.notice_type}'
-        elif hasattr(event, 'request_type'):
-            event_type = f'request.{event.request_type}'
-
-        for etype, handler, plugin_name in self._event_handlers:
-            if etype == event_type or etype == '*':
-                try:
-                    handler(event)
-                except Exception as e:
-                    report_error(PLUGIN, plugin_name, e)
+        result = {}
+        for p in self._plugins.values():
+            cmds = [
+                {
+                    'name': h.get('name', ''),
+                    'pattern': h.get('pattern', ''),
+                    'desc': h.get('desc', ''),
+                    'owner_only': h.get('owner_only', False),
+                    'group_only': h.get('group_only', False),
+                }
+                for h in p.handlers
+            ]
+            desc = ''
+            if p.module and getattr(p.module, '__doc__', None):
+                desc = p.module.__doc__.strip().split('\n')[0]
+            result[p.name] = {'commands': cmds, 'description': desc, 'meta': p.meta}
+        return result
 
     def list_plugins(self) -> list:
-        """列出所有插件"""
+        """列出所有可发现的插件 (含未加载的)"""
         result = []
         if not os.path.isdir(self._dir):
             return result
         for name in sorted(os.listdir(self._dir)):
             plugin_dir = os.path.join(self._dir, name)
-            if not os.path.isdir(plugin_dir) or name.startswith('_'):
+            if not os.path.isdir(plugin_dir) or name.startswith(('_', '.')):
                 continue
+            info = self._plugins.get(name)
             result.append({
                 'name': name,
                 'loaded': name in self._plugins,
-                'handlers': len([h for _, h, n in self._handlers if n == name]),
+                'enabled': info.enabled if info else name not in self._disabled_plugins,
+                'handlers': len(info.handlers) if info else 0,
             })
         return result
-
-    async def reload(self, name: str) -> bool:
-        """重载插件 (web 面板别名)"""
-        return await self.reload_plugin(name)
-
-    async def unload(self, name: str) -> bool:
-        """卸载插件 (移除处理器 + 模块)"""
-        self._handlers = [(p, h, n) for p, h, n in self._handlers if n != name]
-        self._event_handlers = [(e, h, n) for e, h, n in self._event_handlers if n != name]
-        self._plugins.pop(name, None)
-        sys.modules.pop(f'plugins.{name}', None)
-        return True
 
     def get_plugin_bots(self) -> dict:
         return {}
@@ -217,9 +166,25 @@ class PluginManager:
     def set_plugin_bots(self, data: dict):
         pass
 
-    def start_watcher(self):
-        """启动文件监视（简化版，不实现热重载）"""
-        pass
+    # ==================== 禁用持久化 ====================
 
-    def stop_watcher(self):
-        pass
+    def _load_disabled_plugins(self):
+        path = os.path.join(self._dir, 'plugins_disabled.json')
+        if not os.path.isfile(path):
+            return
+        try:
+            with open(path, encoding='utf-8') as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    self._disabled_plugins = set(data)
+        except Exception as e:
+            log.warning(f'加载禁用插件列表失败: {e}')
+
+    def _save_disabled_plugins(self):
+        path = os.path.join(self._dir, 'plugins_disabled.json')
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        try:
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(sorted(self._disabled_plugins), f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            log.warning(f'保存禁用插件列表失败: {e}')

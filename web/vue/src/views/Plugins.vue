@@ -316,10 +316,10 @@ onMounted(() => { appStore.fetchBots(); fetchAll() })
         <!-- Dir bot bind -->
         <div v-if="botBindOpen[d.directory]" class="bot-bind-panel" @click.stop>
           <div class="bot-bind-title">选择允许触发的机器人 (不选 = 全部)</div>
-          <label v-for="bot in appStore.bots" :key="bot.appid" class="bot-bind-item">
-            <input type="checkbox" :checked="(d.allowed_bots || []).includes(bot.appid)" @change="e => bindDirBot(d, bot.appid, e.target.checked)" />
+          <label v-for="bot in appStore.bots" :key="bot.bot_qq" class="bot-bind-item">
+            <input type="checkbox" :checked="(d.allowed_bots || []).includes(bot.bot_qq)" @change="e => bindDirBot(d, bot.bot_qq, e.target.checked)" />
             <img v-if="bot.avatar" :src="bot.avatar" class="bot-bind-avatar" />
-            <span>{{ bot.name || bot.appid }}</span><span class="bot-bind-id">{{ bot.appid }}</span>
+            <span>{{ bot.name || bot.bot_qq }}</span><span class="bot-bind-id">{{ bot.bot_qq }}</span>
           </label>
         </div>
         <!-- Commands -->
@@ -359,10 +359,10 @@ onMounted(() => { appStore.fetchBots(); fetchAll() })
             <!-- File-level bot bind -->
             <div v-if="!d.is_large && botBindOpen[d.directory + '/' + fileBase(f)]" class="bot-bind-panel file-level" @click.stop>
               <div class="bot-bind-title">{{ f.name }} — 选择允许触发的机器人</div>
-              <label v-for="bot in appStore.bots" :key="bot.appid" class="bot-bind-item">
-                <input type="checkbox" :checked="(f.allowed_bots || []).includes(bot.appid)" @change="e => bindFileBot(d, f, bot.appid, e.target.checked)" />
+              <label v-for="bot in appStore.bots" :key="bot.bot_qq" class="bot-bind-item">
+                <input type="checkbox" :checked="(f.allowed_bots || []).includes(bot.bot_qq)" @change="e => bindFileBot(d, f, bot.bot_qq, e.target.checked)" />
                 <img v-if="bot.avatar" :src="bot.avatar" class="bot-bind-avatar" />
-                <span>{{ bot.name || bot.appid }}</span><span class="bot-bind-id">{{ bot.appid }}</span>
+                <span>{{ bot.name || bot.bot_qq }}</span><span class="bot-bind-id">{{ bot.bot_qq }}</span>
               </label>
             </div>
           </template>

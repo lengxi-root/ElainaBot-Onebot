@@ -6,7 +6,7 @@ export const useAppStore = defineStore('app', () => {
   const bots = ref([])
   const currentBotId = ref('')
   const currentBot = computed(() =>
-    (currentBotId.value && bots.value.find(b => b.appid === currentBotId.value)) || null
+    (currentBotId.value && bots.value.find(b => b.bot_qq === currentBotId.value)) || null
   )
   const isAllBots = computed(() => !currentBotId.value)
   const systemInfo = ref(null)
@@ -19,7 +19,7 @@ export const useAppStore = defineStore('app', () => {
       const res = await axios.get('/api/bots')
       bots.value = res.data.bots || []
       if (bots.value.length === 1 && !currentBotId.value) {
-        switchBot(bots.value[0].appid)
+        switchBot(bots.value[0].bot_qq)
       }
     } catch {}
   }
@@ -29,9 +29,9 @@ export const useAppStore = defineStore('app', () => {
     return _botsPromise
   }
 
-  function switchBot(appid) {
-    currentBotId.value = appid
-    localStorage.setItem('elaina_bot', appid)
+  function switchBot(bot_qq) {
+    currentBotId.value = bot_qq
+    localStorage.setItem('elaina_bot', bot_qq)
   }
 
   async function fetchSystemInfo() {
@@ -48,9 +48,9 @@ export const useAppStore = defineStore('app', () => {
     } catch {}
   }
 
-  async function toggleBot(appid, enabled) {
+  async function toggleBot(bot_qq, enabled) {
     try {
-      await axios.post('/api/bots/toggle', { appid, enabled })
+      await axios.post('/api/bots/toggle', { bot_qq, enabled })
       await fetchBots()
       return true
     } catch {

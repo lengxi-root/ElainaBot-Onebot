@@ -38,8 +38,8 @@ function toggleErr(i, type) { expandedErr.value[i] = expandedErr.value[i] === ty
 function fmtJson(s) { if (!s) return ''; try { return JSON.stringify(JSON.parse(s), null, 2) } catch { return s } }
 function fmtCtx(v) { if (!v) return '无'; if (typeof v === 'string') try { return JSON.stringify(JSON.parse(v), null, 2) } catch { return v } return JSON.stringify(v, null, 2) }
 
-const filteredMessages = computed(() => app.currentBotId ? messages.value.filter(m => m.appid === app.currentBotId) : messages.value)
-const filteredLifecycle = computed(() => app.currentBotId ? lifecycle.value.filter(m => m.appid === app.currentBotId) : lifecycle.value)
+const filteredMessages = computed(() => app.currentBotId ? messages.value.filter(m => m.bot_qq === app.currentBotId) : messages.value)
+const filteredLifecycle = computed(() => app.currentBotId ? lifecycle.value.filter(m => m.bot_qq === app.currentBotId) : lifecycle.value)
 const currentLogs = computed(() =>
   tab.value === 'message' ? filteredMessages.value
   : tab.value === 'framework' ? framework.value
@@ -118,7 +118,7 @@ onUnmounted(() => { off('new_log', onNewLog); off('init', onInit) })
         <!-- lifecycle -->
         <template v-else-if="tab === 'lifecycle'">
           <span class="t-time">{{ e.timestamp }}</span>
-          <span v-if="e.bot_name" class="t-bot">[{{ e.bot_name }}({{ e.appid || '?' }})]</span>
+          <span v-if="e.bot_qq" class="t-bot">[{{ e.bot_qq }}]</span>
           <span :class="['t-lc-type', 't-lc-' + (e.event_type || e.type || '')]">{{ { group_add:'入群', group_del:'退群', group_member_add:'用户入群', group_member_del:'用户退群', friend_add:'加好友', friend_del:'删好友', group_msg_reject:'关闭主动消息', group_msg_receive:'开启主动消息', MESSAGE_REACTION_ADD:'表态', MESSAGE_REACTION_REMOVE:'取消表态', GUILD_UPDATE:'频道更新' }[e.event_type || e.type] || e.event_type || e.type }}</span>
           <span v-if="e.user_id" class="t-uid">U:{{ e.user_id }}</span>
           <span v-if="e.group_id" class="t-gid">G:{{ e.group_id }}</span>
@@ -137,7 +137,7 @@ onUnmounted(() => { off('new_log', onNewLog); off('init', onInit) })
         <template v-else>
           <span class="t-time">{{ e.timestamp }}</span>
           <span class="t-level error">ERROR</span>
-          <span v-if="e.appid && e.appid !== '0000'" class="t-appid">({{ e.appid }})</span>
+          <span v-if="e.bot_qq && e.bot_qq !== '0000'" class="t-appid">({{ e.bot_qq }})</span>
           <span v-if="e.module_type || e.module_name" class="t-source"> [{{ [e.module_type, e.module_name].filter(Boolean).join(':') }}] </span>
           <div class="t-err-actions">
             <span :class="['t-expand-btn', { active: expandedErr[i] === 'raw' }]" @click="toggleErr(i, 'raw')">原始消息</span>
@@ -253,7 +253,7 @@ onUnmounted(() => { off('new_log', onNewLog); off('init', onInit) })
   color:var(--info);
   margin-right:4px
 }
-.t-appid {
+.t-appid, .t-bot-qq {
   color:var(--text3);
   margin-right:6px;
   font-size:12px

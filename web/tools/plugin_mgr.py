@@ -24,15 +24,12 @@ _CONFIG_EXTS = ('.yaml', '.yml', '.json')
 
 _PLUGIN_TEMPLATE = '''"""新插件"""
 
-__handlers__ = []
-__event_handlers__ = []
+from core.plugin.decorators import handler
 
 
-def handle_command(event):
-    event.reply("Hello, World!")
-
-
-__handlers__.append({'pattern': r'^指令$', 'handler': handle_command})
+@handler(r'^指令$', name='示例指令', desc='示例指令描述')
+async def handle_command(event, match):
+    await event.reply("Hello, World!")
 '''
 
 
@@ -243,7 +240,8 @@ async def handle_reload_plugin(request: web.Request):
     try:
         result = await pm.reload(name)
         if result:
-            count = len([1 for _p, _h, n in pm._handlers if n == name])
+            info = pm.plugins.get(name)
+            count = len(info.handlers) if info else 0
             return web.json_response({'success': True, 'message': f'重载完成: {count} 个处理器', 'handler_count': count})
         return web.json_response({'success': False, 'message': '重载失败'})
     except Exception as e:

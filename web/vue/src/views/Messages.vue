@@ -68,11 +68,11 @@ function goBackToList() { mobileView.value = 'list'; current.value = null }
 function closeMobileTypeMenu() { mobileTypeOpen.value = false; mobileMediaOpen.value = false }
 function selectMobileMsgType(value) { msgType.value = value; closeMobileTypeMenu() }
 function selectMobileMediaType(value) { mediaFileType.value = value; closeMobileTypeMenu() }
-function getBotAvatar(appid) { const bot = app.bots.find(b => b.appid === appid); return bot?.avatar || '' }
+function getBotAvatar(bot_qq) { const bot = app.bots.find(b => b.bot_qq === bot_qq); return bot?.avatar || '' }
 function qqAvatar(qq) { return `http://q1.qlogo.cn/g?b=qq&nk=${qq}&s=100` }
 function groupQqAvatar(qq) { return `http://p.qlogo.cn/gh/${qq}/${qq}/100/` }
 // OneBot 的 user_id 均为真实 QQ 号, 头像统一走 q1.qlogo.cn
-function avatarUrl(_appid, uid) { return qqAvatar(uid) }
+function avatarUrl(_bot_qq, uid) { return qqAvatar(uid) }
 function openUrl(u) { const a = document.createElement('a'); a.href = u; a.target = '_blank'; a.rel = 'noreferrer noopener'; a.click() }
 const lightboxSrc = ref('')
 function previewImg(src) { lightboxSrc.value = src }
@@ -92,7 +92,7 @@ function formatRaw(m) {
     try { return JSON.stringify(JSON.parse(m.raw_message), null, 2) } catch {}
     return m.raw_message
   }
-  return JSON.stringify({ message_id: m.message_id, user_id: m.user_id, content: m.content, timestamp: m.timestamp, source: m.source, is_self: m.is_self, appid: m.appid }, null, 2)
+  return JSON.stringify({ message_id: m.message_id, user_id: m.user_id, content: m.content, timestamp: m.timestamp, source: m.source, is_self: m.is_self, bot_qq: m.bot_qq }, null, 2)
 }
 
 function quoteAuthor(m) { return m.is_self ? '我' : (m.nickname || m.user_id || '未知用户') }
@@ -141,7 +141,7 @@ async function recallMsg(m) {
     const res = await axios.post('/api/message/recall', {
       chat_type: apiChatType.value,
       chat_id: current.value?.chat_id || '',
-      appid: m.appid || app.currentBotId || '',
+      bot_qq: m.bot_qq || app.currentBotId || '',
       message_id: m.message_id,
     })
     if (res.data?.success) {
@@ -241,7 +241,7 @@ let _fetchTimer = null
 async function fetchChats() {
   if (_unmounted) return
   try {
-    const res = await axios.post('/api/message/chats', { type: chatType.value, search: chatSearch.value, appid: app.currentBotId || '', page: page.value, page_size: PAGE, days: chatDays.value })
+    const res = await axios.post('/api/message/chats', { type: chatType.value, search: chatSearch.value, bot_qq: app.currentBotId || '', page: page.value, page_size: PAGE, days: chatDays.value })
     if (_unmounted) return
     chats.value = res.data?.data?.chats || []
     total.value = res.data?.data?.total || chats.value.length
@@ -343,7 +343,7 @@ async function selectChat(chat) {
   if (isMobile.value) mobileView.value = 'chat'
   history.value = []
   try {
-    const res = await axios.post('/api/message/history', { chat_type: apiChatType.value, chat_id: chat.chat_id, appid: app.currentBotId || '' })
+    const res = await axios.post('/api/message/history', { chat_type: apiChatType.value, chat_id: chat.chat_id, bot_qq: app.currentBotId || '' })
     if (myId !== _selectId) return
     const msgs = res.data?.data?.messages || []
     for (const m of msgs) prepareMessage(m)
@@ -362,7 +362,7 @@ async function loadOlder() {
   try {
     const res = await axios.post('/api/message/history', {
       chat_type: apiChatType.value, chat_id: current.value.chat_id,
-      appid: app.currentBotId || '', before_date: oldestDate.value,
+      bot_qq: app.currentBotId || '', before_date: oldestDate.value,
     })
     const msgs = res.data?.data?.messages || []
     if (!msgs.length) { hasMore.value = false; return }
@@ -386,7 +386,7 @@ function onHistoryScroll() {
 
 async function refreshMsgId() {
   if (!current.value) return
-  try { const r = await axios.post('/api/message/history', { chat_type: apiChatType.value, chat_id: current.value.chat_id, appid: app.currentBotId || '', limit: 1 }); lastMsgId.value = r.data?.data?.last_msg_id || lastMsgId.value } catch {}
+  try { const r = await axios.post('/api/message/history', { chat_type: apiChatType.value, chat_id: current.value.chat_id, bot_qq: app.currentBotId || '', limit: 1 }); lastMsgId.value = r.data?.data?.last_msg_id || lastMsgId.value } catch {}
 }
 
 function isNearBottom() { const el = historyRef.value; if (!el) return true; return el.scrollHeight - el.scrollTop - el.clientHeight < 80 }
@@ -419,7 +419,7 @@ async function onNewLog(data) {
     const isSelf = data.direction === 'send'
     const nick = isSelf ? (data.bot_name || 'Bot') : await getNick(uid)
     if (_unmounted) return
-    const item = prepareMessage({ id: history.value.length, message_id: data.message_id || '', reference_id: data.reference_id || '', user_id: uid, appid: data.appid || app.currentBot?.appid || '', bot_qq: isSelf ? (data.appid || '') : '', nickname: nick, content: data.content || '', timestamp: data.timestamp || '', is_self: isSelf, source: data.source || '', raw_message: data.raw_message || '' })
+    const item = prepareMessage({ id: history.value.length, message_id: data.message_id || '', reference_id: data.reference_id || '', user_id: uid, bot_qq: data.bot_qq || app.currentBot?.bot_qq || '', bot_qq: isSelf ? (data.bot_qq || '') : '', nickname: nick, content: data.content || '', timestamp: data.timestamp || '', is_self: isSelf, source: data.source || '', raw_message: data.raw_message || '' })
     history.value.push(item)
     resolveMessageReferences(history.value)
     if (isNearBottom()) nextTick(scrollBottom)
@@ -437,7 +437,7 @@ async function onLifecycleLog(data) {
   history.value.push({
     id: `lc_rt_${Date.now()}`,
     message_id: '', reference_id: '', user_id: uid,
-    appid: data.appid || app.currentBot?.appid || '',
+    bot_qq: data.bot_qq || app.currentBot?.bot_qq || '',
     bot_qq: '', nickname: nick, content: '', timestamp: data.timestamp || '',
     is_self: false, source: '', raw_message: '', recalled: false,
     event_type: evtType === 'group_member_add' ? 'member_add' : 'member_remove',
@@ -470,7 +470,7 @@ async function sendMsg() {
     if (!content && !imgFile.value) { sending.value = false; return }
     const fd = new FormData()
     fd.append('chat_type', apiChatType.value); fd.append('chat_id', current.value.chat_id)
-    fd.append('appid', app.currentBotId || current.value.appid || '')
+    fd.append('bot_qq', app.currentBotId || current.value.bot_qq || '')
     fd.append('msg_type', msgType.value); fd.append('content', content); fd.append('msg_id', lastMsgId.value)
     if (quotedMsg.value) {
       if (quotedMsg.value.reference_id) fd.append('message_reference_id', quotedMsg.value.reference_id)
@@ -517,7 +517,7 @@ onUnmounted(() => { _unmounted = true; off('new_log', onNewLog); window.removeEv
             <div class="chat-avatar-wrap">
               <img v-if="chatType === 'user' && c.chat_id" class="chat-avatar" :src="qqAvatar(c.chat_id)" loading="lazy" @error="e => e.target.style.display='none'" />
               <img v-else-if="chatType === 'group' && c.chat_id" class="chat-avatar" :src="groupQqAvatar(c.chat_id)" loading="lazy" @error="e => e.target.style.display='none'" />
-              <img v-else-if="app.isAllBots && c.appid && getBotAvatar(c.appid)" class="chat-avatar" :src="getBotAvatar(c.appid)" loading="lazy" @error="e => e.target.style.display='none'" />
+              <img v-else-if="app.isAllBots && c.bot_qq && getBotAvatar(c.bot_qq)" class="chat-avatar" :src="getBotAvatar(c.bot_qq)" loading="lazy" @error="e => e.target.style.display='none'" />
               <div v-else class="chat-avatar-fallback">{{ (c.nickname || c.chat_id || '?').charAt(0) }}</div>
               <span v-if="c.is_full_access" class="chat-avatar-badge">全</span>
             </div>
@@ -563,7 +563,7 @@ onUnmounted(() => { _unmounted = true; off('new_log', onNewLog); window.removeEv
             <template v-for="m in history" :key="m.id">
             <div v-if="m.event_type" class="event-wrap">
               <div class="event-box">
-                <img v-if="m.appid && m.user_id" class="event-avatar" :src="avatarUrl(m.appid, m.user_id)" loading="lazy" @error="e => e.target.style.display='none'" />
+                <img v-if="m.bot_qq && m.user_id" class="event-avatar" :src="avatarUrl(m.bot_qq, m.user_id)" loading="lazy" @error="e => e.target.style.display='none'" />
                 <div v-else class="event-avatar-fallback">{{ (m.nickname || '?').charAt(0) }}</div>
                 <span class="event-uid">{{ m.user_id }}</span>
                 <span class="event-text">{{ m.event_type === 'member_add' ? '已加入本群' : '已退出本群' }}</span>
@@ -575,7 +575,7 @@ onUnmounted(() => { _unmounted = true; off('new_log', onNewLog); window.removeEv
                 <div v-else-if="m.is_self" class="msg-avatar-bot">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="14" rx="3" /><circle cx="9" cy="11" r="1.5" fill="currentColor" /><circle cx="15" cy="11" r="1.5" fill="currentColor" /><path d="M12 2v2M6 20l2-2M18 20l-2-2" /></svg>
                 </div>
-                <img v-else-if="m.appid && m.user_id" class="msg-avatar" :src="avatarUrl(m.appid, m.user_id)" loading="lazy" @error="e => e.target.style.display='none'" />
+                <img v-else-if="m.bot_qq && m.user_id" class="msg-avatar" :src="avatarUrl(m.bot_qq, m.user_id)" loading="lazy" @error="e => e.target.style.display='none'" />
                 <div v-else class="msg-avatar-fallback">{{ (m.nickname || '?').charAt(0) }}</div>
               </div>
               <div class="bubble-main">

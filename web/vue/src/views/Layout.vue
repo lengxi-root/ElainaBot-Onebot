@@ -37,7 +37,7 @@ const NAV_ITEMS = [
 const currentRouteName = computed(() => route.name)
 const botOptions = computed(() => [
   ...(app.bots.length > 1 ? [{ label: '全部机器人', value: '' }] : []),
-  ...app.bots.map(b => ({ label: b.name || b.appid, value: b.appid })),
+  ...app.bots.map(b => ({ label: b.name || b.bot_qq, value: b.bot_qq })),
 ])
 
 // Bot detail modal
@@ -46,8 +46,8 @@ const detailBot = ref(null)
 const togglingBot = ref('')
 
 async function handleToggleBot(bot, enabled) {
-  togglingBot.value = bot.appid
-  const ok = await app.toggleBot(bot.appid, enabled)
+  togglingBot.value = bot.bot_qq
+  const ok = await app.toggleBot(bot.bot_qq, enabled)
   togglingBot.value = ''
   if (ok) {
     window.$message?.success(enabled ? '机器人已启用' : '机器人已关闭')
@@ -223,22 +223,22 @@ onUnmounted(() => {
                 <span class="bot-name">全部机器人</span>
                 <span class="bot-appid">{{ app.bots.length }} 个</span>
               </div>
-              <div v-for="bot in app.bots" :key="bot.appid"
-                :class="['bot-switch-item', { active: bot.appid === app.currentBotId, disabled: bot.enabled === false }]"
-                @click="bot.enabled !== false && app.switchBot(bot.appid)">
+              <div v-for="bot in app.bots" :key="bot.bot_qq"
+                :class="['bot-switch-item', { active: bot.bot_qq === app.currentBotId, disabled: bot.enabled === false }]"
+                @click="bot.enabled !== false && app.switchBot(bot.bot_qq)">
                 <img v-if="bot.avatar" :src="bot.avatar" class="bot-avatar-tiny" :style="bot.enabled === false ? 'opacity:0.4' : ''" />
-                <span v-else class="bot-avatar-letter" :style="bot.enabled === false ? 'opacity:0.4' : ''">{{ (bot.name || bot.appid).charAt(0) }}</span>
+                <span v-else class="bot-avatar-letter" :style="bot.enabled === false ? 'opacity:0.4' : ''">{{ (bot.name || bot.bot_qq).charAt(0) }}</span>
                 <span v-if="bot.enabled !== false" :class="['ws-dot', bot.connected ? 'online' : bot.connection_type === 'Webhook' ? 'waiting' : 'offline']" />
                 <span v-else class="ws-dot offline" />
                 <span class="bot-info-col">
-                  <span class="bot-name" :style="bot.enabled === false ? 'opacity:0.5' : ''">{{ bot.name || bot.appid }}</span>
-                  <span class="bot-appid">{{ bot.appid }}</span>
+                  <span class="bot-name" :style="bot.enabled === false ? 'opacity:0.5' : ''">{{ bot.name || bot.bot_qq }}</span>
+                  <span class="bot-appid">{{ bot.bot_qq }}</span>
                 </span>
                 <n-tag v-if="bot.enabled !== false" :bordered="false" size="tiny" :type="bot.connection_type === 'Webhook' ? 'info' : 'success'" style="font-size:10px;flex-shrink:0">
                   {{ bot.connection_type === 'Webhook' ? 'WH' : 'WS' }}
                 </n-tag>
                 <n-tag v-else :bordered="false" size="tiny" type="warning" style="font-size:10px;flex-shrink:0">已关闭</n-tag>
-                <n-switch size="small" :value="bot.enabled !== false" :loading="togglingBot === bot.appid"
+                <n-switch size="small" :value="bot.enabled !== false" :loading="togglingBot === bot.bot_qq"
                   @click.stop @update:value="v => handleToggleBot(bot, v)" />
                 <n-button quaternary circle size="tiny" @click.stop="fetchBotDetail(bot)" title="详情" style="flex-shrink:0">
                   <template #icon><SvgIcon name="information-circle" :size="14" /></template>
@@ -264,7 +264,7 @@ onUnmounted(() => {
               <span class="bot-name" style="opacity:0.5">{{ app.bots[0].name || '未知' }}</span>
               <n-tag :bordered="false" size="tiny" type="warning" style="font-size:10px">已关闭</n-tag>
             </template>
-            <n-switch size="small" :value="app.bots[0].enabled !== false" :loading="togglingBot === app.bots[0].appid"
+            <n-switch size="small" :value="app.bots[0].enabled !== false" :loading="togglingBot === app.bots[0].bot_qq"
               @update:value="v => handleToggleBot(app.bots[0], v)" style="margin-left:4px" />
             <n-button quaternary circle size="tiny" @click="fetchBotDetail(app.bots[0])" title="详情">
               <template #icon><SvgIcon name="information-circle" :size="14" /></template>
@@ -341,17 +341,17 @@ onUnmounted(() => {
       <div v-if="detailBot" class="bot-detail">
         <div class="bd-header">
           <n-avatar v-if="detailBot.avatar" :src="detailBot.avatar" :size="72" round />
-          <div v-else class="bd-avatar-placeholder">{{ (detailBot.name || detailBot.appid).charAt(0) }}</div>
+          <div v-else class="bd-avatar-placeholder">{{ (detailBot.name || detailBot.bot_qq).charAt(0) }}</div>
           <div class="bd-header-info">
             <div class="bd-name">{{ detailBot.name || '未知机器人' }}</div>
-            <div class="bd-sub">QQ: {{ detailBot.qq || detailBot.appid }}</div>
+            <div class="bd-sub">QQ: {{ detailBot.qq || detailBot.bot_qq }}</div>
             <div class="bd-sub">OneBot v11 协议机器人</div>
           </div>
         </div>
 
         <n-descriptions :column="2" label-placement="left" size="small" class="bd-info">
           <n-descriptions-item label="机器人开关">
-            <n-switch size="small" :value="detailBot.enabled !== false" :loading="togglingBot === detailBot.appid"
+            <n-switch size="small" :value="detailBot.enabled !== false" :loading="togglingBot === detailBot.bot_qq"
               @update:value="v => handleToggleBot(detailBot, v)" />
           </n-descriptions-item>
           <n-descriptions-item label="状态">
