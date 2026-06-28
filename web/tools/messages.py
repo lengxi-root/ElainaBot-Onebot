@@ -111,6 +111,7 @@ async def handle_get_chats(request: web.Request):
             for ch in chats:
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
                 cid = ch['chat_id']
                 ch['nickname'] = friends.get(cid) or f'用户{cid[-6:]}'
                 ch['remark'] = ''
@@ -159,11 +160,23 @@ async def handle_get_chats(request: web.Request):
                 ch['nickname'] = _remark_name(rv) or f'群{ch["chat_id"][-6:]}'
                 ch['remark'] = _remark_name(rv)
 >>>>>>> parent of 7ffdcd2 (fix: web面板修复与优化 (#8))
+=======
+                ch['nickname'] = nicks.get(ch['chat_id'], f'用户{ch["chat_id"][-6:]}')
+                ch['remark'] = ''
+        else:
+            for ch in chats:
+                rv = remarks.get(ch['chat_id'])
+                ch['nickname'] = _remark_name(rv) or f'群{ch["chat_id"][-6:]}'
+                ch['remark'] = _remark_name(rv)
+>>>>>>> parent of 7ffdcd2 (fix: web面板修复与优化 (#8))
                 ch['group_qq'] = _remark_qq(rv)
                 ch['is_full_access'] = False
             if chat_type == 'remark':
                 chats = [ch for ch in chats if ch['chat_id'] in remarks]
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> parent of 7ffdcd2 (fix: web面板修复与优化 (#8))
+=======
 >>>>>>> parent of 7ffdcd2 (fix: web面板修复与优化 (#8))
 =======
 >>>>>>> parent of 7ffdcd2 (fix: web面板修复与优化 (#8))
