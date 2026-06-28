@@ -159,20 +159,33 @@ async def handle_get_chat_history(request: web.Request):
 
     rows = await asyncio.get_running_loop().run_in_executor(None, _query_messages, chat_type, chat_id, 300)
 
-    uid_set = {str(r.get('user_id', '')) for r in rows if r.get('extra') != 'send' and r.get('user_id')}
-    nicks = await _common.batch_nicknames(list(uid_set)) if uid_set else {}
-    appid = _primary_id()
+    # 预解析 extra（接收消息为 JSON，发送/撤回为字符串标记）
+    parsed = []
+    need_nick = set()
+    for r in rows:
+        ex = r.get('extra', '')
+        is_self = ex == 'send'
+        recalled = ex == 'recalled'
+        meta = {}
+        if ex and ex not in ('send', 'recalled') and ex.startswith('{'):
+            with contextlib.suppress(Exception):
+                meta = json.loads(ex)
+        uid = str(r.get('user_id', ''))
+        if not is_self and uid and not meta.get('nickname'):
+            need_nick.add(uid)
+        parsed.append((r, is_self, recalled, meta, uid))
+
+    nicks = await _common.batch_nicknames(list(need_nick)) if need_nick else {}
 
     messages = []
     last_msg_id = ''
-    for r in rows:
-        is_self = r.get('extra') == 'send'
-        uid = str(r.get('user_id', ''))
+    for r, is_self, recalled, meta, uid in parsed:
         raw = r.get('raw_data', '')
-        recalled = r.get('extra') == 'recalled'
         mid = str(r.get('message_id', ''))
+        appid = str(r.get('source', '') or '') if r.get('source') not in ('WebPanel', '') else _primary_id()
         if mid and not is_self:
             last_msg_id = mid
+        nickname = meta.get('nickname') or nicks.get(uid, f'用户{uid[-6:]}' if uid else '未知用户')
         messages.append({
             'id': r.get('id', len(messages)),
             'message_id': mid,
@@ -180,7 +193,7 @@ async def handle_get_chat_history(request: web.Request):
             'user_id': uid,
             'appid': appid,
             'bot_qq': appid if is_self else '',
-            'nickname': (appid or 'Bot') if is_self else nicks.get(uid, f'用户{uid[-6:]}' if uid else '未知用户'),
+            'nickname': (_primary_id() or 'Bot') if is_self else nickname,
             'content': r.get('content', ''),
             'timestamp': r.get('timestamp', ''),
             'is_self': is_self,

@@ -5,7 +5,6 @@ import datetime
 import os
 import sqlite3
 import threading
-import time
 from collections import deque
 
 from core.base.logger import get_logger, SYSTEM
@@ -70,6 +69,8 @@ class LogService:
             )
         ''')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_log_timestamp ON log(timestamp)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_log_group ON log(group_id)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_log_user ON log(user_id, group_id)')
         conn.commit()
         self._connections[log_type] = conn
         return conn
@@ -83,6 +84,18 @@ class LogService:
     def add_sync(self, log_type: str, entry: dict):
         """同步添加（等同于 add）"""
         self.add(log_type, entry)
+
+    def execute(self, log_type: str, sql: str, params=None) -> int:
+        """执行写操作（UPDATE/DELETE），返回受影响行数"""
+        try:
+            conn = self._get_conn(log_type)
+            with self._lock:
+                cursor = conn.execute(sql, params or [])
+                conn.commit()
+                return cursor.rowcount
+        except Exception as e:
+            log.warning(f'执行写操作失败 [{log_type}]: {e}')
+            return 0
 
     def query(self, log_type: str, sql: str, params=None) -> list:
         """查询日志"""
