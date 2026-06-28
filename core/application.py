@@ -4,7 +4,6 @@ import asyncio
 import contextlib
 import datetime
 import json
-import logging
 import os
 import signal
 
@@ -210,14 +209,19 @@ class Application:
 
             # 写入 SQLite
             if self._log_service:
+                nickname = ''
+                if isinstance(event.sender, dict):
+                    nickname = event.sender.get('card') or event.sender.get('nickname') or ''
                 self._log_service.add('message', {
                     'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'content': content,
+                    'source': str(event.self_id or ''),
                     'user_id': str(event.user_id),
                     'group_id': str(event.group_id or ''),
                     'message_id': str(event.message_id),
                     'message_type': event.message_type,
                     'raw_data': json.dumps(event.raw_data, ensure_ascii=False),
+                    'extra': json.dumps({'nickname': nickname, 'self_id': str(event.self_id or '')}, ensure_ascii=False),
                 })
 
             # 推送到 Web 面板

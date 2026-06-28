@@ -5,7 +5,6 @@ import datetime
 import os
 import sqlite3
 import threading
-import time
 from collections import deque
 
 from core.base.logger import get_logger, SYSTEM
@@ -70,6 +69,8 @@ class LogService:
             )
         ''')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_log_timestamp ON log(timestamp)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_log_group ON log(group_id)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_log_user ON log(user_id, group_id)')
         conn.commit()
         self._connections[log_type] = conn
         return conn
