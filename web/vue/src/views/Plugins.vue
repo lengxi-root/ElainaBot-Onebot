@@ -1,268 +1,257 @@
 <template>
   <div class="plugins-page">
-    <header class="page-header">
-      <div class="page-header-row">
-        <div>
-          <h1>插件管理</h1>
-          <p class="subtitle">管理 OneBot 插件</p>
-        </div>
-        <div class="header-actions">
-          <button class="btn btn-secondary" @click="showUpload = true">上传</button>
-          <button class="btn btn-secondary" @click="showCreate = true">新建</button>
-          <button class="btn btn-secondary" @click="loadPlugins">刷新</button>
-        </div>
-      </div>
-    </header>
-
-    <!-- Upload Dialog -->
-    <div v-if="showUpload" class="modal-overlay" @click.self="showUpload = false">
-      <div class="modal card">
-        <h3>上传插件</h3>
-        <p class="modal-desc">支持 .py 文件或 .zip 压缩包</p>
-        <input type="file" ref="uploadInput" accept=".py,.zip" @change="onUploadFile" />
-        <div class="modal-actions">
-          <button class="btn btn-secondary" @click="showUpload = false">取消</button>
-        </div>
-      </div>
+    <!-- Toolbar -->
+    <div class="plugins-toolbar">
+      <input class="p-search" type="text" v-model="searchText" placeholder="搜索插件..." />
+      <button class="p-btn upload-btn" @click="showUpload = true">上传</button>
+      <button class="p-btn" @click="showCreate = true">新建</button>
+      <button class="p-btn" @click="loadPlugins">刷新</button>
     </div>
 
-    <!-- Create Dialog -->
-    <div v-if="showCreate" class="modal-overlay" @click.self="showCreate = false">
-      <div class="modal card">
-        <h3>新建插件</h3>
-        <label>目录名</label>
-        <input v-model="newDir" class="input" placeholder="my_plugin" />
-        <label>文件名</label>
-        <input v-model="newFile" class="input" placeholder="main.py" />
-        <div class="modal-actions">
-          <button class="btn btn-secondary" @click="showCreate = false">取消</button>
-          <button class="btn btn-primary" @click="createPlugin">创建</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Plugin List -->
-    <div class="plugins-grid">
-      <div v-for="plugin in plugins" :key="plugin.name" class="card plugin-card">
-        <div class="plugin-header">
-          <h3>{{ plugin.meta?.name || plugin.name }}</h3>
-          <span class="badge" :class="plugin.enabled ? 'badge-success' : 'badge-danger'">
-            {{ plugin.enabled ? '已加载' : '未加载' }}
+    <!-- Plugin List (directory-based) -->
+    <div class="plugins-list" v-if="!loading">
+      <div v-for="dir in filteredDirs" :key="dir.name" class="p-dir">
+        <div class="p-dir-head" @click="dir._open = !dir._open">
+          <div class="p-dir-title">
+            <SvgIcon name="chevron" :size="14" :style="{ transform: dir._open ? 'rotate(0)' : 'rotate(-90deg)', transition: '0.15s' }" />
+            <span>{{ dir.name }}</span>
+            <span class="p-dir-count">{{ dir.plugins.length }}</span>
+          </div>
+          <span class="p-dir-status" :class="dir.loaded ? 'loaded' : 'unloaded'">
+            {{ dir.loaded ? '已加载' : '未加载' }}
           </span>
         </div>
-        <p v-if="plugin.description" class="plugin-desc">{{ plugin.description }}</p>
-        <div class="plugin-meta">
-          <span v-if="plugin.meta?.version">v{{ plugin.meta.version }}</span>
-          <span v-if="plugin.meta?.author">{{ plugin.meta.author }}</span>
-          <span>{{ plugin.handlers }} 个处理器</span>
-        </div>
-
-        <!-- Files -->
-        <div v-if="plugin.files && plugin.files.length" class="plugin-files">
-          <div v-for="file in plugin.files" :key="file.name" class="file-item" @click="openFile(file)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            <span>{{ file.name }}</span>
-            <span class="file-size">{{ fmtSize(file.size) }}</span>
+        <div class="p-dir-body" v-show="dir._open">
+          <div v-for="file in dir.plugins" :key="file.path" class="p-file" @click="openEditor(file)">
+            <span class="p-file-name">{{ file.name }}</span>
+            <span class="p-file-meta">{{ file.handlers || 0 }} 处理器</span>
           </div>
-        </div>
-
-        <div class="plugin-actions">
-          <button @click="reloadPlugin(plugin.name)" class="btn btn-secondary btn-sm">重载</button>
+          <div v-if="!dir.plugins.length" class="p-empty-inline">无插件文件</div>
         </div>
       </div>
-      <p v-if="!plugins.length" class="empty-text">暂无插件。将插件目录放入 <code>plugins/</code> 即可自动加载。</p>
+      <div v-if="!filteredDirs.length" class="p-empty">暂无插件</div>
     </div>
+    <div v-else class="p-loading">加载中...</div>
 
-    <!-- Code Editor Modal -->
-    <div v-if="editingFile" class="modal-overlay editor-overlay" @click.self="closeEditor">
-      <div class="modal card editor-modal">
+    <!-- Editor Modal -->
+    <div v-if="editorFile" class="modal-mask" @click.self="closeEditor">
+      <div class="editor-modal">
         <div class="editor-header">
-          <h3>{{ editingFile.filename }}</h3>
+          <span class="editor-title">{{ editorFile.path }}</span>
           <div class="editor-actions">
-            <button class="btn btn-primary btn-sm" @click="saveFile" :disabled="!editorChanged">保存</button>
-            <button class="btn btn-secondary btn-sm" @click="closeEditor">关闭</button>
+            <button class="p-btn save-btn" @click="saveFile" :disabled="saving">保存</button>
+            <button class="p-btn" @click="closeEditor">关闭</button>
           </div>
         </div>
         <textarea
-          v-model="editorContent"
-          @input="editorChanged = true"
           class="code-editor"
+          v-model="editorContent"
           spellcheck="false"
+          @keydown.tab.prevent="insertTab"
         ></textarea>
-        <p v-if="editorMsg" class="editor-msg" :class="{ error: editorError }">{{ editorMsg }}</p>
+        <div class="editor-status" v-if="editorMsg" :class="editorMsgType">{{ editorMsg }}</div>
+      </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div v-if="showUpload" class="modal-mask" @click.self="showUpload = false">
+      <div class="small-modal">
+        <h3>上传插件</h3>
+        <p class="modal-desc">支持 .py 文件或 .zip 压缩包</p>
+        <input type="file" accept=".py,.zip" @change="handleUpload" />
+        <div class="modal-footer">
+          <button class="p-btn" @click="showUpload = false">取消</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Create Modal -->
+    <div v-if="showCreate" class="modal-mask" @click.self="showCreate = false">
+      <div class="small-modal">
+        <h3>新建插件</h3>
+        <div class="form-group">
+          <label>目录名</label>
+          <input class="input" v-model="newDir" placeholder="my_plugin" />
+        </div>
+        <div class="form-group">
+          <label>文件名</label>
+          <input class="input" v-model="newFile" placeholder="main.py" />
+        </div>
+        <div class="modal-footer">
+          <button class="p-btn" @click="showCreate = false">取消</button>
+          <button class="p-btn save-btn" @click="createPlugin">创建</button>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAppStore } from '../stores/app'
+import SvgIcon from '../components/SvgIcon.vue'
 
 const store = useAppStore()
-const plugins = ref([])
+const dirs = ref([])
+const loading = ref(false)
+const searchText = ref('')
+const editorFile = ref(null)
+const editorContent = ref('')
+const editorMsg = ref('')
+const editorMsgType = ref('')
+const saving = ref(false)
 const showUpload = ref(false)
 const showCreate = ref(false)
 const newDir = ref('')
 const newFile = ref('main.py')
-const uploadInput = ref(null)
 
-const editingFile = ref(null)
-const editorContent = ref('')
-const editorChanged = ref(false)
-const editorMsg = ref('')
-const editorError = ref(false)
+const filteredDirs = computed(() => {
+  if (!searchText.value) return dirs.value
+  const q = searchText.value.toLowerCase()
+  return dirs.value.filter(d =>
+    d.name.toLowerCase().includes(q) || d.plugins.some(p => p.name.toLowerCase().includes(q))
+  )
+})
 
 async function loadPlugins() {
+  loading.value = true
   const res = await store.fetchApi('/plugins/scan')
   if (res && res.success) {
-    plugins.value = res.plugins || []
+    dirs.value = (res.plugins || []).map(d => ({ ...d, _open: true }))
   }
+  loading.value = false
 }
 
-async function reloadPlugin(name) {
-  await store.postApi('/plugins/reload', { name })
-  await loadPlugins()
-}
-
-async function openFile(file) {
+async function openEditor(file) {
   const res = await store.postApi('/plugins/read', { path: file.path })
   if (res && res.success) {
-    editingFile.value = { path: file.path, filename: res.filename }
-    editorContent.value = res.content
-    editorChanged.value = false
+    editorFile.value = file
+    editorContent.value = res.content || ''
     editorMsg.value = ''
   }
 }
 
+function closeEditor() { editorFile.value = null }
+
 async function saveFile() {
-  const res = await store.postApi('/plugins/save', {
-    path: editingFile.value.path,
-    content: editorContent.value,
-  })
+  saving.value = true
+  editorMsg.value = ''
+  const res = await store.postApi('/plugins/save', { path: editorFile.value.path, content: editorContent.value })
   if (res && res.success) {
     editorMsg.value = '保存成功'
-    editorError.value = false
-    editorChanged.value = false
+    editorMsgType.value = 'success'
   } else {
-    editorMsg.value = res?.message || '保存失败'
-    editorError.value = true
+    editorMsg.value = res?.error || '保存失败'
+    editorMsgType.value = 'error'
   }
+  saving.value = false
 }
 
-function closeEditor() {
-  editingFile.value = null
+function insertTab(e) {
+  const ta = e.target
+  const start = ta.selectionStart
+  const end = ta.selectionEnd
+  editorContent.value = editorContent.value.substring(0, start) + '  ' + editorContent.value.substring(end)
+  setTimeout(() => { ta.selectionStart = ta.selectionEnd = start + 2 }, 0)
 }
 
-async function createPlugin() {
-  if (!newDir.value) return
-  const res = await store.postApi('/plugins/create', {
-    directory: newDir.value,
-    filename: newFile.value || 'main.py',
-  })
-  if (res && res.success) {
-    showCreate.value = false
-    newDir.value = ''
-    newFile.value = 'main.py'
-    await loadPlugins()
-  }
-}
-
-async function onUploadFile() {
-  const file = uploadInput.value?.files?.[0]
+async function handleUpload(e) {
+  const file = e.target.files[0]
   if (!file) return
   const form = new FormData()
   form.append('file', file)
   const token = localStorage.getItem('elaina_token')
-  try {
-    const res = await fetch('/api/plugins/upload', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    })
-    const data = await res.json()
-    if (data.success) {
-      showUpload.value = false
-      await loadPlugins()
-    }
-  } catch (e) {}
+  const res = await fetch('/api/plugins/upload', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form })
+  const data = await res.json()
+  if (data.success) { showUpload.value = false; loadPlugins() }
 }
 
-function fmtSize(bytes) {
-  if (!bytes) return '0 B'
-  if (bytes < 1024) return bytes + ' B'
-  return (bytes / 1024).toFixed(1) + ' KB'
+async function createPlugin() {
+  if (!newDir.value) return
+  const res = await store.postApi('/plugins/create', { dir: newDir.value, filename: newFile.value || 'main.py' })
+  if (res && res.success) { showCreate.value = false; loadPlugins() }
 }
 
-onMounted(loadPlugins)
+onMounted(() => { loadPlugins() })
 </script>
 
 <style scoped>
-.page-header { margin-bottom: 16px; }
-.page-header h1 { font-size: 22px; font-weight: 700; }
-.subtitle { color: var(--color-text-muted); font-size: 13px; margin-top: 2px; }
-.page-header-row { display: flex; align-items: flex-start; justify-content: space-between; }
-.header-actions { display: flex; gap: 8px; }
-
-.plugins-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px;
+.plugins-page { display: flex; flex-direction: column; }
+.plugins-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.p-search {
+  flex: 1; max-width: 260px; background: var(--bg2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 13px; outline: none;
 }
-
-.plugin-card { padding: 16px; }
-.plugin-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-.plugin-header h3 { font-size: 14px; font-weight: 600; }
-.plugin-desc { font-size: 12px; color: var(--color-text-muted); margin-bottom: 8px; }
-.plugin-meta { display: flex; gap: 12px; font-size: 12px; color: var(--color-text-muted); margin-bottom: 8px; }
-
-.plugin-files { margin-bottom: 8px; }
-.file-item {
-  display: flex; align-items: center; gap: 6px; padding: 4px 8px;
-  font-size: 12px; cursor: pointer; border-radius: 4px; transition: background var(--transition);
+.p-search:focus { border-color: var(--accent); }
+.p-btn {
+  display: flex; align-items: center; gap: 4px; padding: 6px 12px;
+  border: 1px solid var(--border); border-radius: 6px; background: transparent;
+  color: var(--text2); cursor: pointer; font-size: 12px;
 }
-.file-item:hover { background: var(--color-bg-secondary); }
-.file-item svg { color: var(--color-text-muted); flex-shrink: 0; }
-.file-size { margin-left: auto; color: var(--color-text-muted); }
+.p-btn:hover { color: var(--text); border-color: var(--text3); }
+.p-btn:disabled { opacity: 0.4; cursor: default; }
+.upload-btn { background: var(--accent); color: #fff; border-color: var(--accent); }
+.upload-btn:hover { opacity: 0.9; }
+.save-btn { background: var(--accent); color: #fff; border-color: var(--accent); }
+.save-btn:hover { opacity: 0.9; }
 
-.plugin-actions { display: flex; gap: 8px; }
-.btn-sm { font-size: 12px; padding: 4px 10px; }
+.plugins-list { display: flex; flex-direction: column; gap: 6px; padding-bottom: 40px; }
+.p-loading, .p-empty { text-align: center; color: var(--text3); padding: 40px 0; font-size: 13px; }
+.p-empty-inline { text-align: center; color: var(--text3); padding: 12px 0; font-size: 12px; }
+
+.p-dir { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; overflow: clip; }
+.p-dir-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; cursor: pointer; user-select: none; gap: 8px;
+}
+.p-dir-title { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--text); }
+.p-dir-count { font-size: 11px; color: var(--text3); font-weight: 400; }
+.p-dir-status { font-size: 11px; padding: 2px 8px; border-radius: 4px; }
+.p-dir-status.loaded { background: #dcfce7; color: #166534; }
+.p-dir-status.unloaded { background: var(--bg3); color: var(--text3); }
+
+.p-dir-body { border-top: 1px solid var(--border); }
+.p-file {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px 8px 28px; cursor: pointer; transition: background 0.12s;
+  font-size: 13px;
+}
+.p-file:hover { background: var(--bg3); }
+.p-file-name { color: var(--text); }
+.p-file-meta { color: var(--text3); font-size: 11px; }
 
 /* Modal */
-.modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 200;
-  display: flex; align-items: center; justify-content: center;
+.modal-mask {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.3);
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
 }
-.modal { padding: 24px; width: 400px; max-width: 90vw; }
-.modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
-.modal-desc { font-size: 13px; color: var(--color-text-muted); margin-bottom: 12px; }
-.modal label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; margin-top: 8px; }
-.input {
-  width: 100%; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-sm);
-  font-size: 13px; outline: none; font-family: inherit; background: var(--color-bg);
+.editor-modal {
+  width: 90vw; max-width: 900px; height: 80vh;
+  background: var(--bg); border-radius: 10px; display: flex; flex-direction: column; overflow: hidden;
+  border: 1px solid var(--border);
 }
-.input:focus { border-color: var(--color-primary); }
-.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-
-/* Editor Modal */
-.editor-overlay { align-items: stretch; padding: 40px; }
-.editor-modal { width: 100%; max-width: 900px; display: flex; flex-direction: column; margin: auto; }
-.editor-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.editor-header h3 { font-size: 14px; font-weight: 600; }
-.editor-actions { display: flex; gap: 8px; }
+.editor-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+}
+.editor-title { font-size: 13px; color: var(--text); font-weight: 500; }
+.editor-actions { display: flex; gap: 6px; }
 .code-editor {
-  flex: 1; min-height: 400px; padding: 16px; border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 13px;
-  line-height: 1.6; resize: vertical; outline: none; background: var(--color-bg-secondary);
-  color: var(--color-text);
+  flex: 1; resize: none; padding: 12px; background: var(--bg2); color: var(--text);
+  border: none; font-family: var(--font-mono); font-size: 13px; line-height: 1.6;
+  tab-size: 2; outline: none;
 }
-.editor-msg { font-size: 12px; margin-top: 8px; color: var(--color-success); }
-.editor-msg.error { color: var(--color-danger); }
+.editor-status { padding: 6px 16px; font-size: 12px; border-top: 1px solid var(--border); }
+.editor-status.success { color: var(--success); }
+.editor-status.error { color: var(--danger); }
 
-.empty-text {
-  color: var(--color-text-muted); font-size: 13px; grid-column: 1 / -1;
-  text-align: center; padding: 40px;
+.small-modal {
+  width: 380px; background: var(--bg); border-radius: 10px; padding: 20px;
+  border: 1px solid var(--border);
 }
-.empty-text code {
-  background: var(--color-bg-tertiary); padding: 2px 6px; border-radius: 4px;
-  font-family: var(--font-mono); font-size: 12px;
-}
+.small-modal h3 { font-size: 16px; margin-bottom: 8px; color: var(--text); }
+.modal-desc { font-size: 12px; color: var(--text2); margin-bottom: 12px; }
+.form-group { margin-bottom: 12px; }
+.form-group label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 </style>

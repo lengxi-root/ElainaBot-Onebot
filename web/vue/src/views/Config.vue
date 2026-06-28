@@ -1,182 +1,128 @@
 <template>
   <div class="config-page">
-    <header class="page-header">
-      <h1>配置管理</h1>
-      <p class="subtitle">编辑框架配置文件 (YAML)</p>
-    </header>
-
-    <div class="card config-container">
-      <div class="config-toolbar">
-        <div class="toolbar-left">
-          <div class="file-tabs">
-            <button
-              v-for="tab in configTabs"
-              :key="tab.key"
-              :class="{ active: currentTab === tab.key }"
-              @click="switchTab(tab.key)"
-            >{{ tab.label }}</button>
-          </div>
-        </div>
-        <div class="toolbar-right">
-          <button @click="loadConfig" class="btn btn-secondary btn-sm">刷新</button>
-          <button @click="saveConfig" class="btn btn-primary btn-sm" :disabled="!changed">保存</button>
-        </div>
+    <div class="config-header">
+      <div class="config-actions">
+        <button class="cfg-btn" @click="loadConfig" :disabled="loading">刷新</button>
+        <button class="cfg-btn save" @click="saveConfig" :disabled="!changed || saving">保存</button>
       </div>
+    </div>
 
-      <div class="config-editor">
-        <div class="line-numbers">
-          <span v-for="n in lineCount" :key="n">{{ n }}</span>
+    <div class="config-tabs">
+      <button
+        v-for="tab in tabs"
+        :key="tab.key"
+        class="config-tab"
+        :class="{ active: activeTab === tab.key }"
+        @click="activeTab = tab.key; loadConfig()"
+      >{{ tab.label }}</button>
+    </div>
+
+    <div class="config-body">
+      <div class="editor-wrap">
+        <div class="editor-hint">
+          <span>{{ activeTab }}.yaml</span>
+          <span class="editor-hint-r" v-if="statusMsg">{{ statusMsg }}</span>
         </div>
         <textarea
-          ref="editorRef"
-          v-model="configText"
-          @input="onInput"
-          @keydown="handleTab"
-          class="config-textarea"
+          class="yaml-editor"
+          v-model="content"
           spellcheck="false"
+          @input="changed = true"
+          @keydown.tab.prevent="insertTab"
         ></textarea>
-      </div>
-
-      <div v-if="message" class="config-status" :class="{ error: isError }">
-        {{ message }}
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useAppStore } from '../stores/app'
 
 const store = useAppStore()
-const editorRef = ref(null)
-const configText = ref('')
+const tabs = [{ key: 'settings', label: 'settings.yaml' }]
+const activeTab = ref('settings')
+const content = ref('')
+const originalContent = ref('')
 const changed = ref(false)
-const message = ref('')
-const isError = ref(false)
-const currentTab = ref('settings')
-const configData = ref({})
-
-const configTabs = [
-  { key: 'settings', label: 'settings.yaml' },
-]
-
-const lineCount = computed(() => {
-  return (configText.value.match(/\n/g) || []).length + 1
-})
+const loading = ref(false)
+const saving = ref(false)
+const statusMsg = ref('')
 
 async function loadConfig() {
+  loading.value = true
+  statusMsg.value = ''
   const res = await store.fetchApi('/config')
   if (res && res.success) {
-    configData.value = {}
-    for (const key of Object.keys(res)) {
-      if (key !== 'success') {
-        configData.value[key] = res[key]
-      }
-    }
-    configText.value = configData.value[currentTab.value] || ''
+    content.value = res[activeTab.value] || ''
+    originalContent.value = content.value
     changed.value = false
-    message.value = ''
   }
-}
-
-function switchTab(tab) {
-  if (changed.value) {
-    if (!confirm('未保存的修改将丢失，是否继续？')) return
-  }
-  currentTab.value = tab
-  configText.value = configData.value[tab] || ''
-  changed.value = false
-  message.value = ''
-}
-
-function onInput() {
-  changed.value = true
-  message.value = ''
-}
-
-function handleTab(e) {
-  if (e.key === 'Tab') {
-    e.preventDefault()
-    const ta = editorRef.value
-    const start = ta.selectionStart
-    const end = ta.selectionEnd
-    const val = ta.value
-    ta.value = val.substring(0, start) + '  ' + val.substring(end)
-    ta.selectionStart = ta.selectionEnd = start + 2
-    configText.value = ta.value
-    changed.value = true
-  }
+  loading.value = false
 }
 
 async function saveConfig() {
-  const res = await store.postApi('/config/save', {
-    file: currentTab.value,
-    content: configText.value,
-  })
+  saving.value = true
+  statusMsg.value = ''
+  const res = await store.postApi('/config/save', { file: activeTab.value, content: content.value })
   if (res && res.success) {
-    message.value = '保存成功'
-    isError.value = false
+    statusMsg.value = '保存成功'
+    originalContent.value = content.value
     changed.value = false
-    configData.value[currentTab.value] = configText.value
   } else {
-    message.value = res?.error || '保存失败'
-    isError.value = true
+    statusMsg.value = res?.error || '保存失败'
   }
+  saving.value = false
+  setTimeout(() => { statusMsg.value = '' }, 3000)
 }
 
-onMounted(loadConfig)
+function insertTab(e) {
+  const ta = e.target
+  const start = ta.selectionStart
+  const end = ta.selectionEnd
+  content.value = content.value.substring(0, start) + '  ' + content.value.substring(end)
+  setTimeout(() => { ta.selectionStart = ta.selectionEnd = start + 2 }, 0)
+  changed.value = true
+}
+
+onMounted(() => { loadConfig() })
 </script>
 
 <style scoped>
-.page-header { margin-bottom: 16px; }
-.page-header h1 { font-size: 22px; font-weight: 700; }
-.subtitle { color: var(--color-text-muted); font-size: 13px; margin-top: 2px; }
+.config-page { display: flex; flex-direction: column; height: calc(100vh - 100px); }
+.config-header {
+  display: flex; align-items: center; justify-content: flex-end; margin-bottom: 12px;
+}
+.config-actions { display: flex; gap: 6px; }
+.cfg-btn {
+  padding: 5px 14px; border: 1px solid var(--border); border-radius: 6px;
+  background: transparent; color: var(--text2); cursor: pointer; font-size: 13px;
+}
+.cfg-btn:hover { color: var(--text); border-color: var(--text3); }
+.cfg-btn:disabled { opacity: 0.4; cursor: default; }
+.cfg-btn.save { background: var(--accent); color: #fff; border-color: var(--accent); }
+.cfg-btn.save:hover { background: var(--accent-hover); }
 
-.config-container { padding: 0; overflow: hidden; }
+.config-tabs { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+.config-tab {
+  padding: 6px 16px; border: 1px solid var(--border); border-radius: 6px;
+  background: transparent; color: var(--text2); cursor: pointer; font-size: 13px;
+}
+.config-tab:hover { color: var(--text); }
+.config-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-.config-toolbar {
+.config-body { flex: 1; display: flex; gap: 12px; min-height: 0; }
+.editor-wrap { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.editor-hint {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 16px; border-bottom: 1px solid var(--color-border-light); gap: 8px;
+  padding: 8px 12px; background: var(--bg3); border: 1px solid var(--border);
+  border-bottom: none; border-radius: 8px 8px 0 0; color: var(--text2); font-size: 12px;
 }
-.toolbar-left { display: flex; align-items: center; gap: 8px; }
-.toolbar-right { display: flex; gap: 8px; }
-
-.file-tabs { display: flex; gap: 2px; }
-.file-tabs button {
-  padding: 6px 12px; border: none; background: none; font-size: 13px;
-  color: var(--color-text-muted); border-radius: 4px; font-family: var(--font-mono);
-  cursor: pointer; transition: all var(--transition);
+.editor-hint-r { color: var(--warning); }
+.yaml-editor {
+  flex: 1; resize: none; padding: 12px; background: var(--bg2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 0 0 8px 8px;
+  font-family: var(--font-mono); font-size: 13px; line-height: 1.6;
+  tab-size: 2; outline: none;
 }
-.file-tabs button.active {
-  background: var(--color-primary-light); color: var(--color-primary); font-weight: 500;
-}
-.file-tabs button:hover:not(.active) { background: var(--color-bg-tertiary); }
-
-.btn-sm { font-size: 12px; padding: 5px 12px; }
-
-.config-editor { display: flex; position: relative; }
-
-.line-numbers {
-  padding: 16px 8px 16px 12px; background: var(--color-bg-secondary);
-  border-right: 1px solid var(--color-border-light); user-select: none;
-  display: flex; flex-direction: column; min-width: 40px; text-align: right;
-}
-.line-numbers span {
-  font-family: var(--font-mono); font-size: 12px; line-height: 1.6;
-  color: var(--color-text-muted); height: 19.2px;
-}
-
-.config-textarea {
-  flex: 1; min-height: 500px; padding: 16px; border: none; outline: none;
-  resize: vertical; font-family: var(--font-mono); font-size: 12px;
-  line-height: 1.6; background: var(--color-bg); color: var(--color-text);
-  tab-size: 2;
-}
-
-.config-status {
-  padding: 8px 16px; font-size: 12px; color: var(--color-success);
-  border-top: 1px solid var(--color-border-light);
-}
-.config-status.error { color: var(--color-danger); }
 </style>

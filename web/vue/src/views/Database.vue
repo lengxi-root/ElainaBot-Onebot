@@ -1,92 +1,58 @@
 <template>
   <div class="db-page">
-    <header class="page-header">
-      <h1>数据库浏览器</h1>
-      <p class="subtitle">浏览 SQLite 数据库</p>
-    </header>
-
-    <div class="db-layout">
-      <!-- Sidebar: DB + Table list -->
-      <div class="card db-sidebar">
-        <div class="panel-header">
-          <span>数据库</span>
-          <button class="btn btn-secondary btn-sm" @click="loadDatabases">刷新</button>
-        </div>
-        <div class="db-list">
-          <div v-for="db in databases" :key="db.path" class="db-item">
-            <div class="db-name" @click="selectDb(db)" :class="{ active: selectedDb?.path === db.path }">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-              <span>{{ db.name }}</span>
-              <span class="db-size">{{ fmtSize(db.size) }}</span>
-            </div>
-            <div v-if="selectedDb?.path === db.path && tables.length" class="table-list">
-              <div
-                v-for="table in tables"
-                :key="table.name"
-                class="table-item"
-                :class="{ active: selectedTable?.name === table.name }"
-                @click="selectTable(table)"
-              >
-                <span>{{ table.name }}</span>
-                <span class="row-count">{{ table.row_count }}</span>
-              </div>
-            </div>
-          </div>
-          <p v-if="!databases.length" class="empty-text">暂无数据库文件</p>
-        </div>
+    <div class="db-toolbar">
+      <h2>数据库浏览器</h2>
+      <div class="db-actions">
+        <select class="db-select" v-model="selectedDb" @change="loadTables">
+          <option value="">选择数据库</option>
+          <option v-for="db in databases" :key="db.path" :value="db.path">{{ db.name }}</option>
+        </select>
+        <select class="db-select" v-model="selectedTable" @change="loadTableData" :disabled="!tables.length">
+          <option value="">选择表</option>
+          <option v-for="t in tables" :key="t.name" :value="t.name">{{ t.name }} ({{ t.row_count }})</option>
+        </select>
+        <button class="db-btn" @click="refreshAll" :disabled="!selectedDb">刷新</button>
       </div>
+    </div>
 
-      <!-- Main: Query results -->
-      <div class="card db-main">
-        <template v-if="selectedTable">
-          <div class="panel-header">
-            <h3>{{ selectedTable.name }}</h3>
-            <span class="table-info">{{ selectedTable.row_count }} 行 / {{ selectedTable.columns?.length || 0 }} 列</span>
-          </div>
-
-          <!-- SQL Editor -->
-          <div class="sql-section">
-            <textarea v-model="sqlQuery" class="sql-input" placeholder="输入 SQL 查询..." rows="2" spellcheck="false"></textarea>
-            <div class="sql-actions">
-              <button class="btn btn-primary btn-sm" @click="executeSQL">执行</button>
-              <button class="btn btn-secondary btn-sm" @click="queryTable">查询表</button>
-            </div>
-          </div>
-
-          <!-- Results Table -->
-          <div class="results-container">
-            <table class="data-table" v-if="rows.length">
-              <thead>
-                <tr>
-                  <th v-for="col in resultColumns" :key="col" @click="toggleSort(col)" class="sortable">
-                    {{ col }}
-                    <span v-if="sortBy === col">{{ sortDir === 'ASC' ? ' ↑' : ' ↓' }}</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(row, idx) in rows" :key="idx">
-                  <td v-for="col in resultColumns" :key="col">{{ formatCell(row[col]) }}</td>
-                </tr>
-              </tbody>
-            </table>
-            <p v-else class="empty-text">{{ sqlMessage || '暂无数据' }}</p>
-          </div>
-
-          <div class="results-footer">
-            <span>{{ resultTotal }} 条结果</span>
-            <div class="page-btns">
-              <button class="btn btn-secondary btn-sm" :disabled="queryPage <= 1" @click="queryPage--; queryTable()">上一页</button>
-              <span>{{ queryPage }}</span>
-              <button class="btn btn-secondary btn-sm" @click="queryPage++; queryTable()">下一页</button>
-            </div>
-          </div>
-        </template>
-
-        <div v-else class="empty-panel">
-          <p>选择一个数据库和表开始浏览</p>
-        </div>
+    <!-- Query Area -->
+    <div class="query-section" v-if="selectedDb">
+      <div class="query-header">
+        <span>SQL 查询</span>
+        <button class="db-btn exec-btn" @click="executeQuery" :disabled="!query.trim()">执行</button>
       </div>
+      <textarea class="query-input" v-model="query" placeholder="输入 SQL 查询..." spellcheck="false" rows="3"></textarea>
+    </div>
+
+    <!-- Results -->
+    <div class="db-results" v-if="columns.length">
+      <div class="results-info">
+        <span>{{ rows.length }} 行</span>
+        <span v-if="queryTime">耗时 {{ queryTime }}ms</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th v-for="col in columns" :key="col">{{ col }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, idx) in rows" :key="idx">
+              <td v-for="col in columns" :key="col">
+                <span class="db-cell-text" :title="String(row[col] ?? '')">{{ row[col] ?? '' }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="db-empty" v-else-if="selectedDb && !loading">
+      {{ queryError || '选择表或执行查询查看数据' }}
+    </div>
+    <div class="db-empty" v-else-if="!selectedDb">
+      选择数据库开始浏览
     </div>
   </div>
 </template>
@@ -98,16 +64,14 @@ import { useAppStore } from '../stores/app'
 const store = useAppStore()
 const databases = ref([])
 const tables = ref([])
-const selectedDb = ref(null)
-const selectedTable = ref(null)
+const selectedDb = ref('')
+const selectedTable = ref('')
+const columns = ref([])
 const rows = ref([])
-const resultColumns = ref([])
-const resultTotal = ref(0)
-const queryPage = ref(1)
-const sortBy = ref('rowid')
-const sortDir = ref('DESC')
-const sqlQuery = ref('')
-const sqlMessage = ref('')
+const query = ref('')
+const queryError = ref('')
+const queryTime = ref(0)
+const loading = ref(false)
 
 async function loadDatabases() {
   const res = await store.fetchApi('/database/list')
@@ -116,183 +80,106 @@ async function loadDatabases() {
   }
 }
 
-async function selectDb(db) {
-  selectedDb.value = db
-  selectedTable.value = null
+async function loadTables() {
+  if (!selectedDb.value) { tables.value = []; return }
+  selectedTable.value = ''
+  columns.value = []
   rows.value = []
-  resultColumns.value = []
-  const res = await store.fetchApi(`/database/tables?db=${encodeURIComponent(db.path)}`)
+  const res = await store.fetchApi('/database/tables?db=' + encodeURIComponent(selectedDb.value))
   if (res && res.success) {
     tables.value = res.tables || []
   }
 }
 
-function selectTable(table) {
-  selectedTable.value = table
-  queryPage.value = 1
-  sortBy.value = 'rowid'
-  sortDir.value = 'DESC'
-  sqlQuery.value = `SELECT * FROM [${table.name}]`
-  queryTable()
+async function loadTableData() {
+  if (!selectedTable.value) return
+  query.value = `SELECT * FROM ${selectedTable.value} LIMIT 100`
+  await executeQuery()
 }
 
-async function queryTable() {
-  if (!selectedDb.value || !selectedTable.value) return
-  const res = await store.postApi('/database/query', {
-    db: selectedDb.value.path,
-    table: selectedTable.value.name,
-    page: queryPage.value,
-    limit: 100,
-    order_by: sortBy.value,
-    order_dir: sortDir.value,
-  })
+async function executeQuery() {
+  if (!query.value.trim() || !selectedDb.value) return
+  loading.value = true
+  queryError.value = ''
+  const start = Date.now()
+  const res = await store.postApi('/database/execute', { db: selectedDb.value, sql: query.value, read_only: true })
+  queryTime.value = Date.now() - start
   if (res && res.success) {
-    rows.value = res.rows || []
-    resultTotal.value = res.total || 0
-    if (rows.value.length) {
-      resultColumns.value = Object.keys(rows.value[0])
-    }
-    sqlMessage.value = ''
-  }
-}
-
-async function executeSQL() {
-  if (!selectedDb.value || !sqlQuery.value.trim()) return
-  const res = await store.postApi('/database/execute', {
-    db: selectedDb.value.path,
-    sql: sqlQuery.value.trim(),
-    read_only: true,
-  })
-  if (res && res.success) {
-    if (res.rows) {
-      rows.value = res.rows
-      resultTotal.value = res.row_count || rows.value.length
-      if (rows.value.length) {
-        resultColumns.value = Object.keys(rows.value[0])
-      }
-      sqlMessage.value = ''
+    const r = res.rows || []
+    if (r.length > 0) {
+      columns.value = Object.keys(r[0])
     } else {
-      sqlMessage.value = `执行成功，影响 ${res.affected_rows || 0} 行`
+      columns.value = []
     }
+    rows.value = r
   } else {
-    sqlMessage.value = res?.error || '执行失败'
+    queryError.value = res?.error || '查询失败'
+    columns.value = []
     rows.value = []
   }
+  loading.value = false
 }
 
-function toggleSort(col) {
-  if (sortBy.value === col) {
-    sortDir.value = sortDir.value === 'ASC' ? 'DESC' : 'ASC'
-  } else {
-    sortBy.value = col
-    sortDir.value = 'DESC'
-  }
-  queryTable()
+function refreshAll() {
+  if (selectedTable.value) loadTableData()
+  else loadTables()
 }
 
-function formatCell(val) {
-  if (val === null || val === undefined) return 'NULL'
-  if (typeof val === 'string' && val.length > 100) return val.slice(0, 100) + '...'
-  return String(val)
-}
-
-function fmtSize(bytes) {
-  if (!bytes) return '0 B'
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-}
-
-onMounted(loadDatabases)
+onMounted(() => { loadDatabases() })
 </script>
 
 <style scoped>
-.page-header { margin-bottom: 16px; }
-.page-header h1 { font-size: 22px; font-weight: 700; }
-.subtitle { color: var(--color-text-muted); font-size: 13px; margin-top: 2px; }
-
-.db-layout { display: grid; grid-template-columns: 260px 1fr; gap: 16px; height: calc(100vh - 140px); }
-
-.db-sidebar { display: flex; flex-direction: column; overflow: hidden; }
-.db-main { display: flex; flex-direction: column; overflow: hidden; }
-
-.panel-header {
-  padding: 10px 16px; border-bottom: 1px solid var(--color-border-light);
-  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
-  font-size: 13px; font-weight: 600;
+.db-page { display: flex; flex-direction: column; height: calc(100vh - 100px); }
+.db-toolbar {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
 }
-.panel-header h3 { font-size: 14px; font-weight: 600; }
-.table-info { font-size: 12px; color: var(--color-text-muted); font-weight: normal; }
-
-.btn-sm { font-size: 12px; padding: 4px 10px; }
-
-.db-list { flex: 1; overflow-y: auto; }
-
-.db-item { border-bottom: 1px solid var(--color-border-light); }
-.db-name {
-  display: flex; align-items: center; gap: 6px; padding: 8px 12px; cursor: pointer;
-  font-size: 13px; transition: background var(--transition);
+.db-toolbar h2 { color: var(--text); font-size: 18px; font-weight: 700; margin: 0; }
+.db-actions { display: flex; gap: 8px; align-items: center; }
+.db-select {
+  background: var(--bg2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 8px; font-size: 13px; outline: none; cursor: pointer;
 }
-.db-name:hover { background: var(--color-bg-secondary); }
-.db-name.active { background: var(--color-primary-light); color: var(--color-primary); }
-.db-name svg { flex-shrink: 0; color: var(--color-text-muted); }
-.db-size { margin-left: auto; font-size: 11px; color: var(--color-text-muted); }
-
-.table-list { padding: 0 0 4px 20px; }
-.table-item {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 4px 12px; font-size: 12px; cursor: pointer; border-radius: 4px;
-  transition: background var(--transition);
+.db-select:focus { border-color: var(--accent); }
+.db-btn {
+  padding: 5px 12px; border: 1px solid var(--border); border-radius: 6px;
+  background: transparent; color: var(--text2); cursor: pointer; font-size: 12px;
 }
-.table-item:hover { background: var(--color-bg-secondary); }
-.table-item.active { background: var(--color-primary-light); color: var(--color-primary); font-weight: 500; }
-.row-count { font-size: 11px; color: var(--color-text-muted); }
+.db-btn:hover { color: var(--text); border-color: var(--text3); }
+.db-btn:disabled { opacity: 0.4; cursor: default; }
+.exec-btn { background: var(--accent); color: #fff; border-color: var(--accent); }
+.exec-btn:hover { opacity: 0.9; }
 
-.sql-section {
-  padding: 8px 16px; border-bottom: 1px solid var(--color-border-light);
-  display: flex; gap: 8px; align-items: flex-start; flex-shrink: 0;
+.query-section {
+  margin-bottom: 12px; background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden;
 }
-.sql-input {
-  flex: 1; padding: 8px; border: 1px solid var(--color-border); border-radius: var(--radius-sm);
-  font-family: var(--font-mono); font-size: 12px; outline: none; resize: none;
-  background: var(--color-bg-secondary);
+.query-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text2);
 }
-.sql-input:focus { border-color: var(--color-primary); }
-.sql-actions { display: flex; flex-direction: column; gap: 4px; }
+.query-input {
+  width: 100%; resize: vertical; padding: 10px 12px; border: none; outline: none;
+  font-family: var(--font-mono); font-size: 13px; background: var(--bg2); color: var(--text);
+  line-height: 1.5;
+}
 
-.results-container { flex: 1; overflow: auto; }
-
-.data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.db-results { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.results-info {
+  display: flex; gap: 12px; font-size: 12px; color: var(--text3); margin-bottom: 6px;
+}
+.table-wrap { flex: 1; overflow: auto; border: 1px solid var(--border); border-radius: 6px; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .data-table th {
-  text-align: left; padding: 6px 12px; background: var(--color-bg-secondary);
-  font-weight: 600; font-size: 11px; color: var(--color-text-secondary);
-  border-bottom: 1px solid var(--color-border); white-space: nowrap;
-  position: sticky; top: 0; z-index: 1;
+  position: sticky; top: 0; background: var(--bg3);
+  text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border);
+  color: var(--text2); font-weight: 600; font-size: 12px; white-space: nowrap;
 }
-.data-table th.sortable { cursor: pointer; }
-.data-table th.sortable:hover { color: var(--color-primary); }
 .data-table td {
-  padding: 4px 12px; border-bottom: 1px solid var(--color-border-light);
-  font-family: var(--font-mono); max-width: 300px; overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap;
+  padding: 6px 10px; border-bottom: 1px solid var(--border); color: var(--text);
+  max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.data-table tr:hover td { background: var(--color-bg-secondary); }
+.data-table tr:hover td { background: rgba(88, 101, 242, 0.03); }
 
-.results-footer {
-  padding: 8px 16px; border-top: 1px solid var(--color-border-light);
-  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
-  font-size: 12px; color: var(--color-text-muted);
-}
-.page-btns { display: flex; align-items: center; gap: 8px; }
-
-.empty-panel {
-  flex: 1; display: flex; align-items: center; justify-content: center;
-  color: var(--color-text-muted); font-size: 14px;
-}
-.empty-text { color: var(--color-text-muted); font-size: 13px; text-align: center; padding: 40px; }
-
-@media (max-width: 768px) {
-  .db-layout { grid-template-columns: 1fr; height: auto; }
-  .db-sidebar { max-height: 250px; }
-}
+.db-cell-text { display: block; width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.db-empty { color: var(--text3); text-align: center; padding: 40px 0; font-size: 13px; }
 </style>

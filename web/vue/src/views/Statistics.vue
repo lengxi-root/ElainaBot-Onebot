@@ -1,86 +1,47 @@
 <template>
   <div class="stats-page">
-    <header class="page-header">
-      <h1>统计分析</h1>
-      <p class="subtitle">消息活跃度与趋势</p>
-    </header>
-
-    <div class="stats-grid">
-      <div class="stat-card card">
-        <div class="stat-icon" style="background: #eef0ff; color: var(--color-primary);">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        </div>
-        <div class="stat-content">
-          <span class="stat-value">{{ stats.today_messages }}</span>
-          <span class="stat-label">今日消息</span>
-        </div>
-      </div>
-      <div class="stat-card card">
-        <div class="stat-icon" style="background: #dcfce7; color: #166534;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        </div>
-        <div class="stat-content">
-          <span class="stat-value">{{ stats.active_users }}</span>
-          <span class="stat-label">活跃用户</span>
-        </div>
-      </div>
-      <div class="stat-card card">
-        <div class="stat-icon" style="background: #fef3c7; color: #92400e;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-        </div>
-        <div class="stat-content">
-          <span class="stat-value">{{ stats.active_groups }}</span>
-          <span class="stat-label">活跃群组</span>
-        </div>
-      </div>
-      <div class="stat-card card">
-        <div class="stat-icon" style="background: #ede9fe; color: #5b21b6;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        </div>
-        <div class="stat-content">
-          <span class="stat-value">{{ stats.total_messages }}</span>
-          <span class="stat-label">总消息数</span>
-        </div>
+    <div class="stats-header">
+      <h2>数据统计</h2>
+      <div class="stats-actions">
+        <button class="refresh-btn" @click="loadData" :disabled="loading">刷新</button>
       </div>
     </div>
 
-    <div class="charts-row">
-      <div class="card chart-card">
-        <h3>今日小时分布</h3>
-        <div class="bar-chart">
-          <div class="bar-container">
-            <div
-              v-for="(val, idx) in stats.hourly"
-              :key="idx"
-              class="bar-wrapper"
-            >
-              <div class="bar" :style="{ height: barHeight(val) + '%' }" :title="`${idx}:00 - ${val} 条`">
-                <span v-if="val > 0" class="bar-val">{{ val }}</span>
-              </div>
-              <span class="bar-label">{{ idx }}</span>
-            </div>
-          </div>
-        </div>
+    <!-- Overview Row -->
+    <div class="overview-row">
+      <div class="ov-card" v-for="s in overviewStats" :key="s.label">
+        <div class="ov-val">{{ s.value }}</div>
+        <div class="ov-label">{{ s.label }}</div>
       </div>
     </div>
 
-    <div class="charts-row">
-      <div class="card chart-card">
-        <h3>近 7 天趋势</h3>
-        <div class="bar-chart">
-          <div class="bar-container daily">
-            <div
-              v-for="day in stats.daily"
-              :key="day.date"
-              class="bar-wrapper"
-            >
-              <div class="bar bar-daily" :style="{ height: dailyBarHeight(day.count) + '%' }" :title="`${day.date} - ${day.count} 条`">
-                <span v-if="day.count > 0" class="bar-val">{{ day.count }}</span>
-              </div>
-              <span class="bar-label">{{ day.date.slice(5) }}</span>
-            </div>
+    <!-- Chart Panel: hourly -->
+    <div class="chart-panel">
+      <div class="chart-panel-title">24小时消息分布</div>
+      <div class="chart-body">
+        <div class="bar-chart" v-if="hourlyData.length">
+          <div class="bar-col" v-for="(count, idx) in hourlyData" :key="idx">
+            <div class="bar-fill" :style="{ height: barH(count, hourlyMax) + '%' }"></div>
+            <span class="bar-val" v-if="count">{{ count }}</span>
+            <span class="bar-label">{{ idx }}时</span>
           </div>
         </div>
+        <div class="chart-empty" v-else>暂无数据</div>
+      </div>
+    </div>
+
+    <!-- Chart Panel: daily -->
+    <div class="chart-panel">
+      <div class="chart-panel-title">7天消息趋势</div>
+      <div class="chart-body">
+        <div class="bar-chart daily" v-if="dailyData.length">
+          <div class="bar-col" v-for="d in dailyData" :key="d.date">
+            <div class="bar-fill" :style="{ height: barH(d.count, dailyMax) + '%' }"></div>
+            <span class="bar-val" v-if="d.count">{{ d.count }}</span>
+            <span class="bar-label">{{ d.date.slice(5) }}</span>
+          </div>
+        </div>
+        <div class="chart-empty" v-else>暂无数据</div>
       </div>
     </div>
   </div>
@@ -91,78 +52,77 @@ import { ref, computed, onMounted } from 'vue'
 import { useAppStore } from '../stores/app'
 
 const store = useAppStore()
-const stats = ref({
-  today_messages: 0,
-  total_messages: 0,
-  active_users: 0,
-  active_groups: 0,
-  hourly: Array(24).fill(0),
-  daily: [],
-})
+const data = ref({})
+const loading = ref(false)
+const hourlyData = ref([])
+const dailyData = ref([])
 
-const maxHourly = computed(() => Math.max(...stats.value.hourly, 1))
-const maxDaily = computed(() => Math.max(...(stats.value.daily || []).map(d => d.count), 1))
+const overviewStats = computed(() => [
+  { label: '今日消息', value: data.value.today_messages || 0 },
+  { label: '总消息数', value: data.value.total_messages || 0 },
+  { label: '今日活跃用户', value: data.value.active_users || 0 },
+  { label: '活跃群聊', value: data.value.active_groups || 0 },
+])
 
-function barHeight(val) {
-  return Math.max((val / maxHourly.value) * 100, 2)
+const hourlyMax = computed(() => Math.max(...hourlyData.value, 1))
+const dailyMax = computed(() => Math.max(...dailyData.value.map(d => d.count), 1))
+
+function barH(count, max) {
+  return max > 0 ? (count / max) * 100 : 0
 }
 
-function dailyBarHeight(val) {
-  return Math.max((val / maxDaily.value) * 100, 2)
-}
-
-async function loadStats() {
+async function loadData() {
+  loading.value = true
   const res = await store.fetchApi('/statistics')
   if (res && res.success) {
-    stats.value = {
-      today_messages: res.today_messages || 0,
-      total_messages: res.total_messages || 0,
-      active_users: res.active_users || 0,
-      active_groups: res.active_groups || 0,
-      hourly: res.hourly || Array(24).fill(0),
-      daily: res.daily || [],
-    }
+    data.value = res
+    hourlyData.value = res.hourly || []
+    dailyData.value = res.daily || []
   }
+  loading.value = false
 }
 
-onMounted(loadStats)
+onMounted(() => { loadData() })
 </script>
 
 <style scoped>
-.page-header { margin-bottom: 20px; }
-.page-header h1 { font-size: 22px; font-weight: 700; }
-.subtitle { color: var(--color-text-muted); font-size: 13px; margin-top: 2px; }
-
-.stats-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px; margin-bottom: 20px;
+.stats-page { width: 100%; }
+.stats-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.stats-header h2 { color: var(--text); font-size: 18px; font-weight: 700; margin: 0; }
+.refresh-btn {
+  background: var(--accent); color: #fff; border: none; border-radius: 6px;
+  padding: 5px 14px; font-size: 13px; cursor: pointer; transition: opacity 0.15s;
 }
-.stat-card { padding: 16px; display: flex; align-items: center; gap: 12px; }
-.stat-icon {
-  width: 40px; height: 40px; border-radius: var(--radius-sm);
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.stat-content { display: flex; flex-direction: column; }
-.stat-value { font-size: 20px; font-weight: 700; line-height: 1.2; }
-.stat-label { font-size: 12px; color: var(--color-text-muted); }
+.refresh-btn:hover { opacity: 0.85; }
+.refresh-btn:disabled { opacity: 0.45; cursor: default; }
 
-.charts-row { margin-bottom: 16px; }
-.chart-card { padding: 20px; }
-.chart-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 16px; }
-
-.bar-chart { overflow-x: auto; }
-.bar-container { display: flex; align-items: flex-end; gap: 4px; height: 160px; padding: 0 4px; }
-.bar-container.daily { gap: 12px; justify-content: center; }
-
-.bar-wrapper { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 20px; height: 100%; justify-content: flex-end; }
-.bar {
-  width: 100%; max-width: 24px; background: var(--color-primary); border-radius: 3px 3px 0 0;
-  transition: height 0.3s ease; position: relative; min-height: 2px;
+.overview-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+.ov-card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 8px; text-align: center;
 }
-.bar-daily { background: var(--color-success); max-width: 40px; }
-.bar-val {
-  position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
-  font-size: 10px; color: var(--color-text-muted); white-space: nowrap;
+.ov-val { color: var(--text); font-size: 16px; font-weight: 700; line-height: 1.2; }
+.ov-label { color: var(--text2); font-size: 11px; margin-top: 2px; }
+
+.chart-panel {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+  margin-bottom: 14px; overflow: hidden;
 }
-.bar-label { font-size: 10px; color: var(--color-text-muted); margin-top: 4px; }
+.chart-panel-title { padding: 12px 16px 0; color: var(--text); font-size: 14px; font-weight: 600; }
+.chart-body { padding: 12px 16px 16px; }
+.chart-empty { color: var(--text3); text-align: center; padding: 40px 0; font-size: 13px; }
+
+.bar-chart { display: flex; align-items: flex-end; gap: 3px; height: 140px; }
+.bar-chart.daily { height: 120px; }
+.bar-col {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  height: 100%; justify-content: flex-end;
+}
+.bar-fill {
+  width: 100%; max-width: 24px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-light));
+  border-radius: 3px 3px 0 0; min-height: 2px; transition: height 0.3s;
+}
+.bar-val { font-size: 9px; color: var(--text2); margin-bottom: 2px; }
+.bar-label { font-size: 10px; color: var(--text3); margin-top: 4px; }
 </style>
