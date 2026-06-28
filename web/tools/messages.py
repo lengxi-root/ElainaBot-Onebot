@@ -60,31 +60,106 @@ async def handle_get_nicknames_batch(request: web.Request):
 
 # ──────────── 聊天列表 ────────────
 
-def _aggregate_chats(chat_type):
+def _db_stats(chat_type):
+    """从消息日志聚合每个会话的最近时间与消息数, 返回 {chat_id: {...}}"""
     if chat_type == 'user':
         sql = ("SELECT user_id AS chat_id, MAX(id) AS last_id, MAX(timestamp) AS last_time, "
                "COUNT(*) AS msg_count FROM log WHERE user_id != '' AND group_id = '' GROUP BY user_id")
     else:
-        # group / full_access / remark 均按群聊聚合 (OneBot 无官方全量群概念)
         sql = ("SELECT group_id AS chat_id, MAX(id) AS last_id, MAX(timestamp) AS last_time, "
                "COUNT(*) AS msg_count FROM log WHERE group_id != '' GROUP BY group_id")
     rows = _q(sql)
-    appid = _primary_id()
-    chats = []
+    stats = {}
     for r in rows:
         cid = str(r.get('chat_id', ''))
-        if not cid:
-            continue
-        chats.append({
-            'chat_id': cid,
-            'appid': appid,
-            'bot_name': appid,
-            'last_id': r.get('last_id', 0) or 0,
-            'last_time': r.get('last_time', '') or '',
-            'last_date': (r.get('last_time', '') or '')[:10],
-            'msg_count': r.get('msg_count', 0) or 0,
-        })
-    chats.sort(key=lambda c: c['last_time'], reverse=True)
+        if cid:
+            stats[cid] = {
+                'last_id': r.get('last_id', 0) or 0,
+                'last_time': r.get('last_time', '') or '',
+                'msg_count': r.get('msg_count', 0) or 0,
+            }
+    return stats
+
+
+def _chat_from_stats(chat_type, stats, remarks):
+    """OneBot 接口不可用时, 退化为仅根据消息日志构造会话列表"""
+    appid = _primary_id()
+    chats = []
+    for cid, st in stats.items():
+        item = {
+            'chat_id': cid, 'appid': appid, 'bot_name': appid,
+            'last_id': st['last_id'], 'last_time': st['last_time'],
+            'last_date': (st['last_time'] or '')[:10], 'msg_count': st['msg_count'],
+            'remark': '', 'is_full_access': False,
+        }
+        if chat_type == 'group':
+            rv = remarks.get(cid)
+            item['nickname'] = _remark_name(rv) or f'群{cid[-6:]}'
+            item['remark'] = _remark_name(rv)
+            item['group_qq'] = _remark_qq(rv)
+        else:
+            item['nickname'] = f'用户{cid[-6:]}'
+        chats.append(item)
+    return chats
+
+
+async def _fetch_chats(chat_type):
+    """群 / 好友列表统一从 OneBot 接口获取, 并合并消息日志的最近时间与计数"""
+    appid = _primary_id()
+    stats = await asyncio.get_running_loop().run_in_executor(None, _db_stats, chat_type)
+    remarks = _load_remarks()
+    api = _api()
+
+    try:
+        if chat_type == 'user':
+            resp = await api.get_friend_list()
+        else:
+            resp = await api.get_group_list()
+    except Exception:
+        resp = None
+
+    data = (resp or {}).get('data') or [] if resp and resp.get('retcode') == 0 else []
+
+    # 接口无数据时退化为消息日志聚合, 保证已有聊天记录仍可查看
+    if not data:
+        chats = _chat_from_stats(chat_type, stats, remarks)
+        chats.sort(key=lambda c: c['last_time'] or '', reverse=True)
+        return chats
+
+    chats = []
+    if chat_type == 'user':
+        for f in data:
+            uid = str(f.get('user_id', ''))
+            if not uid:
+                continue
+            st = stats.get(uid, {})
+            nick = f.get('remark') or f.get('nickname') or f'用户{uid[-6:]}'
+            chats.append({
+                'chat_id': uid, 'appid': appid, 'bot_name': appid,
+                'nickname': nick, 'remark': f.get('remark', '') or '',
+                'last_id': st.get('last_id', 0), 'last_time': st.get('last_time', ''),
+                'last_date': (st.get('last_time', '') or '')[:10],
+                'msg_count': st.get('msg_count', 0),
+            })
+    else:
+        for g in data:
+            gid = str(g.get('group_id', ''))
+            if not gid:
+                continue
+            st = stats.get(gid, {})
+            rv = remarks.get(gid)
+            name = _remark_name(rv) or g.get('group_name') or f'群{gid[-6:]}'
+            chats.append({
+                'chat_id': gid, 'appid': appid, 'bot_name': appid,
+                'nickname': name, 'remark': _remark_name(rv),
+                'group_qq': _remark_qq(rv), 'is_full_access': False,
+                'last_id': st.get('last_id', 0), 'last_time': st.get('last_time', ''),
+                'last_date': (st.get('last_time', '') or '')[:10],
+                'msg_count': st.get('msg_count', 0),
+            })
+
+    # 有聊天记录的排在前面 (按最近时间), 其余保持接口顺序
+    chats.sort(key=lambda c: (c['last_time'] or '', c['msg_count']), reverse=True)
     return chats
 
 
@@ -94,6 +169,8 @@ async def handle_get_chats(request: web.Request):
     except Exception:
         body = {}
     chat_type = body.get('type', 'group')
+    if chat_type not in ('group', 'user'):
+        chat_type = 'group'
     search = body.get('search', '').lower()
     page = max(int(body.get('page', 1)), 1)
     page_size = min(int(body.get('page_size', 50)), 100)
@@ -103,23 +180,7 @@ async def handle_get_chats(request: web.Request):
     if c and now - c[0] < _CHAT_TTL:
         chats = c[1]
     else:
-        chats = await asyncio.get_running_loop().run_in_executor(None, _aggregate_chats, chat_type)
-        remarks = _load_remarks()
-        if chat_type == 'user':
-            ids = [ch['chat_id'] for ch in chats]
-            nicks = await _common.batch_nicknames(ids)
-            for ch in chats:
-                ch['nickname'] = nicks.get(ch['chat_id'], f'用户{ch["chat_id"][-6:]}')
-                ch['remark'] = ''
-        else:
-            for ch in chats:
-                rv = remarks.get(ch['chat_id'])
-                ch['nickname'] = _remark_name(rv) or f'群{ch["chat_id"][-6:]}'
-                ch['remark'] = _remark_name(rv)
-                ch['group_qq'] = _remark_qq(rv)
-                ch['is_full_access'] = False
-            if chat_type == 'remark':
-                chats = [ch for ch in chats if ch['chat_id'] in remarks]
+        chats = await _fetch_chats(chat_type)
         _chat_cache[chat_type] = (now, chats)
 
     if search:

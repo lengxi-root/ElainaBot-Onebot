@@ -74,7 +74,14 @@ class PluginManager:
             commands = []
             for pattern, _h, n in self._handlers:
                 if n == name and pattern:
-                    commands.append(pattern)
+                    # Web 面板期望命令为对象 {pattern, name, desc, owner_only, group_only}
+                    commands.append({
+                        'pattern': pattern,
+                        'name': '',
+                        'desc': '',
+                        'owner_only': False,
+                        'group_only': False,
+                    })
             meta = getattr(module, '__plugin_meta__', {}) or {}
             info[name] = {
                 'commands': commands,
