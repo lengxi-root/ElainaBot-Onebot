@@ -95,12 +95,14 @@ async def handle_login(request: web.Request):
     if auth.is_ip_banned(ip):
         return web.json_response({'success': False, 'error': 'IP 已被封禁'}, status=403)
 
-    password = body.get('password', '')
+    password = str(body.get('password', ''))
     from core.base.config import cfg
     admin_pwd = cfg.get('settings', 'web.admin_password', '')
 
     if not admin_pwd:
         return web.json_response({'success': False, 'error': '未配置密码'}, status=500)
+
+    admin_pwd = str(admin_pwd)
 
     if not auth.verify_password(password, admin_pwd):
         auth.record_ip_access(ip, 'fail')

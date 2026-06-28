@@ -92,6 +92,11 @@ def hash_password(plain: str) -> str:
     return _PWD_HASH_PREFIX + base64.b64encode(salt).decode() + ':' + h
 
 
+def _is_legacy_hex_hash(s: str) -> bool:
+    """Check if stored value is old-style bare SHA-256 hex (64 hex chars)."""
+    return len(s) == 64 and all(c in '0123456789abcdef' for c in s)
+
+
 def verify_password(plain: str, stored: str) -> bool:
     if stored.startswith(_PWD_HASH_PREFIX):
         try:
@@ -102,12 +107,16 @@ def verify_password(plain: str, stored: str) -> bool:
             return hmac.compare_digest(actual_hex, expected_hex)
         except Exception:
             return False
-    # plain text fallback (legacy)
+    # legacy bare SHA-256 hex (old framework format)
+    if _is_legacy_hex_hash(stored):
+        actual_hex = hashlib.sha256(plain.encode('utf-8')).hexdigest()
+        return hmac.compare_digest(actual_hex, stored)
+    # plain text fallback
     return hmac.compare_digest(plain, stored)
 
 
 def is_hashed(stored: str) -> bool:
-    return stored.startswith(_PWD_HASH_PREFIX)
+    return stored.startswith(_PWD_HASH_PREFIX) or _is_legacy_hex_hash(stored)
 
 
 # ==================== IP ====================

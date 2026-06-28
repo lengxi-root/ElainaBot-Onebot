@@ -36,7 +36,7 @@ export const useAppStore = defineStore('app', () => {
         headers: getHeaders(),
         ...options,
       })
-      if (res.status === 401) {
+      if (res.status === 401 && !path.startsWith('/auth/')) {
         localStorage.removeItem('elaina_token')
         window.location.href = '/web/login'
         return null
