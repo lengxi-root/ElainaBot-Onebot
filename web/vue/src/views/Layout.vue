@@ -380,6 +380,7 @@ onUnmounted(() => {
   display:flex;
   flex-direction:column;
   border-right:1px solid var(--border);
+  box-shadow:1px 0 0 var(--border);
   transition:width .2s,transform .25s;
   z-index:100
 }
@@ -425,23 +426,37 @@ onUnmounted(() => {
 .nav-item {
   display:flex;
   align-items:center;
-  gap:10px;
-  padding:10px 16px;
-  margin:2px 8px;
-  border-radius:8px;
+  gap:11px;
+  padding:10px 14px;
+  margin:3px 10px;
+  border-radius:10px;
   color:var(--text2);
   cursor:pointer;
   transition:all .15s;
   text-decoration:none;
-  font-size:14px
+  font-size:14px;
+  font-weight:500;
+  position:relative
 }
 .nav-item:hover {
-  background:var(--border);
+  background:var(--bg3);
   color:var(--text)
 }
 .nav-item.active {
-  background:var(--accent);
-  color:#fff
+  background:var(--accent-soft);
+  color:var(--accent);
+  font-weight:600
+}
+.nav-item.active::before {
+  content:"";
+  position:absolute;
+  left:-10px;
+  top:50%;
+  transform:translateY(-50%);
+  width:3px;
+  height:18px;
+  border-radius:0 3px 3px 0;
+  background:var(--accent)
 }
 .nav-divider {
   font-size:11px;

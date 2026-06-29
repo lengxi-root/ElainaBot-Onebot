@@ -240,6 +240,15 @@ onMounted(() => { appStore.fetchBots(); fetchAll() })
 
 <template>
   <div class="plugins-page">
+    <div class="ui-page-head">
+      <div class="ui-page-head-main">
+        <div class="ui-page-icon"><SvgIcon name="extension-puzzle" :size="24" /></div>
+        <div>
+          <h1 class="ui-page-title">插件模块</h1>
+          <div class="ui-page-sub">管理已加载的插件与模块</div>
+        </div>
+      </div>
+    </div>
     <div class="plugins-toolbar">
       <select v-model="mode" class="p-select"><option value="all">全部</option><option value="plugin">插件</option><option value="module">模块</option></select>
       <input v-model="search" class="p-search" placeholder="搜索插件或模块..." />
@@ -514,7 +523,7 @@ onMounted(() => { appStore.fetchBots(); fetchAll() })
 .plugins-list {
   display:flex;
   flex-direction:column;
-  gap:6px;
+  gap:10px;
   padding-bottom:40px
 }
 .p-loading,.p-empty {
@@ -532,7 +541,8 @@ onMounted(() => { appStore.fetchBots(); fetchAll() })
 .p-dir {
   background:var(--bg2);
   border:1px solid var(--border);
-  border-radius:10px;
+  border-radius:var(--radius-sm);
+  box-shadow:var(--shadow-sm);
   overflow:clip
 }
 .p-dir-head {

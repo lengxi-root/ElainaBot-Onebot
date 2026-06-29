@@ -2,6 +2,7 @@
 import { h, ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useMessage, NButton, NTag, NPopover } from 'naive-ui'
 import axios from '../utils/axios'
+import SvgIcon from '../components/SvgIcon.vue'
 
 const msg = useMessage()
 const PAGE = 50
@@ -226,6 +227,15 @@ watch([rows, tables, () => tableInfo.value, () => total.value], () => nextTick(r
 
 <template>
   <div>
+    <div class="ui-page-head">
+      <div class="ui-page-head-main">
+        <div class="ui-page-icon"><SvgIcon name="cube" :size="24" /></div>
+        <div>
+          <h1 class="ui-page-title">数据库</h1>
+          <div class="ui-page-sub">浏览和查询数据库表</div>
+        </div>
+      </div>
+    </div>
     <n-spin :show="loading">
       <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
         <div ref="leftColRef" class="lg:col-span-1 space-y-3">
@@ -287,6 +297,10 @@ watch([rows, tables, () => tableInfo.value, () => total.value], () => nextTick(r
 </template>
 
 <style scoped>
+:deep(.n-card) {
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow-sm);
+}
 .db-cell-text {
   display: block;
   width: 100%;
