@@ -124,10 +124,11 @@ onMounted(async () => {
     <div class="ui-stat-grid">
       <div v-for="card in overviewCards" :key="card.label" :class="['ui-stat', card.color, { active: chartTab === card.tab }]" @click="chartTab = card.tab">
         <div class="ui-stat-top">
-          <div class="ui-stat-ic"><SvgIcon :name="card.icon" :size="17" /></div>
+          <div class="ui-stat-ic"><SvgIcon :name="card.icon" :size="16" /></div>
           <div class="ui-stat-label">{{ card.label }}</div>
         </div>
         <div class="ui-stat-val">{{ card.value }}</div>
+        <SvgIcon class="ui-stat-wm" :name="card.icon" :size="80" />
       </div>
     </div>
 
@@ -181,7 +182,7 @@ onMounted(async () => {
 }
 .ui-stat.active {
   border-color:var(--cc);
-  box-shadow:0 0 0 1.5px var(--cc)
+  background:var(--cb)
 }
 .ui-stat { cursor:pointer; -webkit-user-select:none; user-select:none }
 .chart-panel {

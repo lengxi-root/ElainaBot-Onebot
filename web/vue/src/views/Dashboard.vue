@@ -105,10 +105,11 @@ onUnmounted(() => { off('system_info', onSysInfo); clearInterval(timer) })
     <div class="ui-stat-grid stat-grid">
       <div v-for="s in statCards" :key="s.label" :class="['ui-stat', s.color]">
         <div class="ui-stat-top">
-          <div class="ui-stat-ic"><SvgIcon :name="s.icon" :size="17" /></div>
+          <div class="ui-stat-ic"><SvgIcon :name="s.icon" :size="16" /></div>
           <div class="ui-stat-label">{{ s.label }}</div>
         </div>
         <div class="ui-stat-val">{{ s.value }}</div>
+        <SvgIcon class="ui-stat-wm" :name="s.icon" :size="80" />
       </div>
     </div>
 
