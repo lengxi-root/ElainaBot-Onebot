@@ -74,6 +74,7 @@ async def _message_stats():
     today = datetime.now().strftime('%Y-%m-%d')
     out = {'today_messages': 0, 'today_active': 0, 'active_groups': 0,
            'total_users': 0, 'total_groups': 0}
+    bot_qq = _common.primary_bot_qq()
     rows = await _common.query_log(
         'message',
         "SELECT COUNT(*) AS cnt, "
@@ -81,6 +82,7 @@ async def _message_stats():
         "COUNT(DISTINCT CASE WHEN group_id!='' THEN group_id END) AS groups_ "
         "FROM log WHERE timestamp LIKE ?",
         (today + '%',),
+        bot_qq=bot_qq,
     )
     if rows:
         out['today_messages'] = rows[0].get('cnt', 0) or 0
@@ -90,6 +92,7 @@ async def _message_stats():
         'message',
         "SELECT COUNT(DISTINCT CASE WHEN user_id!='' THEN user_id END) AS users, "
         "COUNT(DISTINCT CASE WHEN group_id!='' THEN group_id END) AS groups_ FROM log",
+        bot_qq=bot_qq,
     )
     if total:
         out['total_users'] = total[0].get('users', 0) or 0
