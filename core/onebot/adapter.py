@@ -14,9 +14,7 @@ logger = logging.getLogger('ElainaBot.onebot.adapter')
 class OneBotAdapter:
     """OneBot v11 协议适配器"""
 
-    def __init__(self, access_token: str = '', secret: str = ''):
-        self.access_token = access_token or ''
-        self.secret = secret or ''
+    def __init__(self):
         self.bots: Dict[str, Any] = {}
         self.websockets: Dict[str, Any] = {}
         self.api_responses: Dict[str, asyncio.Future] = {}
@@ -28,7 +26,7 @@ class OneBotAdapter:
         self.reverse_http_secrets: Dict[tuple, str] = {}
 
     def expected_ws_token(self, port=None, path=None) -> str:
-        """返回指定 (端口, 路径) 反向 WS 入口应校验的 token; 找不到则回退全局配置"""
+        """返回指定 (端口, 路径) 反向 WS 入口应校验的 token; 找不到则不校验"""
         m = self.reverse_ws_tokens
         if port is not None and (port, path) in m:
             return m[(port, path)]
@@ -36,7 +34,7 @@ class OneBotAdapter:
             for (p, _pa), t in m.items():
                 if p == port:
                     return t
-        return self.access_token or ''
+        return ''
 
     def expected_http_secret(self, port=None, path=None) -> str:
         m = self.reverse_http_secrets
@@ -46,10 +44,9 @@ class OneBotAdapter:
             for (p, _pa), s in m.items():
                 if p == port:
                     return s
-        return self.secret or ''
+        return ''
 
-    def _check_signature(self, body: bytes, signature: Optional[str], secret: Optional[str] = None) -> bool:
-        secret = self.secret if secret is None else secret
+    def _check_signature(self, body: bytes, signature: Optional[str], secret: str = '') -> bool:
         if not secret:
             return True
         if not signature:
@@ -57,8 +54,7 @@ class OneBotAdapter:
         sig = hmac.new(secret.encode('utf-8'), body, 'sha1').hexdigest()
         return signature == "sha1=" + sig
 
-    def _check_access_token(self, auth_header: Optional[str], token: Optional[str] = None) -> bool:
-        token = self.access_token if token is None else token
+    def _check_access_token(self, auth_header: Optional[str], token: str = '') -> bool:
         if not token:
             return True
         if not auth_header:
