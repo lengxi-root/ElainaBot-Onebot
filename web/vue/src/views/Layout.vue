@@ -203,7 +203,7 @@ onUnmounted(() => {
                 <template v-if="app.isAllBots">
                   <span class="ws-dot online" />
                   <span class="bot-name">全部机器人</span>
-                  <span class="bot-appid">{{ app.bots.length }} 个</span>
+                  <span class="bot-qq">{{ app.bots.length }} 个</span>
                 </template>
                 <template v-else>
                   <img v-if="app.currentBot?.avatar" :src="app.currentBot.avatar" class="bot-avatar-tiny" />
@@ -221,7 +221,7 @@ onUnmounted(() => {
               <div :class="['bot-switch-item', { active: app.isAllBots }]" @click="app.switchBot('')">
                 <span class="ws-dot online" />
                 <span class="bot-name">全部机器人</span>
-                <span class="bot-appid">{{ app.bots.length }} 个</span>
+                <span class="bot-qq">{{ app.bots.length }} 个</span>
               </div>
               <div v-for="bot in app.bots" :key="bot.bot_qq"
                 :class="['bot-switch-item', { active: bot.bot_qq === app.currentBotId, disabled: bot.enabled === false }]"
@@ -232,7 +232,7 @@ onUnmounted(() => {
                 <span v-else class="ws-dot offline" />
                 <span class="bot-info-col">
                   <span class="bot-name" :style="bot.enabled === false ? 'opacity:0.5' : ''">{{ bot.name || bot.bot_qq }}</span>
-                  <span class="bot-appid">{{ bot.bot_qq }}</span>
+                  <span class="bot-qq">{{ bot.bot_qq }}</span>
                 </span>
                 <n-tag v-if="bot.enabled !== false" :bordered="false" size="tiny" :type="bot.connection_type === 'Webhook' ? 'info' : 'success'" style="font-size:10px;flex-shrink:0">
                   {{ bot.connection_type === 'Webhook' ? 'WH' : 'WS' }}
@@ -545,7 +545,7 @@ onUnmounted(() => {
   font-size:14px;
   font-weight:600
 }
-.bot-appid {
+.bot-qq {
   color:var(--text3);
   font-size:12px;
   font-family:monospace
@@ -563,7 +563,7 @@ onUnmounted(() => {
   overflow:hidden;
   text-overflow:ellipsis
 }
-.bot-info-col .bot-appid {
+.bot-info-col .bot-qq {
   font-size:11px;
   line-height:1.2
 }
@@ -591,7 +591,7 @@ onUnmounted(() => {
 .bot-switch-item.active .bot-name {
   color:#fff
 }
-.bot-switch-item.active .bot-appid {
+.bot-switch-item.active .bot-qq {
   color:#fff9
 }
 .ws-main {

@@ -232,8 +232,8 @@ async function saveBotBindings() {
   for (const d of dirs.value) { if (d.allowed_bots?.length) map[d.directory] = [...d.allowed_bots]; for (const f of d.files) if (f.allowed_bots?.length) map[`${d.directory}/${fileBase(f)}`] = [...f.allowed_bots] }
   try { await axios.post('/api/plugins/bots', { plugin_bots: map }) } catch { msg.error('保存机器人绑定失败') }
 }
-function bindDirBot(dir, appid, checked) { if (!dir.allowed_bots) dir.allowed_bots = []; checked ? (!dir.allowed_bots.includes(appid) && dir.allowed_bots.push(appid)) : (dir.allowed_bots = dir.allowed_bots.filter(b => b !== appid)); saveBotBindings() }
-function bindFileBot(dir, file, appid, checked) { if (!file.allowed_bots) file.allowed_bots = []; checked ? (!file.allowed_bots.includes(appid) && file.allowed_bots.push(appid)) : (file.allowed_bots = file.allowed_bots.filter(b => b !== appid)); saveBotBindings() }
+function bindDirBot(dir, botQq, checked) { if (!dir.allowed_bots) dir.allowed_bots = []; checked ? (!dir.allowed_bots.includes(botQq) && dir.allowed_bots.push(botQq)) : (dir.allowed_bots = dir.allowed_bots.filter(b => b !== botQq)); saveBotBindings() }
+function bindFileBot(dir, file, botQq, checked) { if (!file.allowed_bots) file.allowed_bots = []; checked ? (!file.allowed_bots.includes(botQq) && file.allowed_bots.push(botQq)) : (file.allowed_bots = file.allowed_bots.filter(b => b !== botQq)); saveBotBindings() }
 
 onMounted(() => { appStore.fetchBots(); fetchAll() })
 </script>
@@ -549,8 +549,11 @@ onMounted(() => { appStore.fetchBots(); fetchAll() })
   display:flex;
   align-items:center;
   justify-content:space-between;
-  padding:10px 14px;
+  padding:9px 12px;
+  margin:4px;
+  border-radius:10px;
   cursor:pointer;
+  transition:background .15s;
   -webkit-user-select:none;
   -moz-user-select:none;
   user-select:none;
@@ -1067,7 +1070,7 @@ onMounted(() => { appStore.fetchBots(); fetchAll() })
   padding:10px 12px
 }
 .p-dir-cmds {
-  padding:6px 12px
+  padding:2px 16px 10px
 }
 .bot-bind-panel {
   padding:8px 12px
