@@ -74,9 +74,6 @@ const treeData = computed(() => {
   return result
 })
 
-// 数据异步加载, 用受控 expanded-keys 默认展开所有机器人节点
-watch(treeData, (d) => { expandedKeys.value = d.map(n => n.key) }, { immediate: true })
-
 function renderDbValue(value) {
   const isNull = value == null
   const text = isNull ? 'NULL' : String(value)
