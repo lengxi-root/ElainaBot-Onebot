@@ -1,17 +1,18 @@
 """AI 开发助手插件 (ai_dev)
 
 接入 OpenAI 兼容接口, 让 AI 通过工具调用直接编写/修改框架插件、热重载自测、
-读写框架配置、检查系统状态, 并提供一个亮色 Web 面板 (/ai/) 与 AI 对话、
-实时查看完整工具调用与日志。
+读写框架配置、检查系统状态, 并以插件侧边栏页面提供一个亮色 Web 面板
+与 AI 对话、实时查看完整工具调用与日志。
 
 QQ 内使用 (仅主人): 发送  ai <你的需求>   即可触发 AI 开发助手。
-Web 面板:        http://<host>:<port>/ai/  (用框架管理员密码登录)
+Web 面板:        登录框架后台 → 侧边栏「AI 开发」页面。
 """
 
 import logging
 import os
 
 from core.plugin.decorators import handler, on_load, on_unload
+from core.plugin.web_pages import register_page, unregister_page
 from plugins.ai_dev import agent as agentmod
 from plugins.ai_dev import aiconfig
 from plugins.ai_dev import webpanel
@@ -27,40 +28,36 @@ __plugin_meta__ = {
 log = logging.getLogger('ElainaBot.plugins.ai_dev')
 
 _PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
+_PANEL_HTML = os.path.join(_PLUGIN_DIR, 'panel.html')
+_PAGE_KEY = 'ai-dev'
 
 
 @on_load
 async def init():
-    """挂载 Web 面板路由 + 初始化存储 (路由只挂一次, 热重载安全)"""
+    """注册侧边栏页面 + /api/ext/aidev/* 路由 + 初始化存储 (热重载安全)"""
     from core.application import get_app
     app = get_app()
-    if not app:
-        log.warning('ai_dev: 无法获取 Application 实例, Web 面板未挂载')
-        return
 
     # AIStore 单例挂在 Application 上, 跨热重载保持同一实例
-    if getattr(app, '_ai_dev_store', None) is None:
+    if app is not None and getattr(app, '_ai_dev_store', None) is None:
         app._ai_dev_store = AIStore(os.path.join(_PLUGIN_DIR, 'data'))
-    app._ai_dev_plugin_dir = _PLUGIN_DIR
 
-    if getattr(app, '_ai_dev_mounted', False):
-        return
-    http = getattr(app, '_http_server', None)
-    aio = getattr(http, 'app', None) if http else None
-    if aio is None:
-        log.warning('ai_dev: HTTP 服务尚未就绪, Web 面板未挂载')
-        return
-    try:
-        webpanel.register_routes(aio)
-        app._ai_dev_mounted = True
-    except RuntimeError as e:
-        # 服务已启动 (路由冻结) — 多见于运行时热重载, 路由此前已挂载
-        log.debug(f'ai_dev: 路由挂载跳过 ({e})')
+    # 注册侧边栏页面 (iframe 渲染 panel.html)
+    register_page(
+        _PAGE_KEY,
+        'AI 开发',
+        source='plugin',
+        source_name='ai_dev',
+        html_file=_PANEL_HTML,
+        icon='extension-puzzle',
+    )
+    # 注册插件自定义路由 (热重载即时生效, 卸载时由框架自动清理)
+    webpanel.register_routes()
 
 
 @on_unload
 async def cleanup():
-    pass
+    unregister_page(_PAGE_KEY)
 
 
 @handler(r'^ai\s+([\s\S]+)$', name='ai', desc='AI 开发助手: ai <需求> (仅主人)', owner_only=True)

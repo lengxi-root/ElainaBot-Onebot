@@ -191,6 +191,12 @@ class _LoaderMixin:
         if not plugin:
             return
         await _run_hooks(plugin.on_unload_funcs, name)
+        try:
+            from core.plugin.web_pages import clear_routes_by_owner
+
+            clear_routes_by_owner(name)
+        except Exception:
+            pass
         prefix = f'plugins.{name}'
         for k in [k for k in sys.modules if k == prefix or k.startswith(prefix + '.')]:
             sys.modules.pop(k, None)

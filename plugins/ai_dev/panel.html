@@ -289,7 +289,8 @@ input,textarea,select{font-family:inherit}
 
 <script>
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
-let TOKEN=localStorage.getItem('ai_dev_token')||'';
+function _qsToken(){try{return new URLSearchParams(location.search).get('token')||'';}catch(e){return '';}}
+let TOKEN=_qsToken()||localStorage.getItem('ai_dev_token')||'';
 let SID=localStorage.getItem('ai_dev_sid')||'';
 let MODEL=localStorage.getItem('ai_dev_model')||'';
 let FILTER='all', evbuf=[], sending=false, es=null;
@@ -339,7 +340,7 @@ $('#logoutBtn').addEventListener('click',()=>{localStorage.removeItem('ai_dev_to
 
 /* ---- boot ---- */
 async function start(){
-  const r=await api('/ai/api/config');
+  const r=await api('/api/ext/aidev/config');
   if(r.status===401){showLogin();return;}
   $('#login').style.display='none';$('#app').style.display='flex';
   const cfg=(await r.json()).config||{};
@@ -355,7 +356,7 @@ function showLogin(){$('#login').style.display='flex';$('#app').style.display='n
 
 async function loadModels(){
   try{
-    const d=await (await api('/ai/api/models')).json();
+    const d=await (await api('/api/ext/aidev/models')).json();
     const sel=$('#modelSel');sel.innerHTML='';
     const list=(d.models&&d.models.length)?d.models:[MODEL||'gpt-4.1-nano'];
     list.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;sel.appendChild(o);});
@@ -367,7 +368,7 @@ $('#modelSel').addEventListener('change',e=>{MODEL=e.target.value;localStorage.s
 
 /* ---- sessions ---- */
 async function loadSessions(pick){
-  const d=await (await api('/ai/api/sessions')).json();
+  const d=await (await api('/api/ext/aidev/sessions')).json();
   const box=$('#sessions');box.innerHTML='';
   const list=(d.sessions||[]).filter(s=>!s.id.startsWith('qq_'));
   if(pick&&!SID&&list.length)SID=list[0].id;
@@ -383,23 +384,23 @@ async function loadSessions(pick){
 }
 async function selectSession(id){SID=id;localStorage.setItem('ai_dev_sid',id);loadSessions();}
 async function delSession(id){
-  await api('/ai/api/sessions/delete',{method:'POST',body:JSON.stringify({session_id:id})});
+  await api('/api/ext/aidev/sessions/delete',{method:'POST',body:JSON.stringify({session_id:id})});
   if(id===SID){SID='';localStorage.removeItem('ai_dev_sid');}
   loadSessions(true);
 }
 $('#newChat').addEventListener('click',async()=>{
-  const d=await (await api('/ai/api/sessions',{method:'POST',body:'{}'})).json();
+  const d=await (await api('/api/ext/aidev/sessions',{method:'POST',body:'{}'})).json();
   if(d.success){SID=d.session.id;localStorage.setItem('ai_dev_sid',SID);loadSessions();$('#input').focus();}
 });
 
 async function loadHistory(){
-  const d=await (await api('/ai/api/history?session_id='+SID)).json();
+  const d=await (await api('/api/ext/aidev/history?session_id='+SID)).json();
   const box=$('#messages');box.innerHTML='';
   const msgs=d.messages||[];
   if(!msgs.length){renderWelcome();return;}
   msgs.forEach(m=>addMsg(m.role==='user'?'user':'ai',m.content,false));
   scrollChat();
-  const cur=(await (await api('/ai/api/sessions')).json()).sessions.find(s=>s.id===SID);
+  const cur=(await (await api('/api/ext/aidev/sessions')).json()).sessions.find(s=>s.id===SID);
   $('#chatTitle').textContent=cur?cur.title:'对话';
 }
 function renderWelcome(){
@@ -440,13 +441,13 @@ $('#sendBtn').addEventListener('click',send);
 
 async function send(){
   const text=inp.value.trim();if(!text||sending)return;
-  if(!SID){const d=await (await api('/ai/api/sessions',{method:'POST',body:'{}'})).json();SID=d.session.id;localStorage.setItem('ai_dev_sid',SID);}
+  if(!SID){const d=await (await api('/api/ext/aidev/sessions',{method:'POST',body:'{}'})).json();SID=d.session.id;localStorage.setItem('ai_dev_sid',SID);}
   sending=true;$('#sendBtn').disabled=true;
   addMsg('user',text,true);inp.value='';autoGrow();
   const typing=addTyping();
   $('#chatMeta').textContent='AI 思考中…';
   try{
-    const r=await api('/ai/api/chat',{method:'POST',body:JSON.stringify({session_id:SID,message:text,model:MODEL})});
+    const r=await api('/api/ext/aidev/chat',{method:'POST',body:JSON.stringify({session_id:SID,message:text,model:MODEL})});
     const d=await r.json();
     typing.remove();
     if(d.success){addMsg('ai',d.message||'(无内容)',true);$('#chatMeta').textContent='完成 · '+(d.iterations||1)+' 步';}
@@ -497,7 +498,7 @@ function pushEvent(e){evbuf.push(e);if(evbuf.length>500)evbuf=evbuf.slice(-500);
   if(evMatch(e.type)){const list=$('#actList');if(list.querySelector('.act-empty'))list.innerHTML='';
     list.appendChild(evEl(e));list.scrollTop=list.scrollHeight;}}
 async function loadCalls(){
-  try{const d=await (await api('/ai/api/calls?limit=200')).json();evbuf=d.events||[];renderEvents();}catch(e){}
+  try{const d=await (await api('/api/ext/aidev/calls?limit=200')).json();evbuf=d.events||[];renderEvents();}catch(e){}
 }
 $$('.tab').forEach(t=>t.addEventListener('click',()=>{$$('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');FILTER=t.dataset.f;renderEvents();}));
 $('#actClear').addEventListener('click',()=>{evbuf=[];renderEvents();});
@@ -505,7 +506,7 @@ $('#actClear').addEventListener('click',()=>{evbuf=[];renderEvents();});
 /* ---- system ---- */
 async function loadSystem(){
   try{
-    const d=await (await api('/ai/api/calls?limit=1')).json(); // keepalive cheap; real sys via tool not needed
+    const d=await (await api('/api/ext/aidev/calls?limit=1')).json(); // keepalive cheap; real sys via tool not needed
   }catch(e){}
   // pull live system info via dedicated lightweight call
   fetchSys();
@@ -528,7 +529,7 @@ async function fetchSys(){
 /* ---- SSE ---- */
 function connectSSE(){
   if(es)es.close();
-  es=new EventSource('/ai/api/stream?token='+encodeURIComponent(TOKEN));
+  es=new EventSource('/api/ext/aidev/stream?token='+encodeURIComponent(TOKEN));
   es.onopen=()=>{$('#connDot').className='dot on';$('#connTxt').textContent='已连接';};
   es.onerror=()=>{$('#connDot').className='dot off';$('#connTxt').textContent='重连中…';};
   es.onmessage=ev=>{

@@ -1,38 +1,38 @@
-"""ai_dev Web 面板路由
+"""ai_dev Web 面板路由 (插件侧边栏页面 + /api/ext/aidev/* 接口)
 
-挂载到框架共享的 aiohttp 服务上, 提供:
-- GET  /ai/                 亮色聊天面板 (静态 HTML)
-- GET  /ai/api/config       面板配置 (模型/base_url 等, 不含 key 明文)
-- GET  /ai/api/models       代理上游模型列表
-- GET  /ai/api/sessions     会话列表
-- POST /ai/api/sessions     新建会话
-- POST /ai/api/sessions/delete  删除会话
-- GET  /ai/api/history      某会话历史
-- POST /ai/api/chat         发送消息 (执行 Agent, 返回最终结果)
-- GET  /ai/api/calls        最近事件 (完整调用 + 日志)
-- GET  /ai/api/stream       SSE 实时事件流
-- POST /ai/api/clear        清空会话
+通过框架的 register_route 机制注册, 统一挂在 /api/ext/aidev/ 前缀下,
+热重载/卸载即时生效。面板 HTML 由 register_page 提供, 在侧边栏以
+iframe 渲染。鉴权复用框架 web.auth (Bearer token / ?token=)。
 
-鉴权复用框架 web.auth (Bearer token / ?token=)。HTML 页面本身不鉴权,
-登录在前端通过框架现有 /api/auth/login 完成。
+接口:
+- GET  /api/ext/aidev/config         面板配置 (不含 key 明文)
+- GET  /api/ext/aidev/models         代理上游模型列表
+- GET  /api/ext/aidev/sessions       会话列表
+- POST /api/ext/aidev/sessions       新建会话
+- POST /api/ext/aidev/sessions/delete  删除会话
+- GET  /api/ext/aidev/history        某会话历史
+- POST /api/ext/aidev/chat           发送消息 (执行 Agent)
+- GET  /api/ext/aidev/calls          最近事件 (完整调用 + 日志)
+- GET  /api/ext/aidev/stream         SSE 实时事件流
+- POST /api/ext/aidev/clear          清空会话
 """
 
 import asyncio
 import contextlib
 import json
 import logging
-import os
 
 import aiohttp
 from aiohttp import web
 
 import web.auth as auth
+from core.plugin.web_pages import register_route
 from plugins.ai_dev import aiconfig
 from plugins.ai_dev import agent as agentmod
 
 log = logging.getLogger('ElainaBot.plugins.ai_dev')
 
-_PREFIX = '/ai'
+_PREFIX = '/api/ext/aidev'
 
 
 def _store():
@@ -42,48 +42,19 @@ def _store():
     return getattr(app, '_ai_dev_store', None) if app else None
 
 
-def _plugin_dir() -> str:
-    from core.application import get_app
-    app = get_app()
-    return getattr(app, '_ai_dev_plugin_dir', '') if app else ''
-
-
-def _require(handler):
-    async def wrapped(request):
-        if not auth.validate_token(request):
-            return web.json_response({'success': False, 'error': '未登录或会话已过期'}, status=401)
-        return await handler(request)
-    wrapped.__name__ = getattr(handler, '__name__', 'wrapped')
-    return wrapped
-
-
-def register_routes(aio_app: web.Application):
-    aio_app.router.add_get(_PREFIX, _redirect)
-    aio_app.router.add_get(_PREFIX + '/', _serve_panel)
-    aio_app.router.add_get(_PREFIX + '/api/config', _require(_get_config))
-    aio_app.router.add_get(_PREFIX + '/api/models', _require(_get_models))
-    aio_app.router.add_get(_PREFIX + '/api/sessions', _require(_get_sessions))
-    aio_app.router.add_post(_PREFIX + '/api/sessions', _require(_create_session))
-    aio_app.router.add_post(_PREFIX + '/api/sessions/delete', _require(_delete_session))
-    aio_app.router.add_get(_PREFIX + '/api/history', _require(_get_history))
-    aio_app.router.add_post(_PREFIX + '/api/chat', _require(_post_chat))
-    aio_app.router.add_get(_PREFIX + '/api/calls', _require(_get_calls))
-    aio_app.router.add_post(_PREFIX + '/api/clear', _require(_clear))
-    aio_app.router.add_get(_PREFIX + '/api/stream', _stream)  # SSE: token via query
-    log.info('AI 开发面板路由已挂载: /ai/')
-
-
-async def _redirect(request: web.Request):
-    raise web.HTTPFound(_PREFIX + '/')
-
-
-async def _serve_panel(request: web.Request):
-    path = os.path.join(_plugin_dir(), 'panel.html')
-    if not os.path.isfile(path):
-        return web.Response(text='panel.html 缺失', status=500)
-    with open(path, encoding='utf-8') as f:
-        html = f.read()
-    return web.Response(text=html, content_type='text/html', charset='utf-8')
+def register_routes():
+    """通过框架 register_route 注册全部 /api/ext/aidev/* 路由 (热重载安全)。"""
+    register_route('GET', _PREFIX + '/config', _get_config)
+    register_route('GET', _PREFIX + '/models', _get_models)
+    register_route('GET', _PREFIX + '/sessions', _get_sessions)
+    register_route('POST', _PREFIX + '/sessions', _create_session)
+    register_route('POST', _PREFIX + '/sessions/delete', _delete_session)
+    register_route('GET', _PREFIX + '/history', _get_history)
+    register_route('POST', _PREFIX + '/chat', _post_chat)
+    register_route('GET', _PREFIX + '/calls', _get_calls)
+    register_route('POST', _PREFIX + '/clear', _clear)
+    register_route('GET', _PREFIX + '/stream', _stream)
+    log.info('AI 开发面板路由已注册: /api/ext/aidev/*')
 
 
 async def _get_config(request: web.Request):
@@ -166,8 +137,6 @@ async def _clear(request: web.Request):
 
 
 async def _stream(request: web.Request):
-    if not auth.validate_token(request):
-        return web.Response(status=401, text='Unauthorized')
     resp = web.StreamResponse()
     resp.headers['Content-Type'] = 'text/event-stream'
     resp.headers['Cache-Control'] = 'no-cache'
