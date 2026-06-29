@@ -563,7 +563,7 @@ onUnmounted(() => { _unmounted = true; off('new_log', onNewLog); window.removeEv
             <template v-for="m in history" :key="m.id">
             <div v-if="m.event_type" class="event-wrap">
               <div class="event-box">
-                <img v-if="m.bot_qq && m.user_id" class="event-avatar" :src="avatarUrl(m.bot_qq, m.user_id)" loading="lazy" @error="e => e.target.style.display='none'" />
+                <img v-if="m.user_id" class="event-avatar" :src="avatarUrl(m.bot_qq, m.user_id)" loading="lazy" @error="e => e.target.style.display='none'" />
                 <div v-else class="event-avatar-fallback">{{ (m.nickname || '?').charAt(0) }}</div>
                 <span class="event-uid">{{ m.user_id }}</span>
                 <span class="event-text">{{ m.event_type === 'member_add' ? '已加入本群' : '已退出本群' }}</span>
@@ -575,7 +575,7 @@ onUnmounted(() => { _unmounted = true; off('new_log', onNewLog); window.removeEv
                 <div v-else-if="m.is_self" class="msg-avatar-bot">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="14" rx="3" /><circle cx="9" cy="11" r="1.5" fill="currentColor" /><circle cx="15" cy="11" r="1.5" fill="currentColor" /><path d="M12 2v2M6 20l2-2M18 20l-2-2" /></svg>
                 </div>
-                <img v-else-if="m.bot_qq && m.user_id" class="msg-avatar" :src="avatarUrl(m.bot_qq, m.user_id)" loading="lazy" @error="e => e.target.style.display='none'" />
+                <img v-else-if="m.user_id" class="msg-avatar" :src="avatarUrl(m.bot_qq, m.user_id)" loading="lazy" @error="e => e.target.style.display='none'" />
                 <div v-else class="msg-avatar-fallback">{{ (m.nickname || '?').charAt(0) }}</div>
               </div>
               <div class="bubble-main">
