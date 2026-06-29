@@ -119,7 +119,7 @@ onUnmounted(() => { off('new_log', onNewLog); off('init', onInit) })
         <template v-else-if="tab === 'lifecycle'">
           <span class="t-time">{{ e.timestamp }}</span>
           <span v-if="e.bot_qq" class="t-bot">[{{ e.bot_qq }}]</span>
-          <span :class="['t-lc-type', 't-lc-' + (e.event_type || e.type || '')]">{{ { group_add:'入群', group_del:'退群', group_member_add:'用户入群', group_member_del:'用户退群', friend_add:'加好友', friend_del:'删好友', group_msg_reject:'关闭主动消息', group_msg_receive:'开启主动消息', MESSAGE_REACTION_ADD:'表态', MESSAGE_REACTION_REMOVE:'取消表态', GUILD_UPDATE:'频道更新' }[e.event_type || e.type] || e.event_type || e.type }}</span>
+          <span :class="['t-lc-type', 't-lc-' + (e.event_type || e.type || '')]">{{ { group_add:'入群', group_del:'退群', group_member_add:'用户入群', group_member_del:'用户退群', group_increase:'用户入群', group_decrease:'用户退群', group_recall:'撤回消息', friend_recall:'撤回消息', friend_add:'加好友', friend_del:'删好友', group_admin:'管理变动', group_ban:'禁言', group_upload:'群文件', notify:'提醒', poke:'戳一戳', honor:'群荣誉', lucky_king:'运气王', group_msg_reject:'关闭主动消息', group_msg_receive:'开启主动消息', MESSAGE_REACTION_ADD:'表态', MESSAGE_REACTION_REMOVE:'取消表态', GUILD_UPDATE:'频道更新' }[e.event_type || e.type] || e.event_type || e.type }}</span>
           <span v-if="e.user_id" class="t-uid">U:{{ e.user_id }}</span>
           <span v-if="e.group_id" class="t-gid">G:{{ e.group_id }}</span>
           <span v-if="e.raw_message || e.content" :class="['t-expand-btn', { active: expandedRaw[i] }]" @click="expandedRaw[i] = !expandedRaw[i]">原始响应</span>

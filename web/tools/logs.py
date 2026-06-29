@@ -40,14 +40,28 @@ def _transform_message_rows(rows: list, bot_qq: str = '') -> list:
     return result
 
 
+def _transform_lifecycle_rows(rows: list, bot_qq: str = '') -> list:
+    """将事件(通知)DB 行转换为前端「事件」面板期望的字段格式"""
+    return [{
+        'timestamp': r.get('timestamp', ''),
+        'type': r.get('message_type', ''),
+        'user_id': r.get('user_id', ''),
+        'group_id': r.get('group_id', ''),
+        'bot_qq': r.get('source', '') or bot_qq,
+        'content': r.get('content', ''),
+        'raw_message': r.get('raw_data', ''),
+    } for r in rows]
+
+
 async def handle_recent_logs(request: web.Request):
     bot_qq = _common.primary_bot_qq()
     msg_rows = await _query_recent('message', bot_qq=bot_qq)
+    lc_rows = await _query_recent('lifecycle', bot_qq=bot_qq)
     payload = {
         'message': _transform_message_rows(msg_rows, bot_qq),
         'framework': await _query_recent('framework'),
         'error': await _query_recent('error'),
-        'lifecycle': await _query_recent('lifecycle', bot_qq=bot_qq),
+        'lifecycle': _transform_lifecycle_rows(lc_rows, bot_qq),
     }
     return web.json_response(payload)
 
