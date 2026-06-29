@@ -15,13 +15,12 @@ const days = ref(7)
 const chartData = ref(null)
 const hasChart = ref(false)
 const chartTab = ref('msg')
-const TABS = [{ key: 'msg', label: '消息统计' }, { key: 'active', label: '活跃统计' }, { key: 'event', label: '事件统计' }]
+const TABS = [{ key: 'msg', label: '消息统计' }, { key: 'active', label: '活跃统计' }]
 
 // 拆分数据源 — 各接口独立加载, 先返回先渲染
 const summary = ref({})
 const active = ref({})
 const top = ref({})
-const events = ref({})
 const totals = ref({})
 const hourly = ref([])
 
@@ -40,10 +39,6 @@ const overviewCards = computed(() => {
     { tab: 'total', label: '总用户数', value: totals.value.total_users ?? 0, icon: 'people', color: 'c-blue' },
     { tab: 'total', label: '总群组数', value: totals.value.total_groups ?? 0, icon: 'group', color: 'c-purple' },
     { tab: 'total', label: '总好友数', value: c?.total_friends ?? 0, icon: 'people', color: 'c-teal' },
-    { tab: 'event', label: '进群', value: events.value.group_join_count ?? 0, icon: 'plus', color: 'c-green' },
-    { tab: 'event', label: '退群', value: events.value.group_leave_count ?? 0, icon: 'minus', color: 'c-red' },
-    { tab: 'event', label: '加好友', value: events.value.friend_add_count ?? 0, icon: 'plus', color: 'c-cyan' },
-    { tab: 'event', label: '删好友', value: events.value.friend_remove_count ?? 0, icon: 'trash', color: 'c-orange' },
   ]
 })
 
@@ -55,7 +50,7 @@ const lineData = computed(() => {
   const labels = d.labels
   if (chartTab.value === 'msg') return { labels, datasets: [ds('总消息量', d.msg_total, C.blue), ds('私聊消息', d.msg_private, C.green), ds('群聊消息', d.msg_group, C.yellow)] }
   if (chartTab.value === 'active') return { labels, datasets: [ds('活跃用户', d.active_users, C.blue), ds('活跃群聊', d.active_groups, C.green)] }
-  return { labels, datasets: [ds('进群', d.ev_group_join, C.green), ds('退群', d.ev_group_leave, C.red), ds('加好友', d.ev_friend_add, C.blue), ds('删好友', d.ev_friend_remove, C.yellow)] }
+  return { labels, datasets: [ds('总消息量', d.msg_total, C.blue), ds('私聊消息', d.msg_private, C.green), ds('群聊消息', d.msg_group, C.yellow)] }
 })
 
 const barData = computed(() => ({ labels: Array.from({ length: 24 }, (_, i) => `${i}:00`), datasets: [{ label: '消息数', data: hourly.value, backgroundColor: 'rgba(88,166,255,0.45)', borderColor: '#58a6ff', borderWidth: 1 }] }))
@@ -71,7 +66,6 @@ async function fetchStats() {
     axios.get(`/api/statistics/summary?${q}`).then(r => { summary.value = r.data?.data || {} }).catch(() => {}),
     axios.get(`/api/statistics/active?${q}`).then(r => { active.value = r.data?.data || {} }).catch(() => {}),
     axios.get(`/api/statistics/top?${q}`).then(r => { top.value = r.data?.data || {} }).catch(() => {}),
-    axios.get(`/api/statistics/events?${q}`).then(r => { events.value = r.data?.data || {} }).catch(() => {}),
     axios.get(`/api/statistics/totals?${q}`).then(r => { totals.value = r.data?.data || {} }).catch(() => {}),
     axios.get(`/api/statistics/hourly?${q}`).then(r => {
       const d = r.data?.data || {}
