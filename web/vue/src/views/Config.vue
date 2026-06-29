@@ -3,6 +3,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import yaml from 'js-yaml'
 import axios from '../utils/axios'
+import SvgIcon from '../components/SvgIcon.vue'
 
 const message = useMessage()
 const loading = ref(false)
@@ -71,13 +72,20 @@ onMounted(fetchConfig)
 
 <template>
   <div class="config-page">
-    <div class="config-tabs">
-      <span class="config-tab active">settings.yaml</span>
-      <span class="config-tabs-spacer" />
-      <button :class="['cfg-btn', { active: viewMode === 'visual' }]" @click="viewMode = 'visual'">可视化</button>
-      <button :class="['cfg-btn', { active: viewMode === 'yaml' }]" @click="viewMode = 'yaml'">YAML</button>
-      <button class="cfg-btn save" @click="saveConfig" :disabled="!dirty || saving">{{ saving ? '保存中...' : '保存' }}</button>
-      <button class="cfg-btn" @click="fetchConfig" :disabled="loading">刷新</button>
+    <div class="ui-page-head">
+      <div class="ui-page-head-main">
+        <div class="ui-page-icon"><SvgIcon name="settings" :size="24" /></div>
+        <div>
+          <h1 class="ui-page-title">框架配置</h1>
+          <div class="ui-page-sub">编辑 settings.yaml 基础配置</div>
+        </div>
+      </div>
+      <div class="ui-page-actions config-tabs">
+        <button :class="['cfg-btn', { active: viewMode === 'visual' }]" @click="viewMode = 'visual'">可视化</button>
+        <button :class="['cfg-btn', { active: viewMode === 'yaml' }]" @click="viewMode = 'yaml'">YAML</button>
+        <button class="cfg-btn save" @click="saveConfig" :disabled="!dirty || saving">{{ saving ? '保存中...' : '保存' }}</button>
+        <button class="cfg-btn" @click="fetchConfig" :disabled="loading">刷新</button>
+      </div>
     </div>
 
     <template v-if="viewMode === 'visual'">
@@ -155,9 +163,9 @@ onMounted(fetchConfig)
   cursor:default
 }
 .cfg-btn.active {
-  background:var(--bg3);
-  color:var(--text);
-  border-color:var(--text3)
+  background:var(--accent-soft);
+  color:var(--accent);
+  border-color:var(--accent)
 }
 .cfg-btn.save {
   background:var(--accent);
@@ -245,8 +253,9 @@ onMounted(fetchConfig)
 .vis-card {
   background:var(--bg2);
   border:1px solid var(--border);
-  border-radius:10px;
-  padding:16px
+  border-radius:var(--radius);
+  box-shadow:var(--shadow-sm);
+  padding:20px
 }
 .vis-card-title {
   color:var(--text);

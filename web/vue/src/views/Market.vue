@@ -392,15 +392,17 @@ onMounted(() => { fetchList(); fetchMirror() })
 .m-card {
   background:var(--bg2);
   border:1px solid var(--border);
-  border-radius:10px;
-  padding:16px;
+  border-radius:var(--radius);
+  box-shadow:var(--shadow-sm);
+  padding:18px;
   display:flex;
   flex-direction:column;
   gap:10px;
-  transition:border-color .15s
+  transition:transform .15s,box-shadow .15s
 }
 .m-card:hover {
-  border-color:var(--accent)
+  transform:translateY(-2px);
+  box-shadow:var(--shadow-hover)
 }
 .m-card-head {
   display:flex;

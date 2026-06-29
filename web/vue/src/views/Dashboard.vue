@@ -21,10 +21,10 @@ const statCards = computed(() => {
   const u = s?.total_users ?? 0, au = s?.today_active ?? 0
   const g = s?.total_groups ?? 0, ag = s?.active_groups ?? 0
   return [
-    { label: '今日消息', value: s?.today_messages ?? 0, icon: 'chatbubbles' },
-    { label: '插件处理器', value: s?.plugins_count ?? 0, icon: 'extension-puzzle' },
-    { label: '全部用户', value: `${u} (${au})`, icon: 'people' },
-    { label: '全部群聊', value: `${g} (${ag})`, icon: 'group' },
+    { label: '今日消息', value: s?.today_messages ?? 0, icon: 'chatbubbles', color: 'c-blue' },
+    { label: '插件处理器', value: s?.plugins_count ?? 0, icon: 'extension-puzzle', color: 'c-purple' },
+    { label: '全部用户', value: `${u} (${au})`, icon: 'people', color: 'c-green' },
+    { label: '全部群聊', value: `${g} (${ag})`, icon: 'group', color: 'c-orange' },
   ]
 })
 
@@ -102,13 +102,13 @@ onUnmounted(() => { off('system_info', onSysInfo); clearInterval(timer) })
       <p>运行 {{ fmtUptime(sys?.uptime) }} · {{ sys?.system_version || '' }}</p>
     </div>
 
-    <div class="stat-grid">
-      <div v-for="s in statCards" :key="s.label" class="stat-card">
-        <div class="stat-icon">
-          <SvgIcon :name="s.icon" :size="28" color="var(--accent)" />
+    <div class="ui-stat-grid stat-grid">
+      <div v-for="s in statCards" :key="s.label" :class="['ui-stat', s.color]">
+        <div class="ui-stat-top">
+          <div class="ui-stat-ic"><SvgIcon :name="s.icon" :size="17" /></div>
+          <div class="ui-stat-label">{{ s.label }}</div>
         </div>
-        <div class="stat-value">{{ s.value }}</div>
-        <div class="stat-label">{{ s.label }}</div>
+        <div class="ui-stat-val">{{ s.value }}</div>
       </div>
     </div>
 
@@ -216,33 +216,7 @@ onUnmounted(() => { off('system_info', onSysInfo); clearInterval(timer) })
   margin:0
 }
 .stat-grid {
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:12px;
-  margin-bottom:16px
-}
-.stat-card {
-  background:var(--bg2);
-  border:1px solid var(--border);
-  border-radius:10px;
-  padding:16px;
-  text-align:center
-}
-.stat-icon {
-  margin:0 auto 10px;
-  display:flex;
-  align-items:center;
-  justify-content:center
-}
-.stat-value {
-  color:var(--text);
-  font-size:24px;
-  font-weight:700
-}
-.stat-label {
-  color:var(--text2);
-  font-size:12px;
-  margin-top:2px
+  grid-template-columns:repeat(4,1fr)
 }
 .main-row {
   display:flex;
@@ -263,8 +237,9 @@ onUnmounted(() => { off('system_info', onSysInfo); clearInterval(timer) })
 .res-card {
   background:var(--bg2);
   border:1px solid var(--border);
-  border-radius:10px;
-  padding:16px
+  border-radius:var(--radius);
+  box-shadow:var(--shadow-sm);
+  padding:18px
 }
 .res-header {
   display:flex;
@@ -347,12 +322,6 @@ onUnmounted(() => { off('system_info', onSysInfo); clearInterval(timer) })
 @media(max-width:767px) {
   .stat-grid {
   grid-template-columns:repeat(2,1fr)
-}
-.stat-value {
-  font-size:18px
-}
-.stat-card {
-  padding:12px
 }
 .main-row {
   flex-direction:column

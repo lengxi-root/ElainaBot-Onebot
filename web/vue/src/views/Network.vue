@@ -157,12 +157,15 @@ onMounted(fetchData)
 
 <template>
   <div class="net-page">
-    <div class="net-head">
-      <div>
-        <h2 class="net-title">网络配置</h2>
-        <p class="net-sub">配置框架与 OneBot 实现端的连接方式，支持正向/反向 WebSocket 与 HTTP，保存后即时生效。</p>
+    <div class="ui-page-head">
+      <div class="ui-page-head-main">
+        <div class="ui-page-icon"><SvgIcon name="link" :size="24" /></div>
+        <div>
+          <h1 class="ui-page-title">网络配置</h1>
+          <div class="ui-page-sub">配置框架与 OneBot 实现端的连接方式，保存后即时生效</div>
+        </div>
       </div>
-      <div class="net-head-actions">
+      <div class="ui-page-actions">
         <n-button size="small" tertiary :loading="loading" @click="fetchData">
           <template #icon><SvgIcon name="refresh" :size="15" /></template>刷新
         </n-button>
@@ -254,22 +257,22 @@ onMounted(fetchData)
 .net-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:18px }
 .net-head-actions { display:flex; gap:8px; flex-shrink:0 }
 .net-title { font-size:18px; font-weight:600; margin:0 }
-.net-sub { margin:4px 0 0; font-size:12.5px; color:var(--text-secondary); line-height:1.5; max-width:680px }
+.net-sub { margin:4px 0 0; font-size:12.5px; color:var(--text2); line-height:1.5; max-width:680px }
 .net-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px }
-.net-card { border:1px solid var(--border,rgba(128,128,128,.2)); border-radius:10px; padding:12px 14px; background:var(--card-bg,rgba(128,128,128,.04)); transition:border-color .15s }
-.net-card:hover { border-color:var(--accent,#5865f2) }
+.net-card { border:1px solid var(--border); border-radius:var(--radius); padding:16px; background:var(--bg2); box-shadow:var(--shadow-sm); transition:transform .15s,box-shadow .15s }
+.net-card:hover { transform:translateY(-2px); box-shadow:var(--shadow-hover) }
 .net-card.disabled { opacity:.62 }
 .net-card-top { display:flex; align-items:center; gap:8px }
 .net-card-icon { color:var(--accent,#5865f2); flex-shrink:0 }
 .net-card-name { font-weight:600; font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
-.net-type-tag { background:rgba(88,101,242,.12); color:var(--accent,#5865f2) }
+.net-type-tag { background:var(--accent-soft); color:var(--accent) }
 .net-card-spacer { flex:1 }
-.net-card-endpoint { display:flex; align-items:center; gap:6px; margin-top:9px; padding:5px 8px; border-radius:7px; background:rgba(128,128,128,.1); font-size:12px; font-family:monospace; cursor:pointer; color:var(--text-secondary) }
+.net-card-endpoint { display:flex; align-items:center; gap:6px; margin-top:9px; padding:6px 9px; border-radius:8px; background:var(--bg3); font-size:12px; font-family:monospace; cursor:pointer; color:var(--text2) }
 .net-card-endpoint:hover { color:var(--text) }
 .net-ep-text { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
 .net-ep-copy { opacity:.5 }
 .net-card-bottom { display:flex; align-items:center; gap:8px; margin-top:10px }
-.net-meta-item { display:flex; align-items:center; gap:3px; font-size:11px; color:var(--text-secondary) }
-.net-form-desc { margin:-6px 0 10px; font-size:11.5px; color:var(--text-secondary) }
-.net-empty { font-size:12.5px; color:var(--text-secondary); padding:32px; text-align:center; border:1px dashed var(--border,rgba(128,128,128,.25)); border-radius:10px }
+.net-meta-item { display:flex; align-items:center; gap:3px; font-size:11px; color:var(--text2) }
+.net-form-desc { margin:-6px 0 10px; font-size:11.5px; color:var(--text2) }
+.net-empty { font-size:12.5px; color:var(--text2); padding:32px; text-align:center; border:1px dashed var(--border); border-radius:10px }
 </style>

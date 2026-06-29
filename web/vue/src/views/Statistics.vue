@@ -5,6 +5,7 @@ import ChartDataLabels from 'chartjs-plugin-datalabels'
 import { Line, Bar } from 'vue-chartjs'
 import { useAppStore } from '../stores/app'
 import axios from '../utils/axios'
+import SvgIcon from '../components/SvgIcon.vue'
 
 Chart.register(Filler, LineElement, PointElement, BarElement, CategoryScale, LinearScale, Legend, Tooltip, BarController, LineController, ChartDataLabels)
 
@@ -31,18 +32,18 @@ const topCmds = computed(() => top.value?.top_commands || [])
 const overviewCards = computed(() => {
   const c = chartData.value
   return [
-    { tab: 'msg', label: '今日消息', value: summary.value.total_messages ?? 0 },
-    { tab: 'msg', label: '私聊消息', value: summary.value.private_messages ?? 0 },
-    { tab: 'msg', label: '群聊消息', value: (summary.value.total_messages ?? 0) - (summary.value.private_messages ?? 0) },
-    { tab: 'active', label: '活跃用户', value: active.value.active_users ?? 0 },
-    { tab: 'active', label: '活跃群聊', value: active.value.active_groups ?? 0 },
-    { tab: 'total', label: '总用户数', value: totals.value.total_users ?? 0 },
-    { tab: 'total', label: '总群组数', value: totals.value.total_groups ?? 0 },
-    { tab: 'total', label: '总好友数', value: c?.total_friends ?? 0 },
-    { tab: 'event', label: '进群', value: events.value.group_join_count ?? 0 },
-    { tab: 'event', label: '退群', value: events.value.group_leave_count ?? 0 },
-    { tab: 'event', label: '加好友', value: events.value.friend_add_count ?? 0 },
-    { tab: 'event', label: '删好友', value: events.value.friend_remove_count ?? 0 },
+    { tab: 'msg', label: '今日消息', value: summary.value.total_messages ?? 0, icon: 'chatbubbles', color: 'c-blue' },
+    { tab: 'msg', label: '私聊消息', value: summary.value.private_messages ?? 0, icon: 'chatbubbles', color: 'c-teal' },
+    { tab: 'msg', label: '群聊消息', value: (summary.value.total_messages ?? 0) - (summary.value.private_messages ?? 0), icon: 'group', color: 'c-purple' },
+    { tab: 'active', label: '活跃用户', value: active.value.active_users ?? 0, icon: 'people', color: 'c-green' },
+    { tab: 'active', label: '活跃群聊', value: active.value.active_groups ?? 0, icon: 'group', color: 'c-orange' },
+    { tab: 'total', label: '总用户数', value: totals.value.total_users ?? 0, icon: 'people', color: 'c-blue' },
+    { tab: 'total', label: '总群组数', value: totals.value.total_groups ?? 0, icon: 'group', color: 'c-purple' },
+    { tab: 'total', label: '总好友数', value: c?.total_friends ?? 0, icon: 'people', color: 'c-teal' },
+    { tab: 'event', label: '进群', value: events.value.group_join_count ?? 0, icon: 'plus', color: 'c-green' },
+    { tab: 'event', label: '退群', value: events.value.group_leave_count ?? 0, icon: 'minus', color: 'c-red' },
+    { tab: 'event', label: '加好友', value: events.value.friend_add_count ?? 0, icon: 'plus', color: 'c-cyan' },
+    { tab: 'event', label: '删好友', value: events.value.friend_remove_count ?? 0, icon: 'trash', color: 'c-orange' },
   ]
 })
 
@@ -59,8 +60,8 @@ const lineData = computed(() => {
 
 const barData = computed(() => ({ labels: Array.from({ length: 24 }, (_, i) => `${i}:00`), datasets: [{ label: '消息数', data: hourly.value, backgroundColor: 'rgba(88,166,255,0.45)', borderColor: '#58a6ff', borderWidth: 1 }] }))
 
-const lineOpts = { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { color: '#8b949e', font: { size: 12 }, usePointStyle: true, pointStyle: 'circle' } }, tooltip: { mode: 'index', intersect: false }, datalabels: { color: '#8b949e', font: { size: 10, weight: 600 }, anchor: 'end', align: 'top', offset: 2, formatter: v => v > 0 ? v : '' } }, scales: { x: { ticks: { color: '#484f58' }, grid: { color: 'rgba(48,54,61,0.6)' } }, y: { beginAtZero: true, ticks: { color: '#484f58', precision: 0 }, grid: { color: 'rgba(48,54,61,0.6)' } } } }
-const barOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false }, datalabels: { display: false } }, scales: { x: { ticks: { color: '#484f58', maxRotation: 0 }, grid: { display: false } }, y: { beginAtZero: true, ticks: { color: '#484f58', precision: 0 }, grid: { color: 'rgba(48,54,61,0.6)' } } } }
+const lineOpts = { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { color: '#5b6675', font: { size: 12 }, usePointStyle: true, pointStyle: 'circle' } }, tooltip: { mode: 'index', intersect: false }, datalabels: { color: '#97a1b0', font: { size: 10, weight: 600 }, anchor: 'end', align: 'top', offset: 2, formatter: v => v > 0 ? v : '' } }, scales: { x: { ticks: { color: '#97a1b0' }, grid: { color: 'rgba(120,130,150,0.12)' } }, y: { beginAtZero: true, ticks: { color: '#97a1b0', precision: 0 }, grid: { color: 'rgba(120,130,150,0.12)' } } } }
+const barOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false }, datalabels: { display: false } }, scales: { x: { ticks: { color: '#97a1b0', maxRotation: 0 }, grid: { display: false } }, y: { beginAtZero: true, ticks: { color: '#97a1b0', precision: 0 }, grid: { color: 'rgba(120,130,150,0.12)' } } } }
 
 async function fetchStats() {
   const bot_qq = app.currentBotId || ''
@@ -95,16 +96,44 @@ onMounted(async () => {
 
 <template>
   <div class="stats-page">
-    <div class="stats-header">
-      <div class="stats-actions">
-        <select v-model="days" class="ctrl-select" @change="refresh"><option :value="7">近 7 天</option><option :value="14">近 14 天</option><option :value="30">近 30 天</option></select>
-        <button class="refresh-btn" @click="refresh" :disabled="loading">{{ loading ? '加载中...' : '刷新' }}</button>
+    <div class="ui-page-head">
+      <div class="ui-page-head-main">
+        <div class="ui-page-icon"><SvgIcon name="stats-chart" :size="24" /></div>
+        <div>
+          <h1 class="ui-page-title">数据看板</h1>
+          <div class="ui-page-sub">查看消息收发统计和插件触发情况</div>
+        </div>
+      </div>
+      <div class="ui-page-actions">
+        <label class="ui-chip">
+          <SvgIcon name="stats-chart" :size="15" style="opacity:.6" />
+          <select v-model="days" @change="refresh">
+            <option :value="7">近 7 天</option><option :value="14">近 14 天</option><option :value="30">近 30 天</option>
+          </select>
+        </label>
+        <button class="ui-btn" @click="refresh" :disabled="loading">
+          <SvgIcon name="refresh" :size="15" />{{ loading ? '加载中' : '刷新' }}
+        </button>
       </div>
     </div>
 
-    <div class="chart-panel">
+    <div class="ui-sec-head">
+      <div class="ui-sec-icon"><SvgIcon name="people" :size="17" /></div>
+      <div class="ui-sec-title">数据概览</div>
+    </div>
+    <div class="ui-stat-grid">
+      <div v-for="card in overviewCards" :key="card.label" :class="['ui-stat', card.color, { active: chartTab === card.tab }]" @click="chartTab = card.tab">
+        <div class="ui-stat-top">
+          <div class="ui-stat-ic"><SvgIcon :name="card.icon" :size="17" /></div>
+          <div class="ui-stat-label">{{ card.label }}</div>
+        </div>
+        <div class="ui-stat-val">{{ card.value }}</div>
+      </div>
+    </div>
+
+    <div class="ui-card chart-panel">
       <div class="chart-tabs">
-        <button v-for="t in TABS" :key="t.key" :class="['chart-tab', { active: chartTab === t.key }]" @click="chartTab = t.key">{{ t.label }}</button>
+        <button v-for="t in TABS" :key="t.key" :class="['ui-pill', { active: chartTab === t.key }]" @click="chartTab = t.key">{{ t.label }}</button>
       </div>
       <div class="chart-box">
         <Line v-if="hasChart" :key="chartTab" :data="lineData" :options="lineOpts" />
@@ -112,42 +141,35 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-if="hourly.length" class="chart-panel">
+    <div v-if="hourly.length" class="ui-card chart-panel">
       <div class="chart-panel-title">今日每小时消息分布</div>
       <div class="chart-box short"><Bar :data="barData" :options="barOpts" /></div>
     </div>
 
     <div class="bottom-row">
-      <div v-if="topCmds.length" class="rank-card">
-        <h3>命令排行</h3>
+      <div v-if="topCmds.length" class="ui-card rank-card">
+        <h3><span class="ui-sec-icon" style="width:26px;height:26px"><SvgIcon name="extension-puzzle" :size="15" /></span>命令排行</h3>
         <div v-for="(c, i) in topCmds" :key="c.command" class="rank-item">
           <span :class="['rank-idx', 'r' + i]">{{ i + 1 }}</span>
           <span class="rank-name">{{ c.command }}</span>
           <span class="rank-val">{{ c.count }}</span>
         </div>
       </div>
-      <div v-if="topGroups.length" class="rank-card">
-        <h3>群消息排行</h3>
+      <div v-if="topGroups.length" class="ui-card rank-card">
+        <h3><span class="ui-sec-icon" style="width:26px;height:26px"><SvgIcon name="group" :size="15" /></span>群消息排行</h3>
         <div v-for="(g, i) in topGroups" :key="g.group_id" class="rank-item">
           <span :class="['rank-idx', 'r' + i]">{{ i + 1 }}</span>
           <span class="rank-name">{{ g.group_id }}</span>
           <span class="rank-val">{{ g.message_count }}</span>
         </div>
       </div>
-      <div v-if="topUsers.length" class="rank-card">
-        <h3>用户消息排行</h3>
+      <div v-if="topUsers.length" class="ui-card rank-card">
+        <h3><span class="ui-sec-icon" style="width:26px;height:26px"><SvgIcon name="people" :size="15" /></span>用户消息排行</h3>
         <div v-for="(u, i) in topUsers" :key="u.user_id" class="rank-item">
           <span :class="['rank-idx', 'r' + i]">{{ i + 1 }}</span>
           <span class="rank-name">{{ u.user_id }}</span>
           <span class="rank-val">{{ u.message_count }}</span>
         </div>
-      </div>
-    </div>
-
-    <div class="overview-row">
-      <div v-for="card in overviewCards" :key="card.label" :class="['ov-card', { active: chartTab === card.tab }]" @click="chartTab = card.tab">
-        <div class="ov-val">{{ card.value }}</div>
-        <div class="ov-label">{{ card.label }}</div>
       </div>
     </div>
   </div>
@@ -157,132 +179,26 @@ onMounted(async () => {
 .stats-page {
   width:100%
 }
-.stats-header {
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  margin-bottom:16px
+.ui-stat.active {
+  border-color:var(--cc);
+  box-shadow:0 0 0 1.5px var(--cc)
 }
-.stats-header h2 {
-  color:var(--text);
-  font-size:18px;
-  font-weight:700;
-  margin:0
-}
-.stats-actions {
-  display:flex;
-  gap:8px;
-  align-items:center
-}
-.ctrl-select {
-  background:var(--bg3);
-  color:var(--text);
-  border:1px solid var(--border);
-  border-radius:6px;
-  padding:4px 8px;
-  font-size:13px;
-  cursor:pointer;
-  outline:none
-}
-.refresh-btn {
-  background:var(--accent);
-  color:#fff;
-  border:none;
-  border-radius:6px;
-  padding:5px 14px;
-  font-size:13px;
-  cursor:pointer;
-  transition:opacity .15s
-}
-.refresh-btn:hover {
-  opacity:.85
-}
-.refresh-btn:disabled {
-  opacity:.45;
-  cursor:default
-}
-.overview-row {
-  display:grid;
-  grid-template-columns:repeat(6,1fr);
-  gap:8px;
-  margin-bottom:14px
-}
-.ov-card {
-  background:var(--bg2);
-  border:1px solid var(--border);
-  border-radius:8px;
-  padding:10px 8px;
-  text-align:center;
-  cursor:pointer;
-  transition:all .15s;
-  -webkit-user-select:none;
-  -moz-user-select:none;
-  user-select:none
-}
-.ov-card:hover {
-  border-color:var(--accent)
-}
-.ov-card.active {
-  border-color:var(--accent);
-  box-shadow:0 0 0 1px var(--accent)
-}
-.ov-val {
-  color:var(--text);
-  font-size:16px;
-  font-weight:700;
-  line-height:1.2
-}
-.ov-label {
-  color:var(--text2);
-  font-size:11px;
-  margin-top:2px
-}
+.ui-stat { cursor:pointer; -webkit-user-select:none; user-select:none }
 .chart-panel {
-  background:var(--bg2);
-  border:1px solid var(--border);
-  border-radius:10px;
-  margin-bottom:14px;
+  margin-bottom:16px;
   overflow:hidden
 }
 .chart-panel-title {
-  padding:12px 16px 0;
+  padding:16px 18px 0;
   color:var(--text);
-  font-size:14px;
-  font-weight:600
+  font-size:15px;
+  font-weight:700
 }
 .chart-tabs {
   display:flex;
+  gap:6px;
+  padding:14px 16px;
   border-bottom:1px solid var(--border)
-}
-.chart-tab {
-  flex:1;
-  padding:10px 0;
-  text-align:center;
-  border:none;
-  background:none;
-  color:var(--text2);
-  font-size:13px;
-  cursor:pointer;
-  position:relative;
-  transition:color .15s;
-  font-weight:500
-}
-.chart-tab:hover {
-  color:var(--text)
-}
-.chart-tab.active {
-  color:var(--accent);
-  font-weight:600
-}
-.chart-tab.active:after {
-  content:"";
-  position:absolute;
-  left:20%;
-  right:20%;
-  bottom:0;
-  height:2px;
-  background:var(--accent);
-  border-radius:2px
 }
 .chart-box {
   height:300px;
@@ -300,20 +216,20 @@ onMounted(async () => {
 .bottom-row {
   display:grid;
   grid-template-columns:repeat(3,1fr);
-  gap:12px;
-  margin-bottom:14px
+  gap:14px;
+  margin-bottom:16px
 }
 .rank-card {
-  background:var(--bg2);
-  border:1px solid var(--border);
-  border-radius:10px;
-  padding:14px
+  padding:18px
 }
 .rank-card h3 {
+  display:flex;
+  align-items:center;
+  gap:8px;
   color:var(--text);
-  font-size:14px;
-  font-weight:600;
-  margin:0 0 8px
+  font-size:15px;
+  font-weight:700;
+  margin:0 0 12px
 }
 .rank-item {
   display:flex;
@@ -364,26 +280,8 @@ onMounted(async () => {
   font-weight:600;
   flex-shrink:0
 }
-@media(max-width:1200px) {
-  .overview-row {
-  grid-template-columns:repeat(4,1fr)
-}
-}
 @media(max-width:767px) {
-  .overview-row {
-  grid-template-columns:repeat(3,1fr);
-  gap:6px
-}
-.ov-card {
-  padding:8px 4px
-}
-.ov-val {
-  font-size:14px
-}
-.ov-label {
-  font-size:10px
-}
-.bottom-row {
+  .bottom-row {
   grid-template-columns:1fr
 }
 .chart-box {
@@ -395,14 +293,6 @@ onMounted(async () => {
 }
 .chart-tabs {
   overflow-x:auto
-}
-.stats-actions {
-  flex-wrap:wrap
-}
-}
-@media(max-width:400px) {
-  .overview-row {
-  grid-template-columns:repeat(2,1fr)
 }
 }
 </style>

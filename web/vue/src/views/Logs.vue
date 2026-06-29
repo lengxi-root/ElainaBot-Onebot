@@ -85,8 +85,8 @@ onUnmounted(() => { off('new_log', onNewLog); off('init', onInit) })
 <template>
   <div class="log-page">
     <div class="log-toolbar">
-      <div class="log-tabs">
-        <button v-for="t in TABS" :key="t.key" :class="['tab-btn', { active: tab === t.key }]" @click="tab = t.key">{{ t.label }}</button>
+      <div class="log-tabs ui-pills">
+        <button v-for="t in TABS" :key="t.key" :class="['ui-pill', { active: tab === t.key }]" @click="tab = t.key">{{ t.label }}</button>
       </div>
       <div class="log-actions">
         <label class="auto-label"><input type="checkbox" v-model="autoScroll" /> 自动滚动 </label>
@@ -169,28 +169,6 @@ onUnmounted(() => { off('new_log', onNewLog); off('init', onInit) })
   flex-wrap:wrap;
   gap:8px
 }
-.log-tabs {
-  display:flex;
-  gap:2px
-}
-.tab-btn {
-  padding:5px 14px;
-  border:1px solid var(--border);
-  border-radius:4px;
-  background:transparent;
-  color:var(--text2);
-  cursor:pointer;
-  font-size:13px
-}
-.tab-btn:hover {
-  color:var(--text);
-  border-color:var(--text3)
-}
-.tab-btn.active {
-  background:var(--accent);
-  color:#fff;
-  border-color:var(--accent)
-}
 .log-actions {
   display:flex;
   align-items:center;
@@ -224,13 +202,14 @@ onUnmounted(() => { off('new_log', onNewLog); off('init', onInit) })
   flex:1;
   min-height:0;
   overflow-y:auto;
-  background:var(--bg3);
+  background:var(--bg2);
   border:1px solid var(--border);
-  border-radius:6px;
+  border-radius:var(--radius);
+  box-shadow:var(--shadow-sm);
   font-family:Cascadia Code,Fira Code,Consolas,Monaco,monospace;
   font-size:13px;
   line-height:1.7;
-  padding:6px 0
+  padding:10px 4px
 }
 .term-empty {
   color:var(--text3);
