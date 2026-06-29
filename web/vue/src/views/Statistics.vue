@@ -78,7 +78,7 @@ async function fetchChart() { try { const r = await axios.get(`/api/statistics/c
 async function refresh() { loading.value = true; await Promise.all([fetchStats(), fetchChart()]); loading.value = false }
 
 // 等待机器人列表加载完成 (单机器人会被自动选中) 后再发起首次统计请求,
-// 避免先用空 appid 查一次、自动选中后再用真实 appid 查一次, 造成数据库重复全表扫描
+// 避免先用空 bot_qq 查一次、自动选中后再用真实 bot_qq 查一次, 造成数据库重复全表扫描
 let ready = false
 watch(() => app.currentBotId, () => { if (ready) refresh() })
 onMounted(async () => {

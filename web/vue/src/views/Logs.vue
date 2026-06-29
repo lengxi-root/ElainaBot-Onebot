@@ -137,7 +137,7 @@ onUnmounted(() => { off('new_log', onNewLog); off('init', onInit) })
         <template v-else>
           <span class="t-time">{{ e.timestamp }}</span>
           <span class="t-level error">ERROR</span>
-          <span v-if="e.bot_qq && e.bot_qq !== '0000'" class="t-appid">({{ e.bot_qq }})</span>
+          <span v-if="e.bot_qq && e.bot_qq !== '0000'" class="t-bot-qq">({{ e.bot_qq }})</span>
           <span v-if="e.module_type || e.module_name" class="t-source"> [{{ [e.module_type, e.module_name].filter(Boolean).join(':') }}] </span>
           <div class="t-err-actions">
             <span :class="['t-expand-btn', { active: expandedErr[i] === 'raw' }]" @click="toggleErr(i, 'raw')">原始消息</span>
@@ -232,7 +232,7 @@ onUnmounted(() => { off('new_log', onNewLog); off('init', onInit) })
   color:var(--info);
   margin-right:4px
 }
-.t-appid, .t-bot-qq {
+.t-bot-qq {
   color:var(--text3);
   margin-right:6px;
   font-size:12px
