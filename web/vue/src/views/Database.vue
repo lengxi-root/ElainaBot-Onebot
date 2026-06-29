@@ -71,7 +71,6 @@ const treeData = computed(() => {
   }
   const result = []
   for (const [k, v] of Object.entries(map)) result.push({ key: `bot_${k}`, label: v.label, children: v.children, isLeaf: false })
-  if (result.length) expandedKeys.value = [result[0].key]
   return result
 })
 
@@ -240,7 +239,7 @@ watch([rows, tables, () => tableInfo.value, () => total.value], () => nextTick(r
       <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
         <div ref="leftColRef" class="lg:col-span-1 space-y-3">
           <n-card size="small" title="数据库" :style="{ background: 'var(--bg2)', border: '1px solid var(--border)' }">
-            <n-tree :data="treeData" :selected-keys="treeSelected" @update:selected-keys="onTreeSelect" block-line selectable :default-expand-all="false" :default-expanded-keys="expandedKeys" />
+            <n-tree :data="treeData" :selected-keys="treeSelected" @update:selected-keys="onTreeSelect" block-line selectable :expanded-keys="expandedKeys" @update:expanded-keys="v => expandedKeys = v" />
             <n-empty v-if="!treeData.length && !loading" description="暂无数据库" size="small" class="mt-2" />
           </n-card>
           <n-card v-if="tables.length" size="small" title="表" :style="{ background: 'var(--bg2)', border: '1px solid var(--border)' }">
