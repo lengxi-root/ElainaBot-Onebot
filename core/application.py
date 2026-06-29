@@ -265,21 +265,33 @@ class Application:
                 })
 
         elif isinstance(event, NoticeEvent):
-            log.info(f'通知: {event.notice_type} | 群 {event.group_id} | 用户 {event.user_id}')
-            # 写入 lifecycle.db 供可视统计「事件统计」使用
-            if self._log_service and event.notice_type in (
-                'group_increase', 'group_decrease', 'friend_add', 'friend_del',
-                'group_recall', 'friend_recall',
-            ):
+            # 通知事件不进「框架」日志(避免刷屏), 改为持久化 + 实时推送到「事件」面板
+            log.debug(f'通知: {event.notice_type} | 群 {event.group_id} | 用户 {event.user_id}',
+                      extra={'web_skip': True})
+            now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            bot_qq = str(event.self_id or '')
+            raw_json = json.dumps(event.raw_data, ensure_ascii=False)
+            content = f'{event.notice_type} | 群{event.group_id or ""} | 用户{event.user_id}'
+            if self._log_service:
                 await self._log_service.add('lifecycle', {
-                    'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    'content': f'{event.notice_type} | 群{event.group_id or ""} | 用户{event.user_id}',
-                    'source': str(event.self_id or ''),
+                    'timestamp': now,
+                    'content': content,
+                    'source': bot_qq,
                     'user_id': str(event.user_id or ''),
                     'group_id': str(event.group_id or ''),
                     'message_type': event.notice_type,
-                    'raw_data': json.dumps(event.raw_data, ensure_ascii=False),
-                }, bot_qq=str(event.self_id or ''))
+                    'raw_data': raw_json,
+                }, bot_qq=bot_qq)
+            if self._web_log_cb:
+                self._web_log_cb('lifecycle', {
+                    'timestamp': now,
+                    'type': event.notice_type,
+                    'user_id': str(event.user_id or ''),
+                    'group_id': str(event.group_id or ''),
+                    'bot_qq': bot_qq,
+                    'content': content,
+                    'raw_message': raw_json,
+                })
             # 撤回事件：标记对应消息为已撤回
             if self._log_service and event.notice_type in ('group_recall', 'friend_recall'):
                 recalled_mid = str(event.raw_data.get('message_id', '') or '')
