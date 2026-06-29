@@ -265,8 +265,10 @@ class Application:
                 })
 
         elif isinstance(event, NoticeEvent):
-            log.info(f'通知: {event.notice_type} | 群 {event.group_id} | 用户 {event.user_id}')
-            # 写入 lifecycle.db 供可视统计「事件统计」使用
+            # 通知事件仅记 DEBUG 且不进框架日志面板, 避免撤回/进退群等刷屏
+            log.debug(f'通知: {event.notice_type} | 群 {event.group_id} | 用户 {event.user_id}',
+                      extra={'web_skip': True})
+            # 写入 lifecycle.db 供撤回标记 / 实时进退群提示使用
             if self._log_service and event.notice_type in (
                 'group_increase', 'group_decrease', 'friend_add', 'friend_del',
                 'group_recall', 'friend_recall',
