@@ -16,9 +16,16 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        chunkFileNames: 'assets/[name].js',
-        entryFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name].[ext]',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (/[\\/]node_modules[\\/](@vue|vue|vue-router|pinia)[\\/]/.test(id)) return 'vue'
+          if (/[\\/]node_modules[\\/](chart\.js|vue-chartjs|chartjs-plugin-datalabels|@kurkle)[\\/]/.test(id)) return 'charts'
+          if (/[\\/]node_modules[\\/](naive-ui|vueuc|@css-render|css-render|seemly|treemate|vooks|evtd|@juggle|date-fns|lodash|lodash-es)[\\/]/.test(id)) return 'naive'
+          return 'vendor'
+        },
       },
     },
   },

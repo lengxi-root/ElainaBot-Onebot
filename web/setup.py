@@ -1,5 +1,6 @@
 """Web 面板集成入口"""
 
+import gzip
 import logging
 import os
 
@@ -112,9 +113,51 @@ _MIME = {
     '.woff': 'font/woff',
     '.woff2': 'font/woff2',
 }
+# 可压缩的文本资源类型
+_COMPRESSIBLE = {'.js', '.css', '.html', '.json', '.svg'}
+# gzip 结果内存缓存: path -> (mtime, original_size, gzipped_bytes)
+_gz_cache: dict = {}
+
+
+def _gzipped(file_path: str) -> bytes:
+    """返回文件的 gzip 压缩字节, 按文件 mtime 缓存, 避免重复压缩"""
+    mtime = os.path.getmtime(file_path)
+    cached = _gz_cache.get(file_path)
+    if cached and cached[0] == mtime:
+        return cached[1]
+    with open(file_path, 'rb') as f:
+        raw = f.read()
+    data = gzip.compress(raw, 6)
+    _gz_cache[file_path] = (mtime, data)
+    return data
+
+
+def _cache_headers(path: str) -> dict:
+    """带 hash 的构建产物可长期不可变缓存; index.html 等不缓存"""
+    if path.startswith('assets/'):
+        return {'Cache-Control': 'public, max-age=31536000, immutable'}
+    return {'Cache-Control': 'no-cache'}
 
 
 def _make_spa_handler(dist_dir: str):
+    def _serve(file_path: str, path: str, request: web.Request):
+        ext = os.path.splitext(file_path)[1].lower()
+        headers = _cache_headers(path)
+        ct = _MIME.get(ext)
+        if ct:
+            headers['Content-Type'] = ct
+
+        accepts_gzip = 'gzip' in request.headers.get('Accept-Encoding', '')
+        if ext in _COMPRESSIBLE and accepts_gzip:
+            try:
+                body = _gzipped(file_path)
+                headers['Content-Encoding'] = 'gzip'
+                headers['Vary'] = 'Accept-Encoding'
+                return web.Response(body=body, headers=headers)
+            except Exception:
+                pass
+        return web.FileResponse(file_path, headers=headers)
+
     async def handler(request: web.Request):
         path = request.match_info.get('path', '')
         if not path or path == '/':
@@ -123,13 +166,11 @@ def _make_spa_handler(dist_dir: str):
         file_path = os.path.join(dist_dir, path.replace('/', os.sep))
 
         if os.path.isfile(file_path):
-            ext = os.path.splitext(file_path)[1].lower()
-            ct = _MIME.get(ext)
-            return web.FileResponse(file_path, headers={'Content-Type': ct} if ct else {})
+            return _serve(file_path, path, request)
 
         index = os.path.join(dist_dir, 'index.html')
         if os.path.isfile(index):
-            return web.FileResponse(index, headers={'Content-Type': 'text/html'})
+            return _serve(index, 'index.html', request)
 
         return web.Response(text='Not Found', status=404)
 
