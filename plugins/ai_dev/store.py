@@ -97,6 +97,11 @@ class AIStore:
         rest = [m for m in messages if m.get('role') != 'system']
         if len(rest) > _MAX_SESSION_MESSAGES:
             rest = rest[-_MAX_SESSION_MESSAGES:]
+            # 避免从工具调用序列中间截断: OpenAI 要求 role=tool 的消息必须紧跟在
+            # 含 tool_calls 的 assistant 之后。从首个 user 回合边界对齐, 防止产生
+            # 「孤立 tool 消息」导致下次请求 400。
+            while rest and rest[0].get('role') != 'user':
+                rest.pop(0)
         sess['messages'] = system + rest
         sess['updated'] = time.time()
         if not sess.get('title'):
@@ -131,6 +136,17 @@ class AIStore:
                             self._events.append(json.loads(line))
         if self._events:
             self._seq = self._events[-1].get('seq', 0)
+            self._compact_event_file()  # 启动时压实事件文件, 防止 jsonl 无限增长
+
+    def _compact_event_file(self):
+        """把磁盘事件文件压实为内存中保留的最近事件 (启动时调用一次)"""
+        with contextlib.suppress(Exception):
+            tmp = self._events_file + '.tmp'
+            with open(tmp, 'w', encoding='utf-8') as f:
+                for e in self._events:
+                    if e.get('type') != 'delta':
+                        f.write(json.dumps(e, ensure_ascii=False) + '\n')
+            os.replace(tmp, self._events_file)
 
     # ==================== 事件 ====================
 
