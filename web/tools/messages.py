@@ -1,6 +1,5 @@
-"""消息管理 — 聊天列表 / 历史 / 发送 / 撤回 (OneBot 适配)"""
+"""消息管理 — 聊天列表 / 历史 / 发送 / 撤回 (异步架构)"""
 
-import asyncio
 import contextlib
 import json
 import os
@@ -34,8 +33,8 @@ def _primary_id():
     return ids[0] if ids else ''
 
 
-def _q(sql, params=None):
-    return _common.query_log('message', sql, params, bot_qq=_primary_id())
+async def _q(sql, params=None):
+    return await _common.query_log('message', sql, params, bot_qq=_primary_id())
 
 
 # ──────────── 昵称 ────────────
@@ -60,7 +59,7 @@ async def handle_get_nicknames_batch(request: web.Request):
 
 # ──────────── 聊天列表 ────────────
 
-def _db_stats(chat_type):
+async def _db_stats(chat_type):
     """从消息日志聚合每个会话的最近时间与消息数, 返回 {chat_id: {...}}"""
     if chat_type == 'user':
         sql = ("SELECT user_id AS chat_id, MAX(id) AS last_id, MAX(timestamp) AS last_time, "
@@ -68,7 +67,7 @@ def _db_stats(chat_type):
     else:
         sql = ("SELECT group_id AS chat_id, MAX(id) AS last_id, MAX(timestamp) AS last_time, "
                "COUNT(*) AS msg_count FROM log WHERE group_id != '' GROUP BY group_id")
-    rows = _q(sql)
+    rows = await _q(sql)
     stats = {}
     for r in rows:
         cid = str(r.get('chat_id', ''))
@@ -106,7 +105,7 @@ def _chat_from_stats(chat_type, stats, remarks):
 async def _fetch_chats(chat_type):
     """群 / 好友列表统一从 OneBot 接口获取, 并合并消息日志的最近时间与计数"""
     bot_qq = _primary_id()
-    stats = await asyncio.get_running_loop().run_in_executor(None, _db_stats, chat_type)
+    stats = await _db_stats(chat_type)
     remarks = _load_remarks()
     api = _api()
 
@@ -196,14 +195,14 @@ async def handle_get_chats(request: web.Request):
 
 # ──────────── 历史消息 ────────────
 
-def _query_messages(chat_type, chat_id, limit=300):
+async def _query_messages(chat_type, chat_id, limit=300):
     if chat_type == 'group':
         sql = f"SELECT * FROM log WHERE group_id = ? ORDER BY id DESC LIMIT {limit}"
         params = (chat_id,)
     else:
         sql = f"SELECT * FROM log WHERE user_id = ? AND group_id = '' ORDER BY id DESC LIMIT {limit}"
         params = (chat_id,)
-    rows = _q(sql, params)
+    rows = await _q(sql, params)
     rows.reverse()
     return rows
 
@@ -218,7 +217,7 @@ async def handle_get_chat_history(request: web.Request):
     if not chat_id:
         return web.json_response({'success': True, 'data': {'messages': [], 'has_more': False}})
 
-    rows = await asyncio.get_running_loop().run_in_executor(None, _query_messages, chat_type, chat_id, 300)
+    rows = await _query_messages(chat_type, chat_id, 300)
 
     # 预解析 extra（接收消息为 JSON，发送/撤回为字符串标记）
     parsed = []
@@ -276,12 +275,12 @@ async def handle_get_chat_history(request: web.Request):
 
 # ──────────── 发送 / 撤回 ────────────
 
-def _log_sent(chat_type, chat_id, content, message_id):
+async def _log_sent(chat_type, chat_id, content, message_id):
     ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     bot_qq = _primary_id()
     svc = _common.log_service()
     if svc:
-        svc.add('message', {
+        await svc.add('message', {
             'timestamp': ts,
             'content': content,
             'user_id': '' if chat_type == 'group' else chat_id,
@@ -356,7 +355,7 @@ async def handle_send_message(request: web.Request):
         if resp and resp.get('retcode') == 0:
             mid = (resp.get('data') or {}).get('message_id', '')
             display = content or '[图片]'
-            _log_sent(chat_type, chat_id, display, mid)
+            await _log_sent(chat_type, chat_id, display, mid)
             return web.json_response({'success': True, 'message': '发送成功'})
         err = (resp or {}).get('message') or (resp or {}).get('wording') or '发送失败'
         return web.json_response({'success': False, 'message': str(err)})
@@ -381,17 +380,17 @@ async def handle_recall_message(request: web.Request):
         return web.json_response({'success': False, 'message': str(e)}, status=500)
     if resp and resp.get('retcode') == 0:
         with contextlib.suppress(Exception):
-            _mark_recalled(message_id)
+            await _mark_recalled(message_id)
         return web.json_response({'success': True})
     return web.json_response({'success': False, 'message': '撤回失败'})
 
 
-def _mark_recalled(message_id):
+async def _mark_recalled(message_id):
     svc = _common.log_service()
     if not svc:
         return
     with contextlib.suppress(Exception):
-        svc.execute('message', "UPDATE log SET extra='recalled' WHERE message_id=?",
+        await svc.execute('message', "UPDATE log SET extra='recalled' WHERE message_id=?",
                     (str(message_id),), bot_qq=_primary_id())
 
 

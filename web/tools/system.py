@@ -69,12 +69,12 @@ def _cpu_model():
     return model
 
 
-def _message_stats():
+async def _message_stats():
     """从 message.db 聚合今日消息统计"""
     today = datetime.now().strftime('%Y-%m-%d')
     out = {'today_messages': 0, 'today_active': 0, 'active_groups': 0,
            'total_users': 0, 'total_groups': 0}
-    rows = _common.query_log(
+    rows = await _common.query_log(
         'message',
         "SELECT COUNT(*) AS cnt, "
         "COUNT(DISTINCT CASE WHEN user_id!='' THEN user_id END) AS users, "
@@ -86,7 +86,7 @@ def _message_stats():
         out['today_messages'] = rows[0].get('cnt', 0) or 0
         out['today_active'] = rows[0].get('users', 0) or 0
         out['active_groups'] = rows[0].get('groups_', 0) or 0
-    total = _common.query_log(
+    total = await _common.query_log(
         'message',
         "SELECT COUNT(DISTINCT CASE WHEN user_id!='' THEN user_id END) AS users, "
         "COUNT(DISTINCT CASE WHEN group_id!='' THEN group_id END) AS groups_ FROM log",
@@ -97,7 +97,8 @@ def _message_stats():
     return out
 
 
-def get_system_info() -> dict:
+def _get_hw_info() -> dict:
+    """CPU/内存/磁盘等硬件信息 (同步, 可在 executor 运行)"""
     global _last_gc
     proc = psutil.Process(os.getpid())
     now = time.time()
@@ -133,8 +134,6 @@ def get_system_info() -> dict:
             plugins_count = getattr(pm, 'handler_count', 0)
         bots_count = len(_common.connected_ids())
 
-    ms = _message_stats()
-
     return {
         'cpu_percent': round(sys_cpu, 1),
         'framework_cpu_percent': round(cpu_pct, 1),
@@ -152,12 +151,21 @@ def get_system_info() -> dict:
         'system_version': platform.platform(),
         'plugins_count': plugins_count,
         'bots_count': bots_count,
+    }
+
+
+async def get_system_info() -> dict:
+    loop = asyncio.get_running_loop()
+    hw = await loop.run_in_executor(None, _get_hw_info)
+    ms = await _message_stats()
+    hw.update({
         'today_active': ms['today_active'],
         'today_messages': ms['today_messages'],
         'active_groups': ms['active_groups'],
         'total_users': ms['total_users'],
         'total_groups': ms['total_groups'],
-    }
+    })
+    return hw
 
 
 async def handle_system_info(request: web.Request):
@@ -167,7 +175,7 @@ async def handle_system_info(request: web.Request):
         ts, data = _info_cache
         if data and now - ts < _INFO_CACHE_TTL:
             return web.json_response(data)
-        data = await asyncio.get_running_loop().run_in_executor(None, get_system_info)
+        data = await get_system_info()
         _info_cache = (now, data)
         return web.json_response(data)
     except Exception as e:

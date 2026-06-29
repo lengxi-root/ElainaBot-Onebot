@@ -1,0 +1,27 @@
+# ===== OneBot 网络连接配置 =====
+# 在「网络配置」页面可视化管理，每条连接可单独配置 token/secret
+# 主服务端口 (server.port) 始终内置 /OneBotv11 反向 WS 入口, 可直接用作反向 WS 连接
+#
+# type 说明:
+#   ws_reverse  — 反向 WS, 框架作为服务器, OneBot 端连入
+#   ws_forward  — 正向 WS, 框架作为客户端, 主动连接 OneBot 端
+#   http_server — HTTP 上报, 框架接收 OneBot 事件
+#   http_client — HTTP 客户端, 框架调用 OneBot API
+#
+# 示例:
+# - type: ws_reverse
+#   name: 反向WS
+#   enable: true
+#   host: "0.0.0.0"
+#   port: 5201
+#   path: /OneBotv11
+#   token: ""
+#
+# - type: ws_forward
+#   name: 正向WS
+#   enable: false
+#   url: "ws://127.0.0.1:6700"
+#   token: ""
+#   reconnect_interval: 5000
+
+connections: []

@@ -13,16 +13,6 @@ web:
   framework_name: "Elaina"                 # 框架名称
   favicon_url: ""                          # 网页图标 URL
 
-# OneBot 协议
-onebot:
-  access_token: ""                         # 默认鉴权 token（连接未单独配置时使用）
-  secret: ""                               # 默认 HTTP 上报签名密钥（可选）
-  # 网络连接（在「网络配置」页面点「新建」可视化管理，支持多条，默认不预置任何连接）
-  # 主服务端口 (server.port) 始终内置 /OneBotv11 反向 WS 入口, 可直接用作反向 WS 连接
-  # type: ws_reverse(反向WS) / ws_forward(正向WS) / http_server(HTTP上报) / http_client(HTTP调用)
-  # 反向 WS / HTTP 上报可设独立监听 host:port (容器部署), 与主端口相同则复用主服务
-  connections: []
-
 # 主人配置
 owner:
   ids:                                     # 主人 QQ 号列表

@@ -92,12 +92,7 @@ onMounted(fetchConfig)
           <div class="vis-grid">
             <div class="vis-field full"><label>主人 QQ 号</label><input :value="(settings.owner?.ids || []).join(',')" @input="updateSettingList('owner', 'ids', $event)" placeholder="多个用逗号分隔" /></div>
           </div>
-          <div class="vis-card-title" style="margin-top:14px">OneBot 协议</div>
-          <div class="vis-grid">
-            <div class="vis-field"><label>默认鉴权 Token</label><input :value="settings.onebot?.access_token || ''" @input="updateSetting('onebot', 'access_token', $event)" placeholder="连接未单独配置时使用" /></div>
-            <div class="vis-field"><label>HTTP 上报签名密钥</label><input :value="settings.onebot?.secret || ''" @input="updateSetting('onebot', 'secret', $event)" placeholder="可选" /></div>
-            <div class="vis-field full" style="font-size:12px;color:var(--text-secondary)">网络连接（正向/反向 WS、HTTP）请在「网络配置」页面管理</div>
-          </div>
+          <div class="vis-field full" style="font-size:12px;color:var(--text-secondary);margin-top:14px">OneBot 网络连接请在「网络配置」页面管理，每条连接可单独配置 Token/Secret</div>
           <div class="vis-card-title" style="margin-top:14px">Web 面板</div>
           <div class="vis-grid">
             <div class="vis-field"><label>管理密码</label><input :value="settings.web?.admin_password || ''" @input="updateSetting('web', 'admin_password', $event)" type="password" /></div>

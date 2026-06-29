@@ -1,6 +1,5 @@
-"""统计数据 — 基于 message.db 聚合 (OneBot)"""
+"""统计数据 — 基于 message.db 聚合 (异步架构)"""
 
-import asyncio
 import time
 from datetime import datetime, timedelta
 
@@ -21,12 +20,12 @@ def set_context(app_instance, base_dir=''):
         _base_dir = base_dir
 
 
-def _q(sql, params=None):
-    return _common.query_log('message', sql, params, bot_qq=_common.primary_appid())
+async def _q(sql, params=None):
+    return await _common.query_log('message', sql, params, bot_qq=_common.primary_bot_qq())
 
 
-def _ql(sql, params=None):
-    return _common.query_log('lifecycle', sql, params, bot_qq=_common.primary_appid())
+async def _ql(sql, params=None):
+    return await _common.query_log('lifecycle', sql, params, bot_qq=_common.primary_bot_qq())
 
 
 def _today():
@@ -39,8 +38,8 @@ def _bots_count():
 
 # ──────────── 聚合函数 ────────────
 
-def _gather_summary(date):
-    rows = _q(
+async def _gather_summary(date):
+    rows = await _q(
         "SELECT COUNT(*) AS cnt, "
         "COUNT(CASE WHEN group_id='' THEN 1 END) AS private "
         "FROM log WHERE timestamp LIKE ?",
@@ -51,8 +50,8 @@ def _gather_summary(date):
     return {'total_messages': total, 'private_messages': priv, 'bots_count': _bots_count()}
 
 
-def _gather_active(date):
-    rows = _q(
+async def _gather_active(date):
+    rows = await _q(
         "SELECT COUNT(DISTINCT CASE WHEN user_id!='' THEN user_id END) AS users, "
         "COUNT(DISTINCT CASE WHEN group_id!='' THEN group_id END) AS groups_ "
         "FROM log WHERE timestamp LIKE ?",
@@ -64,10 +63,10 @@ def _gather_active(date):
     }
 
 
-def _gather_top(date):
+async def _gather_top(date):
     like = (date + '%',)
-    groups = _q("SELECT group_id AS k, COUNT(*) AS c FROM log WHERE group_id!='' AND timestamp LIKE ? GROUP BY k ORDER BY c DESC LIMIT 10", like)
-    users = _q("SELECT user_id AS k, COUNT(*) AS c FROM log WHERE user_id!='' AND timestamp LIKE ? GROUP BY k ORDER BY c DESC LIMIT 10", like)
+    groups = await _q("SELECT group_id AS k, COUNT(*) AS c FROM log WHERE group_id!='' AND timestamp LIKE ? GROUP BY k ORDER BY c DESC LIMIT 10", like)
+    users = await _q("SELECT user_id AS k, COUNT(*) AS c FROM log WHERE user_id!='' AND timestamp LIKE ? GROUP BY k ORDER BY c DESC LIMIT 10", like)
     return {
         'top_groups': [{'group_id': r['k'], 'message_count': r['c']} for r in groups],
         'top_users': [{'user_id': r['k'], 'message_count': r['c']} for r in users],
@@ -83,9 +82,9 @@ _LIFECYCLE_MAP = {
 }
 
 
-def _gather_events(date):
+async def _gather_events(date):
     ev = {'group_join_count': 0, 'group_leave_count': 0, 'friend_add_count': 0, 'friend_remove_count': 0}
-    rows = _ql("SELECT message_type AS t, COUNT(*) AS c FROM log WHERE timestamp LIKE ? GROUP BY t", (date + '%',))
+    rows = await _ql("SELECT message_type AS t, COUNT(*) AS c FROM log WHERE timestamp LIKE ? GROUP BY t", (date + '%',))
     for r in rows:
         key = _LIFECYCLE_MAP.get(r.get('t', ''))
         if key:
@@ -93,8 +92,8 @@ def _gather_events(date):
     return ev
 
 
-def _gather_totals():
-    rows = _q(
+async def _gather_totals():
+    rows = await _q(
         "SELECT COUNT(DISTINCT CASE WHEN user_id!='' THEN user_id END) AS users, "
         "COUNT(DISTINCT CASE WHEN group_id!='' THEN group_id END) AS groups_ FROM log",
     )
@@ -104,8 +103,8 @@ def _gather_totals():
     }
 
 
-def _hourly(date):
-    rows = _q("SELECT substr(timestamp,12,2) AS hr, COUNT(*) AS c FROM log WHERE timestamp LIKE ? GROUP BY hr", (date + '%',))
+async def _hourly(date):
+    rows = await _q("SELECT substr(timestamp,12,2) AS hr, COUNT(*) AS c FROM log WHERE timestamp LIKE ? GROUP BY hr", (date + '%',))
     h = {}
     for r in rows:
         hr = r.get('hr', '')
@@ -120,10 +119,6 @@ def _hourly_list(h):
 
 # ──────────── Handlers ────────────
 
-async def _run(fn, *args):
-    return await asyncio.get_running_loop().run_in_executor(None, fn, *args)
-
-
 async def handle_get_statistics(request: web.Request):
     force = request.query.get('force_refresh', 'false') == 'true'
     date = request.query.get('date', '') or _today()
@@ -134,24 +129,25 @@ async def handle_get_statistics(request: web.Request):
         if c and now - c[0] < _CACHE_TTL:
             return web.json_response({'success': True, 'data': c[1]})
     try:
-        data = await _run(_gather_all, date, bool(request.query.get('date', '')))
+        has_selected = bool(request.query.get('date', ''))
+        data = await _gather_all(date, has_selected)
         _stats_cache[key] = (now, data)
         return web.json_response({'success': True, 'data': data})
     except Exception as e:
         return web.json_response({'success': False, 'error': str(e)}, status=500)
 
 
-def _gather_all(date, has_selected):
-    summary = _gather_summary(date)
-    active = _gather_active(date)
-    top = _gather_top(date)
-    events = _gather_events(date)
-    totals = _gather_totals()
-    hourly = _hourly(date)
+async def _gather_all(date, has_selected):
+    summary = await _gather_summary(date)
+    active = await _gather_active(date)
+    top = await _gather_top(date)
+    events = await _gather_events(date)
+    totals = await _gather_totals()
+    hourly = await _hourly(date)
     peak_h = max(hourly, key=hourly.get) if hourly else '00'
     yesterday_dist = None
     if not has_selected:
-        yh = _hourly((datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d'))
+        yh = await _hourly((datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d'))
         yesterday_dist = _hourly_list(yh)
     return {
         'today': {
@@ -179,26 +175,26 @@ def _gather_all(date, has_selected):
 
 async def handle_get_summary(request: web.Request):
     date = request.query.get('date', '') or _today()
-    return web.json_response({'success': True, 'data': await _run(_gather_summary, date)})
+    return web.json_response({'success': True, 'data': await _gather_summary(date)})
 
 
 async def handle_get_active(request: web.Request):
     date = request.query.get('date', '') or _today()
-    return web.json_response({'success': True, 'data': await _run(_gather_active, date)})
+    return web.json_response({'success': True, 'data': await _gather_active(date)})
 
 
 async def handle_get_top(request: web.Request):
     date = request.query.get('date', '') or _today()
-    return web.json_response({'success': True, 'data': await _run(_gather_top, date)})
+    return web.json_response({'success': True, 'data': await _gather_top(date)})
 
 
 async def handle_get_events(request: web.Request):
     date = request.query.get('date', '') or _today()
-    return web.json_response({'success': True, 'data': await _run(_gather_events, date)})
+    return web.json_response({'success': True, 'data': await _gather_events(date)})
 
 
 async def handle_get_totals(request: web.Request):
-    return web.json_response({'success': True, 'data': await _run(_gather_totals)})
+    return web.json_response({'success': True, 'data': await _gather_totals()})
 
 
 async def handle_get_available_dates(request: web.Request):
@@ -214,19 +210,19 @@ async def handle_get_hourly_statistics(request: web.Request):
     c = _chart_cache.get(key)
     if c and now - c[0] < _CACHE_TTL:
         return web.json_response(c[1])
-    payload = await _run(_hourly_payload)
+    payload = await _hourly_payload()
     _chart_cache[key] = (now, payload)
     return web.json_response(payload)
 
 
-def _hourly_payload():
+async def _hourly_payload():
     today = _today()
     yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
     return {
         'success': True,
         'data': {
-            'today_hourly_distribution': _hourly_list(_hourly(today)),
-            'yesterday_hourly_distribution': _hourly_list(_hourly(yesterday)),
+            'today_hourly_distribution': _hourly_list(await _hourly(today)),
+            'yesterday_hourly_distribution': _hourly_list(await _hourly(yesterday)),
         },
     }
 
@@ -238,12 +234,12 @@ async def handle_get_chart_data(request: web.Request):
     c = _chart_cache.get(key)
     if c and now - c[0] < _CACHE_TTL:
         return web.json_response(c[1])
-    payload = await _run(_chart_payload, days)
+    payload = await _chart_payload(days)
     _chart_cache[key] = (now, payload)
     return web.json_response(payload)
 
 
-def _chart_payload(days):
+async def _chart_payload(days):
     labels, msg_total, msg_private, msg_group = [], [], [], []
     active_users, active_groups = [], []
     ev_join, ev_leave, ev_fadd, ev_frem = [], [], [], []
@@ -252,9 +248,9 @@ def _chart_payload(days):
         d = today - timedelta(days=i)
         ds = d.strftime('%Y-%m-%d')
         labels.append(d.strftime('%m-%d'))
-        s = _gather_summary(ds)
-        a = _gather_active(ds)
-        e = _gather_events(ds)
+        s = await _gather_summary(ds)
+        a = await _gather_active(ds)
+        e = await _gather_events(ds)
         msg_total.append(s['total_messages'])
         msg_private.append(s['private_messages'])
         msg_group.append(s['total_messages'] - s['private_messages'])
@@ -264,7 +260,7 @@ def _chart_payload(days):
         ev_leave.append(e['group_leave_count'])
         ev_fadd.append(e['friend_add_count'])
         ev_frem.append(e['friend_remove_count'])
-    totals = _gather_totals()
+    totals = await _gather_totals()
     return {
         'success': True,
         'data': {
