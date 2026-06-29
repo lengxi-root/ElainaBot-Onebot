@@ -28,7 +28,6 @@ const sendErr = ref('')
 const recalling = ref('')
 const rawDataMsg = ref(null)
 const quotedMsg = ref(null)
-const lastMsgId = ref('')
 const oldestDate = ref('')
 const hasMore = ref(true)
 const loadingOlder = ref(false)
@@ -348,12 +347,12 @@ async function selectChat(chat) {
     const msgs = res.data?.data?.messages || []
     for (const m of msgs) prepareMessage(m)
     resolveMessageReferences(msgs)
-    history.value = msgs; lastMsgId.value = res.data?.data?.last_msg_id || ''
+    history.value = msgs
     if (apiChatType.value === 'group') fetchGroupRoles(chat.chat_id)
     oldestDate.value = res.data?.data?.oldest_date || ''
     hasMore.value = res.data?.data?.has_more !== false
     await nextTick(); scrollBottom(); watchImgLoads()
-  } catch { if (myId === _selectId) { history.value = []; lastMsgId.value = ''; hasMore.value = false } }
+  } catch { if (myId === _selectId) { history.value = []; hasMore.value = false } }
 }
 
 async function loadOlder() {
@@ -382,11 +381,6 @@ async function loadOlder() {
 function onHistoryScroll() {
   const el = historyRef.value
   if (el && el.scrollTop < 60 && hasMore.value && !loadingOlder.value) loadOlder()
-}
-
-async function refreshMsgId() {
-  if (!current.value) return
-  try { const r = await axios.post('/api/message/history', { chat_type: apiChatType.value, chat_id: current.value.chat_id, bot_qq: app.currentBotId || '', limit: 1 }); lastMsgId.value = r.data?.data?.last_msg_id || lastMsgId.value } catch {}
 }
 
 function isNearBottom() { const el = historyRef.value; if (!el) return true; return el.scrollHeight - el.scrollTop - el.clientHeight < 80 }
@@ -471,7 +465,7 @@ async function sendMsg() {
     const fd = new FormData()
     fd.append('chat_type', apiChatType.value); fd.append('chat_id', current.value.chat_id)
     fd.append('bot_qq', app.currentBotId || current.value.bot_qq || '')
-    fd.append('msg_type', msgType.value); fd.append('content', content); fd.append('msg_id', lastMsgId.value)
+    fd.append('msg_type', msgType.value); fd.append('content', content)
     if (quotedMsg.value) {
       if (quotedMsg.value.reference_id) fd.append('message_reference_id', quotedMsg.value.reference_id)
       if (quotedMsg.value.message_id) fd.append('quote_message_id', quotedMsg.value.message_id)
@@ -485,10 +479,10 @@ async function sendMsg() {
   finally { sending.value = false }
 }
 
-watch(chatType, () => { current.value = null; quotedMsg.value = null; history.value = []; chats.value = []; lastMsgId.value = ''; oldestDate.value = ''; hasMore.value = true; page.value = 1; remarkEditing.value = null; groupRoles.value = {}; fetchChats() })
+watch(chatType, () => { current.value = null; quotedMsg.value = null; history.value = []; chats.value = []; oldestDate.value = ''; hasMore.value = true; page.value = 1; remarkEditing.value = null; groupRoles.value = {}; fetchChats() })
 watch(chatDays, () => { page.value = 1; fetchChats() })
 watch(chatSearch, () => { page.value = 1; fetchChats() })
-watch(() => app.currentBotId, () => { current.value = null; quotedMsg.value = null; history.value = []; lastMsgId.value = ''; oldestDate.value = ''; hasMore.value = true; page.value = 1; fetchChats() })
+watch(() => app.currentBotId, () => { current.value = null; quotedMsg.value = null; history.value = []; oldestDate.value = ''; hasMore.value = true; page.value = 1; fetchChats() })
 
 onMounted(() => { fetchChats(); on('new_log', onNewLog); window.addEventListener('resize', handleResize); document.addEventListener('click', closeMobileTypeMenu) })
 onUnmounted(() => { _unmounted = true; off('new_log', onNewLog); window.removeEventListener('resize', handleResize); document.removeEventListener('click', closeMobileTypeMenu); if (_fetchTimer) { clearTimeout(_fetchTimer); _fetchTimer = null } })
@@ -550,12 +544,6 @@ onUnmounted(() => { _unmounted = true; off('new_log', onNewLog); window.removeEv
             </button>
             <span>{{ current.nickname || current.chat_id }}</span>
             <span v-if="current.nickname && current.nickname !== current.chat_id" class="panel-header-remark">({{ current.chat_id }})</span>
-            <span class="panel-header-info">
-              <template v-if="lastMsgId">msg_id: {{ lastMsgId.slice(0, 16) }}...</template>
-              <button class="refresh-msgid-btn" @click="refreshMsgId" title="刷新消息ID">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></svg>
-              </button>
-            </span>
           </div>
           <div class="history-body" ref="historyRef" @scroll="onHistoryScroll">
             <div v-if="loadingOlder" class="history-hint">加载中...</div>
@@ -1653,33 +1641,6 @@ onUnmounted(() => { _unmounted = true; off('new_log', onNewLog); window.removeEv
   font-size:12px;
   color:var(--danger);
   margin-top:4px
-}
-.panel-header-info {
-  font-size:11px;
-  color:var(--text3);
-  font-family:monospace;
-  display:flex;
-  align-items:center;
-  gap:4px
-}
-.refresh-msgid-btn {
-  background:none;
-  border:none;
-  padding:2px;
-  cursor:pointer;
-  color:var(--text3);
-  display:flex;
-  align-items:center;
-  border-radius:4px;
-  transition:color .15s,background .15s
-}
-.refresh-msgid-btn:hover {
-  color:var(--accent);
-  background:var(--bg3)
-}
-.refresh-msgid-btn svg {
-  width:14px;
-  height:14px
 }
 .mobile-back-btn {
   display:flex;
