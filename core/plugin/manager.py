@@ -21,6 +21,10 @@ class PluginManager(_LoaderMixin, _WatcherMixin, _DispatchMixin):
         self._plugins = OrderedDict()
         self._all_handlers = []
         self._all_interceptors = []
+        # 分发索引桶 (按事件类型预分组, 避免每条事件遍历全部处理器)
+        self._msg_handlers = []
+        self._generic_handlers = []
+        self._typed_handlers = {}
         self._disabled_plugins = set()
         self._cooldowns = {}  # {handler_key: last_trigger_time}
         self._lock = asyncio.Lock()

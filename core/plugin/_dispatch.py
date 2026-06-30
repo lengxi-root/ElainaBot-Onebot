@@ -1,7 +1,6 @@
 """事件分发 — PluginManager 的 Mixin (OneBot v11 适配)"""
 
 import asyncio
-import re
 import time
 
 from core.base.logger import PLUGIN, get_logger, report_error
@@ -13,9 +12,31 @@ class _DispatchMixin:
     """异步事件分发"""
 
     def _build_dispatch_index(self):
-        """按 priority 排序 handler 列表"""
+        """按 priority 排序并预分桶
+
+        - _msg_handlers: 可处理 message 事件的处理器
+        - _generic_handlers: 未声明 event_types 的处理器 (对所有非消息事件均候选)
+        - _typed_handlers: {event_type: [handler...]} 声明了具体事件类型的处理器
+        分桶后, 每条事件只需遍历相关子集而非全部处理器。
+        """
         self._all_handlers = sorted(self._all_handlers, key=lambda h: -h['priority'])
         self._all_interceptors = sorted(self._all_interceptors, key=lambda i: -i['priority'])
+
+        msg, generic, typed = [], [], {}
+        for h in self._all_handlers:
+            event_types = h['event_types']
+            if not event_types:
+                msg.append(h)
+                generic.append(h)
+                continue
+            if 'message' in event_types:
+                msg.append(h)
+            for et in event_types:
+                if et != 'message':
+                    typed.setdefault(et, []).append(h)
+        self._msg_handlers = msg
+        self._generic_handlers = generic
+        self._typed_handlers = typed
 
     async def dispatch(self, event) -> bool:
         """异步分发事件到匹配的处理器
@@ -38,12 +59,9 @@ class _DispatchMixin:
             except Exception as e:
                 report_error(PLUGIN, ic.get('_plugin', '?'), e)
 
-        # 消息事件 — 匹配 pattern
+        # 消息事件 — 仅遍历消息桶
         if post_type == 'message':
-            for h in self._all_handlers:
-                # 事件类型过滤
-                if h['event_types'] and post_type not in h['event_types']:
-                    continue
+            for h in self._msg_handlers:
                 # 场景过滤
                 if h['group_only'] and not getattr(event, 'is_group', False):
                     continue
@@ -67,7 +85,7 @@ class _DispatchMixin:
                 asyncio.create_task(self._run_handler(h, event, m))
                 return True
 
-        # 通知/请求事件 — 匹配 event_type
+        # 通知/请求/元事件 — 候选 = 通用桶 + 该事件类型桶, 按优先级合并
         else:
             event_type = post_type
             if hasattr(event, 'notice_type'):
@@ -75,9 +93,13 @@ class _DispatchMixin:
             elif hasattr(event, 'request_type'):
                 event_type = f'request.{event.request_type}'
 
-            for h in self._all_handlers:
-                if h['event_types'] and event_type not in h['event_types']:
-                    continue
+            typed = self._typed_handlers.get(event_type)
+            if typed and self._generic_handlers:
+                candidates = sorted((*self._generic_handlers, *typed), key=lambda h: -h['priority'])
+            else:
+                candidates = typed or self._generic_handlers
+
+            for h in candidates:
                 # 对非消息事件也尝试正则匹配 (pattern='.*' 可匹配所有)
                 m = h['compiled'].search(content or event_type)
                 if not m:
