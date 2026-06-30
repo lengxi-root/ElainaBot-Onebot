@@ -159,7 +159,7 @@ onMounted(() => { fetchList(); fetchMirror() })
           </div>
         </div>
         <button class="m-btn" @click="refresh" :disabled="loading"><SvgIcon name="refresh" :size="14" /><span>刷新</span></button>
-        <a href="https://github.com/ElainaCore/ElainaOnebot-plugins" target="_blank" class="m-btn submit"><SvgIcon name="upload" :size="14" /><span>投稿</span></a>
+        <a href="https://github.com/ElainaCore/Elaina-plugins" target="_blank" class="m-btn submit"><SvgIcon name="upload" :size="14" /><span>投稿</span></a>
       </div>
     </div>
     <div v-if="MARKET_WIP" class="m-wip"><SvgIcon name="alert-circle" :size="15" /><span><b>等待开发：</b>插件市场尚未适配 OneBot 协议，当前插件并不通用，安装功能暂时关闭，敬请期待。</span></div>
