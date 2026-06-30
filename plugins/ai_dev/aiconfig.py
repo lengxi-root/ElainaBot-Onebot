@@ -1,11 +1,16 @@
 """ai_dev 配置读取
 
-配置来源 (优先级): 框架 config/settings.yaml 的 `ai` 段 > 环境变量。
-api_key 出于安全考虑, 优先从环境变量 AI_DEV_API_KEY / OPENAI_API_KEY 读取,
-也允许写在 settings.yaml (该文件已被 .gitignore 忽略, 不会提交)。
+配置来源 (优先级): 面板运行时覆盖 (data/runtime_config.json) > 框架
+config/settings.yaml 的 `ai` 段 > 环境变量 > 内置默认值。
+
+面板可在「设置」里自定义 OpenAI 地址(base_url)与密钥(api_key), 保存后写入
+data/runtime_config.json (该目录已被 .gitignore, 不会随插件提交), 立即生效。
+api_key 也可继续用环境变量 AI_DEV_API_KEY / OPENAI_API_KEY。
 """
 
+import json
 import os
+import threading
 
 from core.base.config import cfg
 
@@ -19,12 +24,69 @@ DEFAULTS = {
     'system_prompt': '',
 }
 
+# 允许面板写入并持久化的字段
+_WRITABLE = ('base_url', 'api_key', 'model', 'temperature', 'max_iterations',
+             'request_timeout', 'system_prompt', 'enabled')
+
+_OVERRIDE_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'data', 'runtime_config.json')
+_lock = threading.Lock()
+_override_cache = None
+
+
+def _load_override() -> dict:
+    global _override_cache
+    if _override_cache is not None:
+        return _override_cache
+    data = {}
+    try:
+        if os.path.exists(_OVERRIDE_FILE):
+            with open(_OVERRIDE_FILE, encoding='utf-8') as f:
+                loaded = json.load(f)
+            if isinstance(loaded, dict):
+                data = {k: v for k, v in loaded.items() if k in _WRITABLE}
+    except Exception:  # noqa: BLE001
+        data = {}
+    _override_cache = data
+    return data
+
+
+def set_runtime(updates: dict) -> dict:
+    """合并并持久化面板可写字段 (base_url / api_key / model 等), 返回最新覆盖值。"""
+    global _override_cache
+    with _lock:
+        cur = dict(_load_override())
+        for k, v in (updates or {}).items():
+            if k not in _WRITABLE:
+                continue
+            if v is None:
+                cur.pop(k, None)
+            elif isinstance(v, str):
+                sv = v.strip()
+                # 空字符串表示清除该覆盖, 回退到 settings.yaml / 环境变量 / 默认
+                if sv == '':
+                    cur.pop(k, None)
+                else:
+                    cur[k] = sv
+            else:
+                cur[k] = v
+        os.makedirs(os.path.dirname(_OVERRIDE_FILE), exist_ok=True)
+        tmp = _OVERRIDE_FILE + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(cur, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, _OVERRIDE_FILE)
+        _override_cache = cur
+        return dict(cur)
+
 
 def _ai(key: str, default=None):
     return cfg.get('settings', f'ai.{key}', default)
 
 
 def get(key: str):
+    ov = _load_override().get(key)
+    if ov is not None and ov != '':
+        return ov
     val = _ai(key, None)
     if val is None or val == '':
         return DEFAULTS.get(key)
@@ -37,7 +99,9 @@ def base_url() -> str:
 
 
 def api_key() -> str:
-    key = _ai('api_key', '') or ''
+    key = _load_override().get('api_key') or ''
+    if not key:
+        key = _ai('api_key', '') or ''
     if not key:
         key = os.environ.get('AI_DEV_API_KEY') or os.environ.get('OPENAI_API_KEY') or ''
     return str(key)

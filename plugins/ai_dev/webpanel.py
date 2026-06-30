@@ -45,6 +45,7 @@ def _store():
 def register_routes():
     """通过框架 register_route 注册全部 /api/ext/aidev/* 路由 (热重载安全)。"""
     register_route('GET', _PREFIX + '/config', _get_config)
+    register_route('POST', _PREFIX + '/config', _set_config)
     register_route('GET', _PREFIX + '/models', _get_models)
     register_route('GET', _PREFIX + '/sessions', _get_sessions)
     register_route('POST', _PREFIX + '/sessions', _create_session)
@@ -61,15 +62,43 @@ async def _get_config(request: web.Request):
     return web.json_response({'success': True, 'config': aiconfig.public_config()})
 
 
+async def _set_config(request: web.Request):
+    """保存面板自定义配置 (base_url / api_key / model 等), 立即生效。
+
+    api_key 为空字符串表示「不修改」(避免前端因不回显密钥而误清空); 传 null
+    表示清除该覆盖, 回退到 settings.yaml / 环境变量。
+    """
+    body = await _json(request)
+    updates = {}
+    for k in ('base_url', 'model', 'temperature', 'max_iterations', 'system_prompt'):
+        if k in body:
+            updates[k] = body[k]
+    # api_key: 仅当显式提供且非空白时才更新; null 清除
+    if 'api_key' in body:
+        ak = body['api_key']
+        if ak is None:
+            updates['api_key'] = None
+        elif isinstance(ak, str) and ak.strip() != '':
+            updates['api_key'] = ak.strip()
+    aiconfig.set_runtime(updates)
+    return web.json_response({'success': True, 'config': aiconfig.public_config()})
+
+
 async def _get_models(request: web.Request):
-    if not aiconfig.is_configured():
+    # 允许用 query 里临时传入的 base_url/api_key 试连 (面板「获取模型」按钮),
+    # 未传则回退到已保存配置。
+    base = (request.query.get('base_url') or '').strip().rstrip('/') or aiconfig.base_url()
+    key = (request.query.get('api_key') or '').strip() or aiconfig.api_key()
+    if not key:
         return web.json_response({'success': False, 'error': '未配置 api_key', 'models': []})
-    url = aiconfig.base_url() + '/models'
-    headers = {'Authorization': f'Bearer {aiconfig.api_key()}'}
+    url = base + '/models'
+    headers = {'Authorization': f'Bearer {key}'}
     try:
         timeout = aiohttp.ClientTimeout(total=20)
         async with aiohttp.ClientSession() as s, s.get(url, headers=headers, timeout=timeout) as r:
             data = await r.json()
+        if not isinstance(data, dict) or 'data' not in data:
+            return web.json_response({'success': False, 'error': f'上游返回异常: {str(data)[:200]}', 'models': []})
         models = sorted(m.get('id', '') for m in data.get('data', []) if m.get('id'))
         return web.json_response({'success': True, 'models': models})
     except Exception as e:  # noqa: BLE001
