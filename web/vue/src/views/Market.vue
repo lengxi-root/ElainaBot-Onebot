@@ -108,8 +108,7 @@ async function previewItem(item) {
   finally { preview.loading = false }
 }
 
-// 插件市场尚未适配 OneBot 协议, 当前插件并不通用, 暂时标记为"等待开发"并禁用安装
-const MARKET_WIP = true
+const MARKET_WIP = false
 
 async function install(item) {
   if (MARKET_WIP) { msg.warning('插件市场正在开发中，当前插件尚未适配 OneBot，暂不可安装'); return }
