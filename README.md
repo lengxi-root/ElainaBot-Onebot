@@ -103,7 +103,7 @@ async def say_hello(event, match):
 
 ## 🛒 插件市场
 
-框架内置插件市场，从 [ElainaCore/Elaina-plugins](https://github.com/ElainaCore/Elaina-plugins) 获取插件列表。
+框架内置插件市场，从 [ElainaCore/Elaina-plugins](https://github.com/ElainaCore/Elaina-plugins) 的 `onebot_plugins.json` 获取插件列表。
 
 - **Web 面板** — 在线浏览、搜索、一键安装/更新
 - **镜像加速** — 自动选用可用的 GitHub 镜像下载
