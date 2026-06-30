@@ -119,9 +119,10 @@ def get_routes() -> list:
         web.get('/api/market/mirror', _(market.handle_market_get_mirror)),
         web.post('/api/market/mirror', _(market.handle_market_set_mirror)),
         web.post('/api/market/mirror/test', _(market.handle_market_test_mirror)),
-        # ── 自定义页面 ──
+        # ── 自定义页面 (插件侧边栏页面 + 插件自定义路由) ──
         web.get('/api/web-pages', _(handle_get_web_pages)),
         web.get('/api/web-pages/{key}', _(handle_get_web_page_html)),
+        web.route('*', '/api/ext/{tail:.*}', handle_ext_route),
         # ── 数据库浏览 ──
         web.get('/api/database/list', _(database.handle_list_databases)),
         web.post('/api/database/tables', _(database.handle_list_tables)),
@@ -211,12 +212,35 @@ async def handle_password_status(request: web.Request):
     return web.json_response({'success': True, 'is_default': is_default, 'is_weak': is_weak})
 
 
-# ======================== 自定义页面 (OneBot 暂无插件 web 页面机制) ========================
+# ======================== 自定义页面 (插件侧边栏页面) ========================
 
 
 async def handle_get_web_pages(request: web.Request):
-    return web.json_response({'success': True, 'pages': []})
+    from core.plugin.web_pages import get_pages
+
+    return web.json_response({'success': True, 'pages': get_pages()})
 
 
 async def handle_get_web_page_html(request: web.Request):
-    return web.json_response({'success': False, 'error': '页面不存在'}, status=404)
+    from core.plugin.web_pages import get_page_html
+
+    key = request.match_info['key']
+    html = get_page_html(key)
+    if html is None:
+        return web.json_response({'success': False, 'error': '页面不存在'}, status=404)
+    return web.Response(text=html, content_type='text/html', charset='utf-8')
+
+
+# ======================== 插件自定义路由 ========================
+
+
+async def handle_ext_route(request: web.Request):
+    """动态分发插件用 register_route 注册的 /api/ext/ 路由 (查表执行, 支持热重载)。"""
+    from core.plugin.web_pages import match_route
+
+    entry = match_route(request.method, request.path)
+    if entry is None:
+        return web.json_response({'success': False, 'error': '路由不存在'}, status=404)
+    if entry['auth'] and not auth.validate_token(request):
+        return web.json_response({'success': False, 'error': '未登录或会话已过期'}, status=401)
+    return await entry['handler'](request)
