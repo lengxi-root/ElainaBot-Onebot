@@ -83,17 +83,29 @@ async def _chat_completion(session: aiohttp.ClientSession, messages: list, model
     raise OpenAIError('模型调用失败')
 
 
-def _build_messages(history: list, user_text: str, model_prompt: str) -> list:
+def _build_user_content(user_text: str, images: list):
+    """无图片时返回纯文本; 有图片时返回 OpenAI 多模态 content 数组 (文本 + image_url)。"""
+    if not images:
+        return user_text
+    content = []
+    if user_text:
+        content.append({'type': 'text', 'text': user_text})
+    for url in images:
+        content.append({'type': 'image_url', 'image_url': {'url': url}})
+    return content
+
+
+def _build_messages(history: list, user_content, model_prompt: str) -> list:
     messages = []
     sys_prompt = model_prompt or SYSTEM_PROMPT
     if not history or history[0].get('role') != 'system':
         messages.append({'role': 'system', 'content': sys_prompt})
     messages.extend(history)
-    messages.append({'role': 'user', 'content': user_text})
+    messages.append({'role': 'user', 'content': user_content})
     return messages
 
 
-async def run_agent(store, session_id: str, user_text: str, model: str = '') -> dict:
+async def run_agent(store, session_id: str, user_text: str, model: str = '', images: list = None) -> dict:
     """执行一轮多步 Agent 对话。返回 {ok, message, iterations}。
 
     过程中向 store 写入事件: user / assistant / tool_call / tool_result / error / info
@@ -102,13 +114,15 @@ async def run_agent(store, session_id: str, user_text: str, model: str = '') -> 
         store.add_event('error', {'message': '未配置 AI api_key (settings.yaml 的 ai.api_key 或环境变量 AI_DEV_API_KEY)'}, session_id)
         return {'ok': False, 'message': '未配置 api_key', 'iterations': 0}
 
+    images = images or []
     model = model or aiconfig.model()
     final_reasoning = ''
     history = store.get_messages(session_id)
     sys_override = aiconfig.system_prompt()
-    messages = _build_messages([m for m in history if m.get('role') != 'system'], user_text, sys_override)
+    user_content = _build_user_content(user_text, images)
+    messages = _build_messages([m for m in history if m.get('role') != 'system'], user_content, sys_override)
 
-    store.add_event('user', {'content': user_text, 'model': model}, session_id)
+    store.add_event('user', {'content': user_text, 'images': images, 'model': model}, session_id)
 
     max_iter = aiconfig.max_iterations()
     final_text = ''

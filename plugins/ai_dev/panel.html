@@ -185,6 +185,16 @@ input,textarea,select{font-family:inherit}
   color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;transition:.2s;box-shadow:0 6px 14px color-mix(in srgb,var(--brand) 35%,transparent)}
 .send:hover{transform:translateY(-1px)}
 .send:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.attach{width:34px;height:34px;flex:0 0 34px;border-radius:10px;color:var(--muted);display:flex;align-items:center;justify-content:center;transition:.15s}
+.attach:hover{background:var(--brand-soft);color:var(--brand)}
+.composer.drag .box{border-color:var(--brand);background:var(--brand-soft)}
+.composer .thumbs{display:flex;flex-wrap:wrap;gap:8px;padding:0 4px 8px}
+.composer .thumbs:empty{display:none}
+.thumb{position:relative;width:60px;height:60px;border-radius:10px;overflow:hidden;border:1.5px solid var(--line)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb .rm{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:12px;line-height:18px;text-align:center}
+.bubble .imgs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.bubble .imgs img{max-width:160px;max-height:160px;border-radius:10px;border:1px solid var(--line);cursor:pointer;display:block}
 .composer .hint{font-size:11px;color:var(--muted);margin-top:7px;padding-left:4px}
 
 /* activity */
@@ -319,11 +329,14 @@ input,textarea,select{font-family:inherit}
       </div>
       <div class="messages" id="messages"></div>
       <div class="composer">
+        <div class="thumbs" id="thumbs"></div>
         <div class="box">
+          <button class="attach" id="attachBtn" title="添加图片（也可直接粘贴/拖拽）"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></button>
+          <input type="file" id="fileInput" accept="image/*" multiple hidden>
           <textarea id="input" rows="1" placeholder="对 AI 说点什么… 例如：写一个 ID 命令插件，返回我的 QQ 号"></textarea>
           <button class="send" id="sendBtn" title="发送"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
         </div>
-        <div class="hint">Enter 发送 · Shift+Enter 换行 · AI 可读写文件、热重载插件、运行测试、管理配置</div>
+        <div class="hint">Enter 发送 · Shift+Enter 换行 · 可粘贴/拖拽图片（需选用支持视觉的模型）· AI 可读写文件、热重载插件、运行测试</div>
       </div>
     </div>
 
@@ -662,7 +675,7 @@ function renderHistory(msgs,events){
     let tools=[],reason=[];
     events.forEach(e=>{
       const d=e.data||{};
-      if(e.type==='user'){addMsg('user',d.content||'',false);tools=[];reason=[];}
+      if(e.type==='user'){addMsg('user',d.content||'',false,d.images||[]);tools=[];reason=[];}
       else if(e.type==='reasoning'){if(d.content)reason.push(d.content);}
       else if(e.type==='tool_call'||e.type==='tool_result'){tools.push(e);}
       else if(e.type==='assistant'){addAiTurnFromHistory(d.content||'',tools,reason.join('\n\n'),true);tools=[];reason=[];}
@@ -713,11 +726,16 @@ function renderWelcome(){
 }
 
 /* ---- messages ---- */
-function addMsg(role,content,anim){
+function imgsHtml(images){
+  if(!images||!images.length)return '';
+  return `<div class="imgs">${images.map(u=>`<img src="${esc(u)}" onclick="window.open(this.src)">`).join('')}</div>`;
+}
+function addMsg(role,content,anim,images){
   const w=$('#welcome'); const box=$('#messages');
   if(box.querySelector('.welcome'))box.innerHTML='';
   const el=document.createElement('div');el.className='msg '+role;if(!anim)el.style.animation='none';
-  el.innerHTML=`<div class="av">${role==='user'?'我':'AI'}</div><div class="bubble">${role==='ai'?render(content):esc(content).replace(/\n/g,'<br>')}</div>`;
+  const inner=role==='ai'?render(content):imgsHtml(images)+esc(content).replace(/\n/g,'<br>');
+  el.innerHTML=`<div class="av">${role==='user'?'我':'AI'}</div><div class="bubble">${inner}</div>`;
   box.appendChild(el);scrollChat();return el;
 }
 /* 开启一次 AI 回合: 气泡内含「工具调用时间线 + 思考点 + 答案」 */
@@ -774,16 +792,41 @@ inp.addEventListener('input',autoGrow);
 inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
 $('#sendBtn').addEventListener('click',send);
 
+/* ---- 图片附件 (多模态): 点击/粘贴/拖拽, base64 data URL ---- */
+let pendingImages=[];
+const MAX_IMAGES=8;
+function renderThumbs(){
+  const wrap=$('#thumbs');
+  wrap.innerHTML=pendingImages.map((u,i)=>`<div class="thumb"><img src="${esc(u)}"><span class="rm" data-i="${i}" title="移除">×</span></div>`).join('');
+  wrap.querySelectorAll('.rm').forEach(b=>b.addEventListener('click',()=>{pendingImages.splice(+b.dataset.i,1);renderThumbs();}));
+}
+function addFiles(files){
+  const imgs=[...files].filter(f=>f.type.startsWith('image/'));
+  imgs.forEach(f=>{
+    if(pendingImages.length>=MAX_IMAGES)return;
+    const reader=new FileReader();
+    reader.onload=()=>{if(pendingImages.length<MAX_IMAGES){pendingImages.push(reader.result);renderThumbs();}};
+    reader.readAsDataURL(f);
+  });
+}
+$('#attachBtn').addEventListener('click',()=>$('#fileInput').click());
+$('#fileInput').addEventListener('change',e=>{addFiles(e.target.files);e.target.value='';});
+inp.addEventListener('paste',e=>{const f=[...(e.clipboardData?.files||[])];if(f.some(x=>x.type.startsWith('image/'))){e.preventDefault();addFiles(f);}});
+const composer=document.querySelector('.composer');
+['dragover','dragenter'].forEach(ev=>composer.addEventListener(ev,e=>{e.preventDefault();composer.classList.add('drag');}));
+['dragleave','drop'].forEach(ev=>composer.addEventListener(ev,e=>{e.preventDefault();if(ev==='drop')addFiles(e.dataTransfer.files);composer.classList.remove('drag');}));
+
 async function send(){
-  const text=inp.value.trim();if(!text||sending)return;
+  const text=inp.value.trim();const imgs=pendingImages.slice();
+  if((!text&&!imgs.length)||sending)return;
   if(!SID){const d=await (await api('/api/ext/aidev/sessions',{method:'POST',body:'{}'})).json();SID=d.session.id;localStorage.setItem('ai_dev_sid',SID);}
   sending=true;$('#sendBtn').disabled=true;
-  addMsg('user',text,true);inp.value='';autoGrow();
+  addMsg('user',text,true,imgs);inp.value='';pendingImages=[];renderThumbs();autoGrow();
   const turn=startAiTurn();
   liveTurn={stepsWrap:turn.stepsWrap,stepsBody:turn.stepsBody,cnt:turn.cnt,thinkWrap:turn.thinkWrap,thinkBody:turn.thinkBody,turn,startIdx:evbuf.length};
   $('#chatMeta').textContent='AI 运行中…';
   try{
-    const r=await api('/api/ext/aidev/chat',{method:'POST',body:JSON.stringify({session_id:SID,message:text,model:MODEL})});
+    const r=await api('/api/ext/aidev/chat',{method:'POST',body:JSON.stringify({session_id:SID,message:text,model:MODEL,images:imgs})});
     const d=await r.json();
     finishAiTurn(turn,d);
     loadSessions(false,true);
