@@ -33,7 +33,7 @@ ElainaBot OneBot 是一个基于 Python 的 QQ 机器人框架，采用 **OneBot
 ### 安装
 
 ```bash
-git clone https://github.com/lengxi-root/ElainaBot-Onebot.git
+git clone https://github.com/ElainaCore/ElainaBot-Onebot.git
 cd ElainaBot-Onebot
 pip install -r requirements.txt
 python main.py

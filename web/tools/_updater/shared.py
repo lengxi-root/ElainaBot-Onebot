@@ -6,7 +6,7 @@ import os
 
 log = logging.getLogger('ElainaBot.web.updater')
 
-GITHUB_REPO = 'lengxi-root/ElainaBot-Onebot'
+GITHUB_REPO = 'ElainaCore/ElainaBot-Onebot'
 GITHUB_API_URL = f'https://api.github.com/repos/{GITHUB_REPO}'
 GITHUB_DOWNLOAD_URL = f'https://github.com/{GITHUB_REPO}/archive/main.zip'
 GITHUB_SHA_URL = f'https://codeload.github.com/{GITHUB_REPO}/zip/{{version}}'
