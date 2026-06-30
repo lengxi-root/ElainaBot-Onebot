@@ -1,125 +1,117 @@
-<div align="center">
+<p>
+<img src="https://download.nature.qq.com/SnsShare/SocialProfile/1779098988_1264b08a.png" width="200" align="left" style="border-radius:50%; margin-right:16px" />
 
-# Elaina Bot Framework
+<h1>ElainaBot OneBot</h1>
 
-Elaina 是一个基于 Python 的轻量级 QQ 机器人框架，采用 **OneBot v11** 协议标准，支持 NapCat、LLOneBot 等多种 OneBot 实现。
+ElainaBot OneBot 是一个基于 Python 的 QQ 机器人框架，采用 **OneBot v11** 协议标准，纯异步架构，支持 NapCat / LLOneBot / go-cqhttp 等多种 OneBot 实现，具备插件热重载、模块化扩展、插件市场、Web 面板管理等特性。
 
+[![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white)](https://python.org)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![QQ群](https://img.shields.io/badge/QQ交流群-164178653-blue)](https://qm.qq.com/q/nepv1UcwRE)
 
-</div>
+- **纯异步架构** — 基于 aiohttp，反向/正向 WebSocket 与 HTTP 多种接入方式
+- **插件市场** — 基于 GitHub 插件库，一键浏览、安装、更新插件
+- **Web 管理面板** — 实时日志、系统监控、插件管理、配置编辑、网络连接管理
 
-## ✨ 框架特性
+</p>
+<br clear="left" />
 
-- 🚀 **OneBot 协议**：完整支持 OneBot v11 标准，兼容多种 OneBot 实现
-- 🔌 **插件化架构**：动态加载与热重载插件，支持插件独立配置
-- 📊 **Web 管理面板**：实时监控系统状态、消息日志、插件管理
-- 🔐 **安全鉴权**：支持 OneBot access_token 和 secret 签名验证
-- 💾 **日志持久化**：SQLite 数据库存储消息记录，支持自动清理
-- 🎨 **现代化界面**：Bootstrap 5 响应式设计，支持移动端访问
-- 🔄 **消息实时显示**：WebSocket 推送，实时查看消息和日志
-- 📝 **完整消息 API**：支持文本、图片、语音、视频等多种消息类型
-
-项目仅供学习交流使用，严禁用于任何商业用途和非法行为
+> 项目仅供学习交流使用，严禁用于任何商业用途和非法行为。
 
 ## 📢 交流群
 
-如果你在使用过程中遇到问题或有任何建议，欢迎加入我们的交流群：
+**Elaina Bot 框架交流群：[164178653](https://qm.qq.com/q/nepv1UcwRE)**
 
-**Elaina Bot 框架交流群：[631348711](https://qm.qq.com/q/qSErOcGf2o)**
-
-## 📦 快速开始
+## 🚀 快速开始
 
 ### 环境要求
 
-- Python 3.9+
-- NapCat / LLOneBot / go-cqhttp 等 OneBot 实现
-- Windows / Linux / MacOS
+- Python 3.11+
+- Git
+- NapCat / LLOneBot / go-cqhttp 等任意 OneBot v11 实现
 
-### 安装步骤
-
-1. **克隆项目**
+### 安装
 
 ```bash
-git clone https://github.com/lengxi-root/ElainaBot.git
-cd ElainaBot
-```
-
-2. **安装依赖**
-
-```bash
+git clone https://github.com/ElainaCore/ElainaBot-Onebot.git
+cd ElainaBot-Onebot
 pip install -r requirements.txt
-```
-
-3. **配置框架**
-
-编辑 `config.py` 文件：
-
-```python
-# 服务器配置
-SERVER_CONFIG = {
-    'host': "0.0.0.0",
-    'port': 5003,  # OneBot WebSocket + Web 面板统一端口
-}
-
-# Web面板安全配置
-WEB_SECURITY = {
-    'access_token': "your_token_here",  # Web面板访问令牌
-    'admin_password': "your_password",   # 管理员密码
-}
-
-# OneBot 协议配置
-ONEBOT_CONFIG = {
-    'access_token': None,  # OneBot 连接鉴权 token（可选）
-    'secret': None,        # OneBot 签名密钥（可选）
-}
-```
-
-4. **启动框架**
-
-```bash
 python main.py
 ```
 
-5. **配置 OneBot 实现**
+首次启动会自动从 `config/*.example.yaml` 生成 `config/settings.yaml` 与 `config/connections.yaml`。配置文件均支持**热加载**，修改后无需重启。
 
-在 NapCat/LLOneBot 配置中，设置 WebSocket 客户端：
+启动后访问 Web 面板完成配置：
 
-```yaml
-#请根据自身情况链接
-ws://127.0.0.1:5003/OneBotv11
 ```
+http://localhost:5201/web/?token=admin
+```
+
+> 默认端口 `5201`、令牌 `admin`，可在 `config/settings.yaml` 的 `server` / `web` 区块修改。主人 QQ 号填在 `owner.ids`。
+
+### 连接 OneBot 实现
+
+框架在主服务端口内置反向 WS 入口 `/OneBotv11`，在 NapCat / LLOneBot 中把**反向 WebSocket 客户端**指向：
+
+```
+ws://127.0.0.1:5201/OneBotv11
+```
+
+也可在 Web 面板「网络配置」页面可视化添加反向 WS、正向 WS、HTTP 上报 / HTTP 客户端等连接，每条连接可单独配置 `token` / `secret`。
 
 ## 🌐 Web 管理面板
 
-启动框架后，访问 Web 管理面板：
+启动框架后访问：
 
 ```
-http://localhost:5003/web/?token=your_access_token
+http://localhost:5201/web/?token=<access_token>
 ```
 
-## 📂 项目结构
+面板提供：实时消息与日志、系统状态监控、插件启停/热重载、插件市场、配置编辑、网络连接管理等。
+
+## 📁 框架结构
 
 ```
-ElainaBot/
-├── config.py                   # 全局配置文件
-├── main.py                     # 主程序入口
-├── requirements.txt            # 项目依赖
-├── core/                       # 核心模块
-│   ├── MessageEvent.py         # 消息事件处理
-│   ├── PluginManager.py        # 插件管理器
-│   └── onebot/                 # OneBot 协议实现
-│       ├── adapter.py          # OneBot 适配器
-│       ├── api.py              # OneBot API 封装
-│       └── client.py           # WebSocket 客户端
-├── function/                   # 工具函数库
-│   ├── httpx_pool.py           # HTTP 连接池
-│   └── log_db.py               # 日志数据库操作
-├── plugins/                    # 插件目录
-└── web/                        # Web 控制面板
-    ├── app.py                  # Flask 应用主文件
-    ├── templates/              # 页面模板
-    │   └── pc/                 # PC 端页面
-    └── static/                 # 静态资源
+ElainaBot-Onebot/
+├── main.py          # 主程序入口
+├── config/          # 配置文件 (settings.yaml / connections.yaml)
+├── core/            # 核心框架
+│   ├── base/        #   配置、日志、上下文
+│   ├── onebot/      #   OneBot v11 适配器 / API / 连接
+│   ├── plugin/      #   插件加载、分发、热重载、装饰器
+│   ├── module/      #   模块系统
+│   ├── server/      #   HTTP / WS 服务器
+│   └── storage/     #   日志数据库等存储
+├── plugins/         # 插件目录 (热加载)
+└── web/             # Web 面板 (后端 + 前端 dist)
 ```
+
+## 🔌 插件开发
+
+详见 **[插件开发文档 (PLUGIN_DEVELOPMENT.md)](PLUGIN_DEVELOPMENT.md)** — 包含完整的装饰器、Event 事件对象、OneBot 消息发送 API、插件上下文、元数据、Web 面板扩展等参考。
+
+最简插件 `plugins/hello/main.py`：
+
+```python
+from core.plugin.decorators import handler
+
+
+@handler(r'^你好$', name='打招呼', desc='回复一句问候')
+async def say_hello(event, match):
+    await event.reply("你好!")
+```
+
+## 🛒 插件市场
+
+框架内置插件市场，从 [ElainaCore/Elaina-plugins](https://github.com/ElainaCore/Elaina-plugins) 获取插件列表。
+
+- **Web 面板** — 在线浏览、搜索、一键安装/更新
+- **镜像加速** — 自动选用可用的 GitHub 镜像下载
+
+**插件开发者** 可前往 [Elaina-plugins](https://github.com/ElainaCore/Elaina-plugins) 提交 PR，将你的插件加入市场。
+
+## 📄 开源协议
+
 本项目采用 MIT 协议开源，详见 [LICENSE](LICENSE) 文件。
 
 ## ⚠️ 免责声明

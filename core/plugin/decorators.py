@@ -1,191 +1,74 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+"""插件装饰器: handler / on_load / on_unload / interceptor"""
 
-"""
-插件装饰器模块
-提供插件开发相关的装饰器
-"""
+import asyncio
+import re
 
-from typing import Callable, Optional
+# 临时注册表 (加载插件时收集, 由 PluginManager.load 消费)
+_pending_handlers: list = []
+_pending_on_load: list = []
+_pending_on_unload: list = []
+_pending_interceptors: list = []
 
 
 def handler(
-    pattern: str,
-    owner_only: bool = False,
-    group_only: bool = False,
-    priority: int = None,
-    description: str = ""
-) -> Callable:
-    """
-    处理器装饰器
-    用于标记方法为消息处理器
-    
-    Args:
-        pattern: 正则表达式模式
-        owner_only: 仅主人可用
-        group_only: 仅群聊可用
-        priority: 处理器优先级
-        description: 处理器描述
-    
-    Example:
-        class MyPlugin(BasePlugin):
-            @handler(r'^测试$', description='测试命令')
-            def handle_test(self, event):
-                event.reply("测试成功！")
-    """
-    def decorator(func: Callable) -> Callable:
-        func._handler_config = {
-            'pattern': pattern,
-            'handler': func.__name__,
-            'owner_only': owner_only,
-            'group_only': group_only,
-            'priority': priority,
-            'description': description
-        }
+    pattern,
+    *,
+    name='',
+    desc='',
+    priority=0,
+    owner_only=False,
+    group_only=False,
+    private_only=False,
+    event_types=None,
+    cooldown=0,
+):
+    """注册消息处理器 (pattern 正则; priority 越大越先匹配; event_types 限定事件类型; cooldown 秒)"""
+
+    def decorator(func):
+        _pending_handlers.append(
+            {
+                'func': func,
+                'is_coro': asyncio.iscoroutinefunction(func),
+                'pattern': pattern,
+                'compiled': re.compile(pattern, re.DOTALL),
+                'name': name or func.__name__,
+                'desc': desc,
+                'priority': priority,
+                'owner_only': owner_only,
+                'group_only': group_only,
+                'private_only': private_only,
+                'event_types': frozenset(event_types) if event_types else None,
+                'cooldown': cooldown,
+            }
+        )
         return func
+
     return decorator
 
 
-def event_hook(event_type: str = None) -> Callable:
-    """
-    事件钩子装饰器
-    用于标记方法为事件钩子
-    
-    Args:
-        event_type: 事件类型过滤（message/notice/request）
-    
-    Example:
-        class MyPlugin(BasePlugin):
-            @event_hook('notice')
-            def on_notice(self, event):
-                if event.notice_type == 'group_increase':
-                    event.reply("欢迎新成员！")
-    """
-    def decorator(func: Callable) -> Callable:
-        func._event_hook = {
-            'event_type': event_type
-        }
-        return func
-    return decorator
-
-
-def scheduled(interval: int = 60, enabled: bool = True) -> Callable:
-    """
-    定时任务装饰器
-    
-    Args:
-        interval: 执行间隔（秒）
-        enabled: 是否启用
-    
-    Example:
-        class MyPlugin(BasePlugin):
-            @scheduled(interval=3600)
-            def hourly_task(self):
-                print("每小时执行一次")
-    """
-    def decorator(func: Callable) -> Callable:
-        func._schedule_config = {
-            'interval': interval,
-            'enabled': enabled
-        }
-        return func
-    return decorator
-
-
-def command(
-    cmd: str,
-    aliases: list = None,
-    owner_only: bool = False,
-    group_only: bool = False,
-    description: str = ""
-) -> Callable:
-    """
-    命令装饰器
-    简化的命令注册方式
-    
-    Args:
-        cmd: 命令名称
-        aliases: 命令别名列表
-        owner_only: 仅主人可用
-        group_only: 仅群聊可用
-        description: 命令描述
-    
-    Example:
-        class MyPlugin(BasePlugin):
-            @command('help', aliases=['帮助', '?'])
-            def handle_help(self, event):
-                event.reply("帮助信息")
-    """
-    def decorator(func: Callable) -> Callable:
-        # 构建正则表达式
-        all_cmds = [cmd] + (aliases or [])
-        pattern = r'^(' + '|'.join(all_cmds) + r')(?:\s+(.*))?$'
-        
-        func._handler_config = {
-            'pattern': pattern,
-            'handler': func.__name__,
-            'owner_only': owner_only,
-            'group_only': group_only,
-            'priority': None,
-            'description': description,
-            'command': cmd,
-            'aliases': aliases or []
-        }
-        return func
-    return decorator
-
-
-def admin_only(func: Callable) -> Callable:
-    """
-    管理员限制装饰器
-    
-    Example:
-        class MyPlugin(BasePlugin):
-            @admin_only
-            def handle_admin(self, event):
-                ...
-    """
-    func._admin_only = True
+def on_load(func):
+    """插件加载时执行 (支持 async/sync)"""
+    _pending_on_load.append((func, asyncio.iscoroutinefunction(func)))
     return func
 
 
-def cooldown(seconds: int) -> Callable:
-    """
-    冷却时间装饰器
-    
-    Args:
-        seconds: 冷却时间（秒）
-    
-    Example:
-        class MyPlugin(BasePlugin):
-            @cooldown(60)
-            def handle_limited(self, event):
-                ...
-    """
-    def decorator(func: Callable) -> Callable:
-        func._cooldown = seconds
-        return func
-    return decorator
+def on_unload(func):
+    """插件卸载时执行 (支持 async/sync)"""
+    _pending_on_unload.append((func, asyncio.iscoroutinefunction(func)))
+    return func
 
 
-def rate_limit(calls: int, period: int) -> Callable:
-    """
-    频率限制装饰器
-    
-    Args:
-        calls: 允许的调用次数
-        period: 时间周期（秒）
-    
-    Example:
-        class MyPlugin(BasePlugin):
-            @rate_limit(calls=5, period=60)  # 每分钟最多5次
-            def handle_api(self, event):
-                ...
-    """
-    def decorator(func: Callable) -> Callable:
-        func._rate_limit = {
-            'calls': calls,
-            'period': period
-        }
+def interceptor(priority=100):
+    """消息拦截器: 返回 True 则阻止后续处理"""
+
+    def decorator(func):
+        _pending_interceptors.append(
+            {
+                'func': func,
+                'is_coro': asyncio.iscoroutinefunction(func),
+                'priority': priority,
+            }
+        )
         return func
+
     return decorator

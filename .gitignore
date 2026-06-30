@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Data (运行时数据)
+data/*.db
+data/log/
+data/media/
+data/web/
+data/group_remarks.json
+data/market_mirror.json
+data/mirror_cache.json
+plugins/plugins_disabled.json
+modules/modules_enabled.json
+
+# Config (keep examples only)
+config/settings.yaml
+config/connections.yaml
+config/bot.yaml
+
+# Node
+web/vue/node_modules/
+# web/dist/ is committed (compiled Vue panel)
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
