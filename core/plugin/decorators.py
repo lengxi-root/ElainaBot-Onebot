@@ -23,10 +23,7 @@ def handler(
     cooldown=0,
     block=False,
 ):
-    """注册消息处理器 (pattern 正则; priority 越大越先匹配; event_types 限定事件类型; cooldown 秒)
-
-    block: 默认 False 放行 (相同指令的多个插件都响应); True 则命中即拦截后续插件。
-    """
+    """注册消息处理器 (pattern 正则; priority 越大越先; event_types 限定类型; cooldown 秒; block=True 命中即拦截后续, 默认放行)"""
 
     def decorator(func):
         _pending_handlers.append(
