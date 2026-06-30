@@ -32,11 +32,10 @@ class ConfigWatcherService:
         config_dir = cfg._config_dir
         if not config_dir:
             return
-        loop = asyncio.get_running_loop()
         while self._running:
             try:
                 await asyncio.sleep(self._interval)
-                changed = await loop.run_in_executor(None, self._detect_changes, config_dir)
+                changed = await asyncio.to_thread(self._detect_changes, config_dir)
                 for name in changed:
                     cfg.reload(name)
                     log.info(f'配置热加载: {name}.yaml')

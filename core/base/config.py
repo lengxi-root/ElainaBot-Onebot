@@ -1,7 +1,7 @@
 """YAML 配置管理器 — 支持热加载"""
 
-import os
 import logging
+import os
 import threading
 from typing import Any
 
@@ -60,7 +60,7 @@ class Config:
         if not os.path.isfile(path):
             return
         try:
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(path, encoding='utf-8') as f:
                 data = yaml.safe_load(f) or {}
             with self._lock:
                 self._data[name] = data

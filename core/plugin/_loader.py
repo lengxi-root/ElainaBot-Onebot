@@ -39,10 +39,9 @@ def _collect_pending():
 
 
 async def _run_hooks(funcs, name):
-    loop = asyncio.get_running_loop()
     for func, is_coro in funcs:
         try:
-            await func() if is_coro else await loop.run_in_executor(None, func)
+            await func() if is_coro else await asyncio.to_thread(func)
         except Exception as e:
             report_error(PLUGIN, name, e)
 

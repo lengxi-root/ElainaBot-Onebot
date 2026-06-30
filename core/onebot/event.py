@@ -1,11 +1,27 @@
 """OneBot v11 事件模型 (异步框架)"""
 
 import time
-from typing import List, Optional
+from enum import StrEnum
+
+
+class PostType(StrEnum):
+    """OneBot 上报类型"""
+    MESSAGE = 'message'
+    NOTICE = 'notice'
+    REQUEST = 'request'
+    META = 'meta_event'
+
+
+class MsgType(StrEnum):
+    """消息类型"""
+    GROUP = 'group'
+    PRIVATE = 'private'
 
 
 class OneBotEvent:
     """OneBot v11 基础事件"""
+
+    __slots__ = ('raw_data', 'time', 'self_id', 'post_type', '_api')
 
     def __init__(self, data: dict):
         self.raw_data = data
@@ -25,6 +41,9 @@ class OneBotEvent:
 class MessageEvent(OneBotEvent):
     """消息事件"""
 
+    __slots__ = ('message_type', 'sub_type', 'message_id', 'user_id', 'group_id',
+                 'message', 'raw_message', 'sender', 'font', '_content')
+
     def __init__(self, data: dict):
         super().__init__(data)
         self.message_type = data.get('message_type', '')
@@ -32,18 +51,19 @@ class MessageEvent(OneBotEvent):
         self.message_id = data.get('message_id', 0)
         self.user_id = data.get('user_id', 0)
         self.group_id = data.get('group_id')
-        self.message: List[dict] = data.get('message', [])
+        self.message: list[dict] = data.get('message', [])
         self.raw_message = data.get('raw_message', '')
         self.sender: dict = data.get('sender', {})
         self.font = data.get('font', 0)
+        self._content: str | None = None
 
     @property
     def is_group(self) -> bool:
-        return self.message_type == 'group'
+        return self.message_type == MsgType.GROUP
 
     @property
     def is_private(self) -> bool:
-        return self.message_type == 'private'
+        return self.message_type == MsgType.PRIVATE
 
     @property
     def sender_nickname(self) -> str:
@@ -55,19 +75,18 @@ class MessageEvent(OneBotEvent):
 
     @property
     def content(self) -> str:
-        """提取纯文本内容"""
-        parts = []
-        for seg in self.message:
-            if isinstance(seg, dict) and seg.get('type') == 'text':
-                parts.append(seg.get('data', {}).get('text', ''))
-        return ''.join(parts).strip()
+        """提取纯文本内容 (首次访问后缓存)"""
+        if self._content is None:
+            parts = [
+                seg.get('data', {}).get('text', '')
+                for seg in self.message
+                if isinstance(seg, dict) and seg.get('type') == 'text'
+            ]
+            self._content = ''.join(parts).strip()
+        return self._content
 
     async def reply(self, message, **kwargs):
-        """异步回复消息
-
-        Args:
-            message: 消息内容 (字符串或消息段列表)
-        """
+        """异步回复消息 (字符串或消息段列表)"""
         if self._api is None:
             return None
         if isinstance(message, str):
@@ -96,6 +115,8 @@ class MessageEvent(OneBotEvent):
 class NoticeEvent(OneBotEvent):
     """通知事件"""
 
+    __slots__ = ('notice_type', 'sub_type', 'user_id', 'group_id', 'operator_id')
+
     def __init__(self, data: dict):
         super().__init__(data)
         self.notice_type = data.get('notice_type', '')
@@ -107,6 +128,8 @@ class NoticeEvent(OneBotEvent):
 
 class RequestEvent(OneBotEvent):
     """请求事件"""
+
+    __slots__ = ('request_type', 'sub_type', 'user_id', 'group_id', 'comment', 'flag')
 
     def __init__(self, data: dict):
         super().__init__(data)
@@ -121,23 +144,26 @@ class RequestEvent(OneBotEvent):
 class MetaEvent(OneBotEvent):
     """元事件"""
 
+    __slots__ = ('meta_event_type',)
+
     def __init__(self, data: dict):
         super().__init__(data)
         self.meta_event_type = data.get('meta_event_type', '')
 
 
-def parse_event(data: dict) -> Optional[OneBotEvent]:
+def parse_event(data: dict) -> OneBotEvent | None:
     """解析 OneBot 事件"""
     if not isinstance(data, dict) or 'post_type' not in data:
         return None
 
-    post_type = data.get('post_type')
-    if post_type == 'message':
-        return MessageEvent(data)
-    elif post_type == 'notice':
-        return NoticeEvent(data)
-    elif post_type == 'request':
-        return RequestEvent(data)
-    elif post_type == 'meta_event':
-        return MetaEvent(data)
-    return OneBotEvent(data)
+    match data.get('post_type'):
+        case PostType.MESSAGE:
+            return MessageEvent(data)
+        case PostType.NOTICE:
+            return NoticeEvent(data)
+        case PostType.REQUEST:
+            return RequestEvent(data)
+        case PostType.META:
+            return MetaEvent(data)
+        case _:
+            return OneBotEvent(data)

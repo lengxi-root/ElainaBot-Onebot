@@ -1,7 +1,6 @@
 """基础上下文 — 模块/插件通用"""
 
 import os
-import logging
 
 import yaml
 
@@ -30,7 +29,7 @@ class BaseContext:
         config_path = os.path.join(self._root_dir, 'config.yaml')
         if os.path.isfile(config_path):
             try:
-                with open(config_path, 'r', encoding='utf-8') as f:
+                with open(config_path, encoding='utf-8') as f:
                     data = yaml.safe_load(f) or {}
                 # 合并默认值
                 merged = dict(defaults)

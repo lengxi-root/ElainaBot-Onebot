@@ -1,0 +1,46 @@
+[project]
+name = "elainabot-onebot"
+version = "1.0.0"
+description = "ElainaBot OneBot - OneBot v11 QQ Bot Framework"
+requires-python = ">=3.11"
+readme = "README.md"
+license = "MIT"
+
+dependencies = [
+    "aiohttp>=3.9,<3.14",
+    "pyyaml>=6.0,<7.0",
+    "psutil>=5.9,<7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.4,<0.11",
+    "mypy>=1.8,<1.14",
+    "types-PyYAML",
+]
+
+[tool.setuptools]
+packages = []
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+warn_unused_configs = true
+ignore_missing_imports = true
+exclude = [
+    "modules/",
+    "plugins/",
+    "data/",
+    "web/dist/",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 160
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "single"

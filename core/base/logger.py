@@ -1,5 +1,6 @@
 """日志系统"""
 
+import contextlib
 import logging
 import sys
 
@@ -52,10 +53,10 @@ def on_error(callback):
     _error_callbacks.append(callback)
 
 
-def report_error(module_type: str, name: str, error: Exception):
-    """报告错误"""
-    import traceback
+def report_error(module_type: str, name: str, error: Exception, context: dict | None = None):
+    """报告错误 (context 为可选的附加调试信息)"""
     import datetime
+    import traceback
     log = get_logger(module_type, name)
     log.error(f'{error}')
     data = {
@@ -65,8 +66,8 @@ def report_error(module_type: str, name: str, error: Exception):
         'content': str(error),
         'traceback': traceback.format_exc(),
     }
+    if context:
+        data['context'] = context
     for cb in _error_callbacks:
-        try:
+        with contextlib.suppress(Exception):
             cb(data)
-        except Exception:
-            pass

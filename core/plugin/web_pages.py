@@ -1,10 +1,4 @@
-"""Web 面板自定义页面注册表
-
-插件可在此注册侧边栏页面与自定义 HTTP 路由, 从而把自己的 Web 面板融入框架后台:
-- ``register_page`` 注册一个侧边栏页面, 前端用 iframe 渲染 ``/api/web-pages/{key}``。
-- ``register_route`` 注册插件自己的 HTTP 接口 (统一挂在 ``/api/ext/`` 前缀下),
-  由 web 层的动态分发器在请求时查表执行, 因此插件热重载/卸载即时生效。
-"""
+"""Web 面板自定义页面/路由注册表 (供插件注册侧边栏页面与 /api/ext/ HTTP 接口)"""
 
 from __future__ import annotations
 
@@ -21,17 +15,7 @@ def register_page(
     html_file: str = '',
     icon: str = '',
 ):
-    """注册自定义 Web 面板页面 (侧边栏)。
-
-    Args:
-        key:         页面唯一标识 (路由 /custom/<key>)。
-        label:       侧边栏显示名称。
-        source:      来源类型 ('plugin' / 'module' / 'link'), 仅用于前端角标。
-        source_name: 来源插件名。
-        html:        直接提供的 HTML 字符串 (优先于 html_file)。
-        html_file:   HTML 文件绝对路径。
-        icon:        图标 (预留)。
-    """
+    """注册侧边栏自定义页面 (html 优先于 html_file)"""
     _registry[key] = {
         'key': key,
         'label': label,
@@ -70,28 +54,13 @@ def get_page_html(key: str) -> str | None:
         return '<p style="color:red">页面文件加载失败</p>'
 
 
-# ==================== 自定义 HTTP 路由 ====================
-# 插件可注册自己的 Web 路由 (统一挂在 /api/ext/ 前缀下), 由 web 层的动态分发器
-# 在请求时查表执行, 因此插件热重载/卸载即时生效。默认需要框架登录 token, 可显式
-# auth=False 开放免验证路由 (如对外回调、健康检查)。
-
+# 自定义 HTTP 路由 (挂 /api/ext/ 前缀, 查表执行, 热重载即时生效; auth=False 开放免验证)
 _routes: dict = {}  # {(METHOD, path): route_info}
 _ROUTE_PREFIX = '/api/ext/'
 
 
 def register_route(method: str, path: str, handler=None, *, auth: bool = True):
-    """注册插件 HTTP 路由 (路径需以 /api/ext/ 开头)。
-
-    用法 (装饰器)::
-
-        @register_route('GET', '/api/ext/myplugin/ping', auth=False)
-        async def ping(request):
-            return web.json_response({'ok': True})
-
-    或直接调用: ``register_route('POST', '/api/ext/myplugin/do', do_handler)``。
-
-    auth=True (默认) 时复用框架登录 token 鉴权; auth=False 时开放免验证。
-    """
+    """注册插件 HTTP 路由 (路径需以 /api/ext/ 开头; 可作装饰器或直接传 handler)"""
     from core.plugin import context as _ctx
 
     owner = getattr(getattr(_ctx, 'ctx', None), 'name', '') or ''

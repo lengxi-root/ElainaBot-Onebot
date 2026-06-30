@@ -6,6 +6,10 @@ import contextlib
 import os
 import sys
 
+if sys.version_info < (3, 11):  # noqa: UP036  运行时版本守卫, 面向使用旧版 Python 的用户
+    raise SystemExit(
+        f'ElainaBot 需要 Python 3.11+，当前为 {sys.version_info.major}.{sys.version_info.minor}，请升级后再运行。')
+
 _ROOT = os.path.dirname(os.path.abspath(__file__))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)

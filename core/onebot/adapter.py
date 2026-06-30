@@ -1,12 +1,12 @@
 """OneBot v11 适配器 — WebSocket/HTTP 连接管理"""
 
+import asyncio
 import hmac
 import json
-import asyncio
 import logging
-from typing import Any, Optional, Dict
+from typing import Any
 
-from core.onebot.event import parse_event, OneBotEvent
+from core.onebot.event import OneBotEvent, parse_event
 
 logger = logging.getLogger('ElainaBot.onebot.adapter')
 
@@ -15,15 +15,13 @@ class OneBotAdapter:
     """OneBot v11 协议适配器"""
 
     def __init__(self):
-        self.bots: Dict[str, Any] = {}
-        self.websockets: Dict[str, Any] = {}
-        self.api_responses: Dict[str, asyncio.Future] = {}
-        # HTTP 客户端: name -> {url, token} (框架主动调用 OneBot HTTP API)
-        self.http_clients: Dict[str, Dict[str, str]] = {}
-        # 每个反向 WS / HTTP 上报连接的鉴权: (port, path) -> token/secret
-        # 鉴权必须按连接区分, 否则某条连接配的 token 会被错误地应用到其它连接
-        self.reverse_ws_tokens: Dict[tuple, str] = {}
-        self.reverse_http_secrets: Dict[tuple, str] = {}
+        self.bots: dict[str, Any] = {}
+        self.websockets: dict[str, Any] = {}
+        self.api_responses: dict[str, asyncio.Future] = {}
+        self.http_clients: dict[str, dict[str, str]] = {}  # name -> {url, token}
+        # 鉴权按连接区分 (port, path) -> token/secret, 避免某连接 token 误用到其它连接
+        self.reverse_ws_tokens: dict[tuple, str] = {}
+        self.reverse_http_secrets: dict[tuple, str] = {}
 
     def expected_ws_token(self, port=None, path=None) -> str:
         """返回指定 (端口, 路径) 反向 WS 入口应校验的 token; 找不到则不校验"""
@@ -46,7 +44,7 @@ class OneBotAdapter:
                     return s
         return ''
 
-    def _check_signature(self, body: bytes, signature: Optional[str], secret: str = '') -> bool:
+    def _check_signature(self, body: bytes, signature: str | None, secret: str = '') -> bool:
         if not secret:
             return True
         if not signature:
@@ -54,7 +52,7 @@ class OneBotAdapter:
         sig = hmac.new(secret.encode('utf-8'), body, 'sha1').hexdigest()
         return signature == "sha1=" + sig
 
-    def _check_access_token(self, auth_header: Optional[str], token: str = '') -> bool:
+    def _check_access_token(self, auth_header: str | None, token: str = '') -> bool:
         if not token:
             return True
         if not auth_header:
@@ -64,7 +62,7 @@ class OneBotAdapter:
             return False
         return parts[1] == token
 
-    def parse_event(self, data: dict) -> Optional[OneBotEvent]:
+    def parse_event(self, data: dict) -> OneBotEvent | None:
         """解析 OneBot 事件"""
         return parse_event(data)
 
@@ -106,9 +104,7 @@ class OneBotAdapter:
         return True, self_id, None
 
     def register_bot(self, self_id: str, ws=None):
-        # 注意: aiohttp 的 WebSocketResponse 定义了 __len__→0, bool(ws) 为 False,
-        # 必须用 `is not None` 判断, 否则反向 WS 会被误判为 http 且不进入 websockets
-        is_ws = ws is not None
+        is_ws = ws is not None  # 必须 is not None: aiohttp WS 的 bool() 为 False, 否则反向 WS 误判为 http
         self.bots[self_id] = {"self_id": self_id, "type": "websocket" if is_ws else "http", "ws": ws}
         if is_ws:
             self.websockets[self_id] = ws
@@ -133,7 +129,7 @@ class OneBotAdapter:
     def clear_http_clients(self):
         self.http_clients.clear()
 
-    async def http_call_action(self, action: str, params: dict = None) -> Optional[dict]:
+    async def http_call_action(self, action: str, params: dict = None) -> dict | None:
         """通过 HTTP 调用 OneBot API (POST {url}/{action})"""
         if not self.http_clients:
             return None
@@ -145,9 +141,11 @@ class OneBotAdapter:
             headers['Authorization'] = 'Bearer ' + client['token']
         try:
             timeout = aiohttp.ClientTimeout(total=30)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(url, json=params or {}, headers=headers) as resp:
-                    return await resp.json()
+            async with (
+                aiohttp.ClientSession(timeout=timeout) as session,
+                session.post(url, json=params or {}, headers=headers) as resp,
+            ):
+                return await resp.json()
         except Exception as e:
             logger.warning(f'HTTP API 调用失败: {action} - {e}')
             return None
