@@ -88,6 +88,12 @@ def _setup():
     state.set_apps_data_root(apps_data)
     state.set_apps_dir(_APPS_DIR)
 
+    # 基座自身依赖 (jinja2 等, html_render 需要), 先于插件安装
+    try:
+        deps.ensure_requirements("astrbot基座", _PLUGIN_DIR)
+    except Exception as e:
+        log.warning(f"[astrbot基座] 基座依赖检查异常 (继续加载): {e}")
+
     # 注入兼容层 (import 插件前必须就位)
     install_shim()
 
