@@ -21,8 +21,14 @@ def handler(
     private_only=False,
     event_types=None,
     cooldown=0,
+    block=False,
 ):
-    """注册消息处理器 (pattern 正则; priority 越大越先匹配; event_types 限定事件类型; cooldown 秒)"""
+    """注册消息处理器 (pattern 正则; priority 越大越先匹配; event_types 限定事件类型; cooldown 秒)
+
+    block: 命中后是否拦截后续处理器。默认 False (放行),
+        让其它注册了相同指令的低优先级插件也能响应;
+        设为 True 则命中即停止分发, 拦截后续插件。
+    """
 
     def decorator(func):
         _pending_handlers.append(
@@ -39,6 +45,7 @@ def handler(
                 'private_only': private_only,
                 'event_types': frozenset(event_types) if event_types else None,
                 'cooldown': cooldown,
+                'block': block,
             }
         )
         return func
