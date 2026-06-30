@@ -25,9 +25,7 @@ def handler(
 ):
     """注册消息处理器 (pattern 正则; priority 越大越先匹配; event_types 限定事件类型; cooldown 秒)
 
-    block: 命中后是否拦截后续处理器。默认 False (放行),
-        让其它注册了相同指令的低优先级插件也能响应;
-        设为 True 则命中即停止分发, 拦截后续插件。
+    block: 默认 False 放行 (相同指令的多个插件都响应); True 则命中即拦截后续插件。
     """
 
     def decorator(func):

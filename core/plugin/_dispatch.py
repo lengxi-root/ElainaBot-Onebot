@@ -66,8 +66,7 @@ class _DispatchMixin:
                         continue
                     self._cooldowns[key] = now
                 matched.append((h, m))
-                # block=False (默认) 放行继续匹配后续插件; block=True 命中即拦截
-                if h.get('block', False):
+                if h.get('block', False):  # 默认放行, block=True 时拦截后续
                     break
             if not matched:
                 return False
@@ -95,8 +94,7 @@ class _DispatchMixin:
                 if not m:
                     continue
                 matched.append((h, m))
-                # block=False (默认) 放行继续匹配后续插件; block=True 命中即拦截
-                if h.get('block', False):
+                if h.get('block', False):  # 默认放行, block=True 时拦截后续
                     break
             if not matched:
                 return False
@@ -104,7 +102,7 @@ class _DispatchMixin:
             return True
 
     async def _run_chain(self, matched, event):
-        """顺序执行命中的处理器链 (保证回复顺序与 priority 一致)"""
+        """顺序执行命中的处理器链 (回复顺序与 priority 一致)"""
         for h, match in matched:
             await self._run_handler(h, event, match)
 
