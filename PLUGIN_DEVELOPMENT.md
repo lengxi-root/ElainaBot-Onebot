@@ -333,9 +333,18 @@ await event.call_api('set_friend_add_request', {
 | `get_friend_list` / `get_group_list` / `get_group_info` | 列表与信息 |
 | `get_group_member_list` / `get_group_member_info` | 群成员 |
 | `set_group_kick` / `set_group_ban` / `set_group_whole_ban` | 群管理 |
+| `set_group_card` / `set_group_name` / `set_group_admin` / `set_group_special_title` / `set_group_leave` | 群资料/成员管理 |
+| `set_group_portrait` / `set_group_sign` / `get_group_at_all_remain` / `get_group_honor_info` / `get_group_system_msg` | 群扩展 |
+| `get_essence_msg_list` / `set_essence_msg` / `delete_essence_msg` | 群精华消息 |
 | `set_friend_add_request` / `set_group_add_request` | 处理请求 |
+| `send_forward_msg` / `send_group_forward_msg` / `send_private_forward_msg` / `get_forward_msg` | 合并转发 |
+| `get_group_msg_history` / `get_friend_msg_history` / `mark_group_msg_as_read` / `mark_private_msg_as_read` | 历史/已读 |
+| `set_msg_emoji_like` / `send_poke` | 表情回应 / 戳一戳 |
+| `send_like` / `delete_friend` / `set_qq_avatar` / `set_qq_profile` / `get_unidirectional_friend_list` / `ocr_image` | 用户/账号 |
+| `upload_group_file` / `upload_private_file` / `get_group_root_files` / `get_group_files_by_folder` / `get_group_file_url` / `delete_group_file` / `create_group_file_folder` | 文件 |
+| `get_version_info` / `get_status` / `can_send_image` / `can_send_record` / `get_cookies` / `get_csrf_token` / `clean_cache` | 系统 |
 
-> 任何未封装的动作都可用 `call_api(action, params)` 直接调用。API 调用默认 30 秒超时，无可用连接时返回 `None`。
+> 表中为通用动作名 (各 OneBot v11 实现普遍支持)；个别实现可能未实现某动作。任何未封装的动作都可用 `call_api(action, params)` 直接调用。API 调用默认 30 秒超时，无可用连接时返回 `None`。
 
 ---
 
