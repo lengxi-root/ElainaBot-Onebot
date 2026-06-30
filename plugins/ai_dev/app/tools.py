@@ -15,8 +15,8 @@ import time
 
 from core.base.config import cfg
 
-# 仓库根目录: plugins/ai_dev/tools.py -> 上溯三层
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 仓库根目录: plugins/ai_dev/app/tools.py -> 上溯四层 (app -> ai_dev -> plugins -> 根)
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 _MAX_READ_BYTES = 200_000
 _MAX_WRITE_BYTES = 1_000_000
