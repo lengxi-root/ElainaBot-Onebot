@@ -24,6 +24,7 @@ modules/modules_enabled.json
 
 # Config (keep examples only)
 config/settings.yaml
+config/connections.yaml
 config/bot.yaml
 
 # Node
