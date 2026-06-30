@@ -23,11 +23,12 @@ DEFAULTS = {
     'request_timeout': 120,
     'system_prompt': '',
     'reasoning_effort': '',
+    'history_limit': 50,
 }
 
 # 允许面板写入并持久化的字段
 _WRITABLE = ('base_url', 'api_key', 'model', 'temperature', 'max_iterations',
-             'request_timeout', 'system_prompt', 'enabled', 'reasoning_effort')
+             'request_timeout', 'system_prompt', 'enabled', 'reasoning_effort', 'history_limit')
 
 # 子模块位于 ai_dev/app/, data 目录在插件根 ai_dev/data/
 _OVERRIDE_FILE = os.path.join(
@@ -127,6 +128,14 @@ def max_iterations() -> int:
         return DEFAULTS['max_iterations']
 
 
+def history_limit() -> int:
+    """单会话保留的最大对话轮数 (1 轮 = 用户提问 + AI 回复); <=0 表示不限制。"""
+    try:
+        return int(get('history_limit'))
+    except (TypeError, ValueError):
+        return DEFAULTS['history_limit']
+
+
 def request_timeout() -> int:
     try:
         return int(get('request_timeout'))
@@ -156,6 +165,7 @@ def public_config() -> dict:
         'model': model(),
         'temperature': temperature(),
         'max_iterations': max_iterations(),
+        'history_limit': history_limit(),
         'request_timeout': request_timeout(),
         'system_prompt': system_prompt(),
         'reasoning_effort': reasoning_effort(),

@@ -189,14 +189,13 @@ input,textarea,select{font-family:inherit}
 
 /* activity */
 .activity{width:300px;flex:0 0 300px;display:flex;flex-direction:column;overflow:hidden}
-.act-head{padding:11px 14px;border-bottom:1px solid var(--line2);display:flex;flex-direction:column;gap:9px}
-.act-head-top{display:flex;align-items:center;gap:9px}
-.act-head h3{font-size:14px}
-.act-head .spacer{flex:1}
-.tabs{display:flex;flex-wrap:nowrap;gap:4px;background:var(--bg2);border-radius:10px;padding:3px}
-.tab{flex:1 1 0;min-width:0;text-align:center;font-size:12px;padding:6px 4px;border-radius:8px;color:var(--ink2);font-weight:600;white-space:nowrap;transition:.15s}
+.act-head{padding:11px 12px;border-bottom:1px solid var(--line2);display:flex;align-items:center;flex-wrap:nowrap;gap:7px}
+.act-head h3{font-size:14px;white-space:nowrap;flex:0 0 auto}
+.act-head .spacer{flex:1;min-width:0}
+.tabs{display:flex;flex-wrap:nowrap;flex:0 0 auto;gap:3px;background:var(--bg2);border-radius:10px;padding:3px}
+.tab{flex:0 0 auto;font-size:11.5px;padding:5px 9px;border-radius:8px;color:var(--ink2);font-weight:600;white-space:nowrap;transition:.15s}
 .tab.active{background:var(--card);color:var(--brand);box-shadow:0 2px 6px rgba(60,72,140,.1)}
-.act-clear{font-size:12px;color:var(--muted)}
+.act-clear{font-size:12px;color:var(--muted);flex:0 0 auto;white-space:nowrap}
 .act-clear:hover{color:var(--red)}
 .act-list{flex:1;overflow-y:auto;padding:6px 8px;display:flex;flex-direction:column;gap:1px}
 .act-empty{margin:auto;text-align:center;color:var(--muted);font-size:13px;padding:40px 20px}
@@ -331,16 +330,14 @@ input,textarea,select{font-family:inherit}
     <!-- activity -->
     <div class="panel activity">
       <div class="act-head">
-        <div class="act-head-top">
-          <h3>实时调用</h3>
-          <div class="spacer"></div>
-          <button class="act-clear" id="actClear" title="清空显示">清空</button>
-        </div>
+        <h3>实时调用</h3>
+        <div class="spacer"></div>
         <div class="tabs">
           <button class="tab active" data-f="all">全部</button>
           <button class="tab" data-f="tool">调用</button>
           <button class="tab" data-f="msg">对话</button>
         </div>
+        <button class="act-clear" id="actClear" title="清空显示">清空</button>
       </div>
       <div class="act-list" id="actList">
         <div class="act-empty">暂无活动，发送消息后这里会实时显示 AI 的每一次工具调用与结果。</div>
@@ -382,6 +379,11 @@ input,textarea,select{font-family:inherit}
         <option value="high">high — 高 (思考最充分)</option>
       </select>
       <div class="set-hint">仅推理模型 (如 gpt-5.x / o 系列) 生效；普通模型忽略此项。思考过程会显示在回复气泡的「思考过程」里。</div>
+    </div>
+    <div class="set-row">
+      <div class="set-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>对话上限 (history_limit)</div>
+      <input class="set-input" id="setHistoryLimit" type="number" min="0" step="1" placeholder="50" spellcheck="false" autocomplete="off">
+      <div class="set-hint">单个会话保留的最大对话轮数 (1 轮 = 提问+回复)，超出后丢弃最旧的轮次以控制上下文长度。默认 50，填 0 表示不限制。</div>
     </div>
     <div class="set-err" id="setErr"></div>
     <div class="modal-actions">
@@ -570,6 +572,7 @@ function openSettings(){
   $('#setApiKey').value='';
   $('#setApiKey').placeholder=CFG.api_key_set?'已配置 (留空表示不修改)':'sk-...';
   $('#setReasoning').value=CFG.reasoning_effort||'';
+  $('#setHistoryLimit').value=(CFG.history_limit!=null?CFG.history_limit:50);
   fillSetModels(MODEL?[MODEL]:[],MODEL);
   setErr('');
   $('#settingsModal').classList.add('show');
@@ -594,9 +597,11 @@ async function fetchSetModels(){
 }
 async function saveSettings(){
   const base=$('#setBaseUrl').value.trim(), key=$('#setApiKey').value.trim(), m=$('#setModel').value, re=$('#setReasoning').value;
+  const hlRaw=$('#setHistoryLimit').value.trim();
   const btn=$('#setSave');btn.disabled=true;btn.textContent='保存中…';setErr('');
   try{
     const payload={base_url:base,model:m,reasoning_effort:re};
+    if(hlRaw!==''){const hl=parseInt(hlRaw,10);if(isNaN(hl)||hl<0){setErr('对话上限需为 ≥0 的整数');btn.disabled=false;btn.textContent='保存并应用';return;}payload.history_limit=hl;}
     if(key)payload.api_key=key;          // 留空不修改已保存密钥
     const d=await (await api('/api/ext/aidev/config',{method:'POST',body:JSON.stringify(payload)})).json();
     if(!d.success){setErr(d.error||'保存失败');btn.disabled=false;btn.textContent='保存并应用';return;}

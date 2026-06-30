@@ -70,7 +70,7 @@ async def _set_config(request: web.Request):
     """
     body = await _json(request)
     updates = {}
-    for k in ('base_url', 'model', 'temperature', 'max_iterations', 'system_prompt', 'reasoning_effort'):
+    for k in ('base_url', 'model', 'temperature', 'max_iterations', 'history_limit', 'system_prompt', 'reasoning_effort'):
         if k in body:
             updates[k] = body[k]
     # api_key: 仅当显式提供且非空白时才更新; null 清除

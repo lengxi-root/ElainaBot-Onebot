@@ -16,8 +16,8 @@ import time
 import uuid
 from collections import deque
 
-_MAX_EVENTS = 2000          # 内存中保留的事件数
-_MAX_SESSION_MESSAGES = 80   # 单会话保留的消息数 (滚动裁剪, 保留 system)
+_MAX_EVENTS = 2000              # 内存中保留的事件数
+_DEFAULT_HISTORY_ROUNDS = 50    # 单会话默认保留的对话轮数 (面板「设置」可改, 配置不可用时回退)
 
 
 class AIStore:
@@ -84,6 +84,14 @@ class AIStore:
         self._save_sessions()
         return True
 
+    def _history_limit(self) -> int:
+        """单会话保留的最大对话轮数 (面板「设置」可改, 默认 50); <=0 不限制。"""
+        try:
+            from . import aiconfig
+            return int(aiconfig.history_limit())
+        except Exception:
+            return _DEFAULT_HISTORY_ROUNDS
+
     def get_messages(self, sid: str) -> list:
         sess = self._sessions.get(sid)
         return list(sess['messages']) if sess else []
@@ -92,16 +100,17 @@ class AIStore:
         sess = self._sessions.get(sid)
         if not sess:
             return
-        # 滚动裁剪: 保留 system + 最近的若干条
+        # 滚动裁剪: 保留 system + 最近的若干「轮」对话 (1 轮 = 1 个 user 回合)
         system = [m for m in messages if m.get('role') == 'system']
         rest = [m for m in messages if m.get('role') != 'system']
-        if len(rest) > _MAX_SESSION_MESSAGES:
-            rest = rest[-_MAX_SESSION_MESSAGES:]
-            # 避免从工具调用序列中间截断: OpenAI 要求 role=tool 的消息必须紧跟在
-            # 含 tool_calls 的 assistant 之后。从首个 user 回合边界对齐, 防止产生
-            # 「孤立 tool 消息」导致下次请求 400。
-            while rest and rest[0].get('role') != 'user':
-                rest.pop(0)
+        limit_rounds = self._history_limit()
+        if limit_rounds > 0:
+            # 以 user 消息为「轮」边界, 仅保留最近 limit_rounds 轮。从 user 边界
+            # 对齐裁剪, 既避免上下文无限增长, 又不会在工具调用序列中间截断 (OpenAI
+            # 要求 role=tool 必须紧跟含 tool_calls 的 assistant), 防止下次请求 400。
+            user_idx = [i for i, m in enumerate(rest) if m.get('role') == 'user']
+            if len(user_idx) > limit_rounds:
+                rest = rest[user_idx[len(user_idx) - limit_rounds]:]
         sess['messages'] = system + rest
         sess['updated'] = time.time()
         if not sess.get('title'):
