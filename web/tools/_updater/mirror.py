@@ -19,7 +19,7 @@ _mirror_testing = None  # asyncio.Task (防重复测速)
 
 async def _test_one_mirror(mirror, timeout=3):
     """HEAD 请求测试镜像延迟, 2xx/3xx 均视为成功"""
-    test_url = _build_mirror_url('https://github.com/lengxi-root/napcat-plugin-lengxi/releases/latest', mirror)
+    test_url = _build_mirror_url('https://github.com/ElainaCore/ElainaBot-Onebot/releases/latest', mirror)
     start = time.time()
     try:
         async with (
