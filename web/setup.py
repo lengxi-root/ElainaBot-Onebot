@@ -38,7 +38,7 @@ class _WebPanelLogHandler(logging.Handler):
             _ws.push_log('framework', entry)
             svc = getattr(self._app, '_log_service', None)
             if svc:
-                svc.add('framework', entry)
+                svc.add_nowait('framework', entry)
         except Exception:
             pass
 

@@ -80,12 +80,16 @@ class LogService:
         self._connections[key] = conn
         return conn
 
-    async def add(self, log_type: str, entry: dict, bot_qq: str = ''):
-        """异步添加日志条目到队列"""
+    def add_nowait(self, log_type: str, entry: dict, bot_qq: str = ''):
+        """同步入队 (供同步上下文使用, 如日志 handler); 仅追加到内存队列, 不做 IO"""
         key = (log_type, bot_qq or '')
         if key not in self._queues:
             self._queues[key] = deque()
         self._queues[key].append(entry)
+
+    async def add(self, log_type: str, entry: dict, bot_qq: str = ''):
+        """异步添加日志条目到队列"""
+        self.add_nowait(log_type, entry, bot_qq)
 
     async def execute(self, log_type: str, sql: str, params=None, bot_qq: str = '') -> int:
         """异步执行写操作（UPDATE/DELETE）"""

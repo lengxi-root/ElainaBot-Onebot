@@ -105,7 +105,8 @@ class Application:
 
         # 5) 插件管理器
         self._plugin_manager = PluginManager(self._path('plugins'))
-        owner_ids = cfg.get('settings', 'owner_ids', []) or []
+        owner_ids = cfg.get('settings', 'owner.ids', []) or []
+        owner_ids = [str(uid).strip() for uid in owner_ids if str(uid).strip()]
         self._plugin_manager.set_owner_ids(owner_ids)
         await self._plugin_manager.load_all()
         self._plugin_manager.start_watcher()
