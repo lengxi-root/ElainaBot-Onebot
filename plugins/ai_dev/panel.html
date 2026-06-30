@@ -271,9 +271,42 @@ input,textarea,select{font-family:inherit}
 .set-err{color:var(--red);font-size:12.5px;min-height:16px;margin-top:10px}
 .set-err.ok{color:var(--green)}
 
+/* 顶栏菜单按钮 (仅窄屏显示) + 抽屉遮罩 + 站点预设 */
+.menu-btn{display:none}
+.site-pick select{max-width:130px}
+.drawer-back{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:35;animation:fade .18s}
+.drawer-back.show{display:block}
+.preset-bar{display:flex;gap:8px;align-items:center}
+.preset-bar select{flex:1;min-width:0;height:38px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg2);padding:0 10px;font-size:13px;color:var(--ink)}
+.preset-bar .btn-ghost{flex:0 0 auto;padding:0 12px;height:38px}
+
 @media(max-width:1180px){.activity{width:270px;flex-basis:270px}}
-@media(max-width:1020px){.activity{display:none}.sidebar{width:184px;flex-basis:184px}}
-@media(max-width:760px){.sidebar{display:none}.main{padding:8px}}
+@media(max-width:1020px){
+  .activity{position:fixed;top:0;right:0;bottom:0;width:320px;max-width:86vw;z-index:40;border-radius:0;
+    transform:translateX(105%);transition:transform .25s ease;box-shadow:-10px 0 30px rgba(20,24,60,.18)}
+  .activity.open{transform:none}
+  .sidebar{width:184px;flex-basis:184px}
+  .menu-act{display:flex}
+}
+@media(max-width:760px){
+  .topbar{height:56px;flex:0 0 56px;padding:0 10px;gap:8px}
+  .brand small{display:none}
+  .brand{font-size:14px}
+  .status{display:none}
+  .model-pick{padding:6px 9px}
+  .model-pick select{max-width:108px}
+  .site-pick select{max-width:108px}
+  .main{padding:8px;gap:0}
+  .sidebar{position:fixed;top:0;left:0;bottom:0;width:260px;max-width:84vw;z-index:40;background:var(--bg);padding:12px;
+    transform:translateX(-105%);transition:transform .25s ease;box-shadow:10px 0 30px rgba(20,24,60,.18);overflow-y:auto}
+  .sidebar.open{transform:none}
+  .menu-side{display:flex}
+}
+@media(max-width:480px){
+  .model-pick:not(.site-pick){display:none}
+  .composer{padding:10px}
+  .bubble .imgs img{max-width:120px;max-height:120px}
+}
 </style>
 </head>
 <body>
@@ -295,16 +328,22 @@ input,textarea,select{font-family:inherit}
 <!-- App -->
 <div id="app">
   <div class="topbar">
+    <button class="icon-btn menu-btn menu-side" id="menuSidebar" title="对话列表"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
     <div class="brand">
       <div class="mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5 10.1 7.6z"/><path d="M19 14l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg></div>
       <div>ElainaBot<small>AI 开发助手面板</small></div>
     </div>
     <div class="spacer"></div>
+    <div class="model-pick site-pick" title="切换 AI 站点">
+      <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20a15.3 15.3 0 0 1 0-20z"/><circle cx="12" cy="12" r="10"/></svg></span>
+      <select id="siteSel" title="切换 AI 站点"><option value="">默认配置</option></select>
+    </div>
     <div class="model-pick" title="选择模型">
       <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg></span>
       <select id="modelSel"></select>
     </div>
     <div class="status"><span class="dot" id="connDot"></span><span id="connTxt">连接中…</span></div>
+    <button class="icon-btn menu-btn menu-act" id="menuActivity" title="实时调用"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg></button>
     <button class="icon-btn" id="settingsBtn" title="设置 (OpenAI 地址 / 密钥 / 模型)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
     <button class="icon-btn" id="logoutBtn" title="退出登录"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
   </div>
@@ -357,13 +396,24 @@ input,textarea,select{font-family:inherit}
       </div>
     </div>
   </div>
+  <div class="drawer-back" id="drawerBack"></div>
 </div>
 
 <!-- Settings modal -->
 <div class="modal" id="settingsModal">
   <div class="modal-card">
     <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>AI 设置</h2>
-    <div class="sub">自定义 OpenAI 兼容接口地址与密钥，保存后自动获取可用模型。密钥仅保存在本地。</div>
+    <div class="sub">管理多个 AI 站点（接口地址/密钥/模型），随时一键切换。密钥仅保存在服务器本地。</div>
+    <div class="set-row preset-row">
+      <div class="set-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20a15.3 15.3 0 0 1 0-20z"/></svg>AI 站点 (预设)</div>
+      <div class="preset-bar">
+        <select id="presetSel"><option value="">— 新站点 —</option></select>
+        <button class="btn-ghost" id="presetApply" type="button">切换</button>
+        <button class="btn-ghost" id="presetDel" type="button">删除</button>
+      </div>
+      <input class="set-input" id="presetName" placeholder="站点名称，如「OpenAI 官方」「中转 A」" spellcheck="false" autocomplete="off" style="margin-top:8px">
+      <div class="set-hint">选择一个站点会把下面字段填好；填好地址/密钥/模型后点「存为站点」保存或更新。「切换」会立即应用该站点。</div>
+    </div>
     <div class="set-row">
       <div class="set-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>接口地址 (base_url)</div>
       <input class="set-input" id="setBaseUrl" placeholder="https://api.openai.com/v1" spellcheck="false" autocomplete="off">
@@ -401,6 +451,7 @@ input,textarea,select{font-family:inherit}
     <div class="set-err" id="setErr"></div>
     <div class="modal-actions">
       <button class="btn-primary" id="setSave" type="button">保存并应用</button>
+      <button class="btn-ghost" id="presetSave" type="button">存为站点</button>
       <button class="btn-ghost" id="setCancel" type="button">取消</button>
     </div>
   </div>
@@ -558,6 +609,7 @@ async function start(){
   $('#login').style.display='none';$('#app').style.display='flex';
   CFG=(await r.json()).config||{};
   if(!MODEL)MODEL=CFG.model||'';
+  await loadPresets();
   await loadModels();
   await loadSessions(true);
   await loadCalls();
@@ -587,6 +639,8 @@ function openSettings(){
   $('#setReasoning').value=CFG.reasoning_effort||'';
   $('#setMaxIter').value=(CFG.max_iterations!=null?CFG.max_iterations:50);
   fillSetModels(MODEL?[MODEL]:[],MODEL);
+  if($('#presetSel')){$('#presetSel').value=ACTIVE_PRESET||'';
+    const ap=PRESETS.find(x=>x.id===ACTIVE_PRESET);$('#presetName').value=ap?ap.name:'';}
   setErr('');
   $('#settingsModal').classList.add('show');
 }
@@ -632,6 +686,79 @@ $('#setFetchModels').addEventListener('click',fetchSetModels);
 $('#setSave').addEventListener('click',saveSettings);
 $('#settingsModal').addEventListener('click',e=>{if(e.target.id==='settingsModal')closeSettings();});
 
+/* ---- AI 站点预设: 顶栏一键切换 + 设置里管理 ---- */
+let PRESETS=[], ACTIVE_PRESET='';
+function fillSiteSelectors(){
+  const head=$('#siteSel');
+  head.innerHTML='<option value="">默认配置</option>'+PRESETS.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+  head.value=ACTIVE_PRESET||'';
+  const mng=$('#presetSel');
+  mng.innerHTML='<option value="">— 新站点 —</option>'+PRESETS.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+}
+async function loadPresets(){
+  try{
+    const d=await (await api('/api/ext/aidev/presets')).json();
+    PRESETS=d.presets||[];ACTIVE_PRESET=d.active_id||'';
+    fillSiteSelectors();
+  }catch(e){}
+}
+async function applyPreset(id){
+  if(!id){return;}
+  const d=await (await api('/api/ext/aidev/presets/apply',{method:'POST',body:JSON.stringify({id})})).json();
+  if(!d.success){toast(d.error||'切换失败');return;}
+  PRESETS=d.presets||PRESETS;ACTIVE_PRESET=d.active_id||id;CFG=d.config||CFG;
+  MODEL=CFG.model||MODEL;localStorage.setItem('ai_dev_model',MODEL);
+  fillSiteSelectors();await loadModels();
+  const p=PRESETS.find(x=>x.id===ACTIVE_PRESET);
+  toast('已切换到站点：'+(p?p.name:id));
+}
+$('#siteSel').addEventListener('change',e=>{const id=e.target.value;if(id)applyPreset(id);else fillSiteSelectors();});
+/* 设置弹窗内的站点管理 */
+function fillPresetEditor(id){
+  const p=PRESETS.find(x=>x.id===id);
+  if(!p){$('#presetName').value='';return;}
+  $('#presetName').value=p.name||'';
+  $('#setBaseUrl').value=p.base_url||'';
+  fillSetModels(p.model?[p.model]:[],p.model);
+  $('#setReasoning').value=p.reasoning_effort||'';
+  $('#setApiKey').value='';
+  $('#setApiKey').placeholder=p.api_key_set?'该站点已配置密钥 (留空表示不修改)':'sk-...';
+}
+$('#presetSel').addEventListener('change',e=>fillPresetEditor(e.target.value));
+$('#presetApply').addEventListener('click',async()=>{
+  const id=$('#presetSel').value;if(!id){setErr('请先选择一个站点');return;}
+  await applyPreset(id);setErr('已切换并应用该站点',true);
+});
+$('#presetSave').addEventListener('click',async()=>{
+  const name=$('#presetName').value.trim();
+  const base=$('#setBaseUrl').value.trim(), key=$('#setApiKey').value.trim(), m=$('#setModel').value, re=$('#setReasoning').value;
+  if(!name){setErr('请填写站点名称');return;}
+  if(!base){setErr('请填写接口地址 (base_url)');return;}
+  const payload={id:$('#presetSel').value||'',name,base_url:base,model:m,reasoning_effort:re};
+  if(key)payload.api_key=key;
+  const btn=$('#presetSave');btn.disabled=true;
+  try{
+    const d=await (await api('/api/ext/aidev/presets/save',{method:'POST',body:JSON.stringify(payload)})).json();
+    PRESETS=d.presets||PRESETS;fillSiteSelectors();
+    const saved=PRESETS.find(x=>x.name===name);if(saved)$('#presetSel').value=saved.id;
+    setErr('站点已保存，可在顶栏随时切换',true);toast('站点已保存');
+  }catch(e){setErr('保存失败: '+e.message);}
+  btn.disabled=false;
+});
+$('#presetDel').addEventListener('click',async()=>{
+  const id=$('#presetSel').value;if(!id){setErr('请先选择要删除的站点');return;}
+  const d=await (await api('/api/ext/aidev/presets/delete',{method:'POST',body:JSON.stringify({id})})).json();
+  PRESETS=d.presets||[];ACTIVE_PRESET=d.active_id||'';fillSiteSelectors();
+  $('#presetSel').value='';fillPresetEditor('');setErr('站点已删除',true);
+});
+
+/* ---- 手机端抽屉: 侧栏 / 实时调用 ---- */
+function closeDrawers(){$('.sidebar').classList.remove('open');$('.activity').classList.remove('open');$('#drawerBack').classList.remove('show');}
+function openDrawer(sel){const el=$(sel);const on=el.classList.contains('open');closeDrawers();if(!on){el.classList.add('open');$('#drawerBack').classList.add('show');}}
+$('#menuSidebar').addEventListener('click',()=>openDrawer('.sidebar'));
+$('#menuActivity').addEventListener('click',()=>openDrawer('.activity'));
+$('#drawerBack').addEventListener('click',closeDrawers);
+
 /* ---- sessions ---- */
 async function loadSessions(pick,keepView){
   const d=await (await api('/api/ext/aidev/sessions')).json();
@@ -649,7 +776,7 @@ async function loadSessions(pick,keepView){
   if(keepView)return;            // 发送完成后只刷新侧栏列表, 保留当前实时气泡 (思考过程/工具时间线不被历史视图覆盖)
   if(SID)loadHistory();else renderWelcome();
 }
-async function selectSession(id){SID=id;localStorage.setItem('ai_dev_sid',id);loadSessions();}
+async function selectSession(id){SID=id;localStorage.setItem('ai_dev_sid',id);loadSessions();closeDrawers();}
 async function delSession(id){
   await api('/api/ext/aidev/sessions/delete',{method:'POST',body:JSON.stringify({session_id:id})});
   if(id===SID){SID='';localStorage.removeItem('ai_dev_sid');}
@@ -657,7 +784,7 @@ async function delSession(id){
 }
 $('#newChat').addEventListener('click',async()=>{
   const d=await (await api('/api/ext/aidev/sessions',{method:'POST',body:'{}'})).json();
-  if(d.success){SID=d.session.id;localStorage.setItem('ai_dev_sid',SID);loadSessions();$('#input').focus();}
+  if(d.success){SID=d.session.id;localStorage.setItem('ai_dev_sid',SID);loadSessions();closeDrawers();$('#input').focus();}
 });
 
 async function loadHistory(){

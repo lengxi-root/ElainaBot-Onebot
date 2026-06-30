@@ -29,6 +29,10 @@ def register_routes():
     """通过框架 register_route 注册全部 /api/ext/aidev/* 路由 (热重载安全)。"""
     register_route('GET', _PREFIX + '/config', _get_config)
     register_route('POST', _PREFIX + '/config', _set_config)
+    register_route('GET', _PREFIX + '/presets', _get_presets)
+    register_route('POST', _PREFIX + '/presets/save', _save_preset)
+    register_route('POST', _PREFIX + '/presets/delete', _del_preset)
+    register_route('POST', _PREFIX + '/presets/apply', _apply_preset)
     register_route('GET', _PREFIX + '/models', _get_models)
     register_route('GET', _PREFIX + '/sessions', _get_sessions)
     register_route('POST', _PREFIX + '/sessions', _create_session)
@@ -61,6 +65,28 @@ async def _set_config(request: web.Request):
             updates['api_key'] = ak.strip()
     aiconfig.set_runtime(updates)
     return web.json_response({'success': True, 'config': aiconfig.public_config()})
+
+
+async def _get_presets(request: web.Request):
+    return web.json_response({'success': True, **aiconfig.list_presets()})
+
+
+async def _save_preset(request: web.Request):
+    body = await _json(request)
+    return web.json_response({'success': True, **aiconfig.save_preset(body)})
+
+
+async def _del_preset(request: web.Request):
+    body = await _json(request)
+    return web.json_response({'success': True, **aiconfig.delete_preset(str(body.get('id', '')))})
+
+
+async def _apply_preset(request: web.Request):
+    body = await _json(request)
+    res = aiconfig.apply_preset(str(body.get('id', '')))
+    if res is None:
+        return web.json_response({'success': False, 'error': '站点不存在'})
+    return web.json_response({'success': True, 'config': aiconfig.public_config(), **res})
 
 
 async def _get_models(request: web.Request):
