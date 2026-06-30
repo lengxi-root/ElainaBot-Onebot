@@ -1,0 +1,54 @@
+{
+  "auto_use_current_name": {
+    "type": "bool",
+    "description": "自动获取机器人名称",
+    "default": "true"
+  },
+  "bot_name": {
+    "type": "string",
+    "description": "自定义机器人名称",
+    "hint": "当 自动获取机器人名称 为关闭状态时生效，自定义显示在状态卡片上的机器人名称。",
+    "default": "AstrBot"
+  },
+  "banner_image": {
+    "type": "file",
+    "description": "自定义状态背景图",
+    "default": [],
+    "file_types": [
+      "png",
+      "jpg",
+      "jpeg"
+    ]
+  },
+  "enable_llm_analysis": {
+    "type": "bool",
+    "description": "LLM 分析",
+    "hint": "在 /状态 命令返回图片后，是否调用 LLM 分析",
+    "default": false
+  },
+  "vision_provider_id": {
+    "description": "识图模型",
+    "type": "string",
+    "default": "",
+    "_special": "select_provider",
+    "hint": "用于分析状态图片的视觉模型（需支持图片输入）。留空时优先使用 AstrBot 全局图片描述模型，再回退到当前会话模型。"
+  },
+  "comment_provider_id": {
+    "description": "转述模型",
+    "type": "string",
+    "default": "",
+    "_special": "select_provider",
+    "hint": "用于根据识图结果生成文字分析的文本模型。留空时使用当前会话模型。"
+  },
+  "vision_prompt": {
+    "type": "string",
+    "description": "识图提示词（发送给视觉模型）",
+    "default": "把图片中各种指标用文字描述出来"
+  },
+  "comment_prompt": {
+    "type": "string",
+    "description": "转述提示词（发送给文本模型）",
+    "hint": "用 {description} 代表识图结果的占位符。",
+    "default": "根据以下系统状态描述，用简洁友好的语气总结当前服务器状况，重点关注异常项。\n\n系统状态描述：{description}"
+  }
+}

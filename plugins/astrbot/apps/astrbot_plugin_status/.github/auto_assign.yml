@@ -1,0 +1,14 @@
+# Auto-assign reviewers for pull requests
+addReviewers: true
+addAssignees: false
+
+reviewers:
+  - FlanChanXwO
+  - shitianyaa
+
+# Set 0 to add all reviewers
+numberOfReviewers: 1
+
+skipKeywords:
+  - wip
+  - draft

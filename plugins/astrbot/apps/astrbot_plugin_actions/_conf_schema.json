@@ -1,0 +1,108 @@
+{
+  "commands": {
+    "type": "template_list",
+    "description": "指令列表",
+    "hint": "点击添加更多后新增一条指令，并在条目里选择触发方式。",
+    "templates": {
+      "new_command": {
+        "name": "指令",
+        "hint": "适合配置类似 生图、嵌字翻译 这样的动作触发词。",
+        "items": {
+          "command": {
+            "type": "string",
+            "description": "触发词或正则表达式",
+            "default": ""
+          },
+          "model": {
+            "type": "string",
+            "description": "执行此指令使用的 Provider",
+            "default": "",
+            "_special": "select_provider"
+          },
+          "enabled": {
+            "type": "bool",
+            "description": "是否启用此指令",
+            "default": true
+          },
+          "description": {
+            "type": "string",
+            "description": "指令描述",
+            "default": ""
+          },
+          "triggerType": {
+            "type": "string",
+            "description": "触发方式(prefix: 前缀匹配, regex: 正则匹配)",
+            "default": "prefix",
+            "options": [
+              "prefix",
+              "regex"
+            ]
+          },
+          "chatMode": {
+            "type": "string",
+            "description": "指令模式(chat: 对话模式, agent: Agent 模式)",
+            "default": "chat",
+            "options": [
+              "chat",
+              "agent"
+            ]
+          },
+          "promptType": {
+            "type": "string",
+            "description": "提示词类型(instruction: 指令, preset: 预设文本)",
+            "default": "instruction",
+            "options": [
+              "instruction",
+              "preset"
+            ]
+          },
+          "preset": {
+            "type": "text",
+            "description": "预设文本。当提示词类型为 preset 时使用",
+            "default": ""
+          },
+          "prompt": {
+            "type": "text",
+            "description": "自定义提示词",
+            "default": ""
+          },
+          "inputPrompt": {
+            "type": "text",
+            "description": "自定义输入模板，使用 {input} 作为占位符",
+            "default": "{input}"
+          },
+          "allowExecuteWithoutMessage": {
+            "type": "bool",
+            "description": "是否允许空文本触发",
+            "default": false
+          },
+          "requireImage": {
+            "type": "bool",
+            "description": "是否要求消息中至少包含一张图片",
+            "default": false
+          },
+          "waitForImage": {
+            "type": "bool",
+            "description": "缺少图片时是否等待用户在指定秒内补图",
+            "default": true
+          },
+          "waitForImageTimeout": {
+            "type": "int",
+            "description": "缺少图片时等待补图的秒数",
+            "default": 60
+          },
+          "maxSteps": {
+            "type": "int",
+            "description": "Agent 模式最大工具循环步数",
+            "default": 12
+          },
+          "toolCallTimeout": {
+            "type": "int",
+            "description": "Agent 模式工具调用超时时间(秒)",
+            "default": 120
+          }
+        }
+      }
+    }
+  }
+}

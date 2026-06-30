@@ -1,0 +1,114 @@
+<div align="center">
+
+![:name](https://count.getloli.com/@astrbot_plugin_apis?name=astrbot_plugin_apis&theme=minecraft&padding=6&offset=0&align=top&scale=1&pixelated=1&darkmode=auto)
+
+# astrbot_plugin_apis
+
+_✨ API聚合插件 ✨_
+
+[![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.html)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![AstrBot](https://img.shields.io/badge/AstrBot-4.0%2B-orange.svg)](https://github.com/Soulter/AstrBot)
+[![GitHub](https://img.shields.io/badge/作者-Zhalslar-blue)](https://github.com/Zhalslar)
+
+</div>
+
+## 💡 介绍
+
+API聚合插件，海量免费API动态添加，热门API：看看腿、看看腹肌...
+
+## 📦 安装
+
+在astrbot的插件市场搜索astrbot_plugin_apis，点击安装即可  
+
+## ⚙️ 配置
+
+### 插件配置
+
+请在astrbot面板配置，插件管理 -> astrbot_plugin_apis -> 操作 -> 插件配置
+
+## ⌨️ 使用说明
+
+- 本插件的面板已集成到astrbot框架，无需再独立开设端口，在插件面板点“打开插件UI界面”即可使用
+
+- 部分api站点需要密钥，如 倾梦API：<https://api.317ak.cn>， 此站点需前往网页，注册账号，获取ckey密钥。然后在面板的站点池上添加站点，填入配置中的密钥池：“ ckey : xxxxxxxxxxx”
+
+### 指令表
+
+|     命令      |        说明        |
+|:-------------:|:--------------------------:|
+| 查看api <api名称>  | 查看一个api的详细参数，不指定api名称时，将列出所有api名称 |
+|   {关键词}     |   按所有的api的正则规则进行匹配，触发api      |
+
+### 收录API
+
+```plaintext
+ ----共收录了160+个API（请用命令 [查看api] 查看）----
+
+
+【text】52个：
+讲讲社会、讲讲人生、讲个笑话、讲讲爱情、讲讲温柔、讲讲摆烂、来句古诗、
+来碗毒鸡汤、讲讲舔狗、来句情话、讲讲伤感、来句骚话、讲讲英汉、电影票房、
+脑筋急弯、随机谜语、随机姓名、B站更新、光遇任务、来点段子、兽语加密、
+兽语解密、看看黄历、二次元形象、动漫一言、香烟价格、人品运势、KFC、QQ签名、
+嘲讽、晚安、胡乱描述、Linux命令、身份证查询、高校查询、古诗文查询、今天吃什么、
+黄金价格、人物年轮、车辆查询、起个网名、号码归属地、挑战古诗词、显卡排行榜、
+垃圾分类、刑法、来碗鸡汤、发病、来句诗、文案、来篇文章、中草药、
+
+【image】45个：
+电脑壁纸、来个头像、手机壁纸、读世界、来份早报、生成二维码、测CP、看看风景、随便来点、
+来点龙图、来点cos、来点二次元、海贼王、看看猫猫、doro结局、晚安、来点腹肌、原神、来点坤图、
+看看腿、来点帅哥、超甜辣妹、每日一签、竖屏动漫壁纸、奥运会、光遇日历、斗图、热榜、星座运势、
+小动物、三坑少女、画画、LOL查询、看看妞、bing图、随机上色、原神黄历、艺术字、搜图、每日日报、
+搜表情、搜菜谱、高清壁纸、今日运势、日历、
+
+【video】61个：
+看看女大、看看骚的、看看玉足、看看漫画、看看emo、看看动漫、看看治愈、看看帅哥、
+来点色色、女高中生、女大、欲梦、看看黑丝、看看白丝、高质量小姐姐、深刻推荐、
+看看小葫芦、看看jk、看看久喵、仙桃猫、看看公主、看看心情、看看小雪、看看红鸾、
+看看狼宝、看看雪梨、看看兔兔、拜托前辈、看看穿搭、鞠婧祎、音乐视频、周扬青、周清欢、
+潇潇、看看甜妹、看看清纯、看看萌娃、看看慢摇、看看COS、看看余震、看看欲梦、看看萝莉、
+看看晴天、光剑变装、动漫变装、完美身材、火车摇、蹲下变装、看看吊带、擦玻璃、背影变装、
+安慕希、看看微胖、硬气卡点、黑白双煞、猫系女友、看看女仆、又纯又欲、看看甩裙、看看腹肌、看看原神、
+
+【audio】8个：
+每日听力、逆天语音、坤叫、报时、王者语音、喘息、原神语音、御姐撒娇、 
+
+```
+
+- 本插件支持从原始消息中提取参数，请用空格隔开参数，如 “艺术字 哈喽”
+- 本插件支持从引用消息中提取参数，如“[引用的消息]艺术字”
+- 提供的参数不够时，插件自动获取消息发送者、被 @ 的用户以及 bot 自身的相关参数来补充。
+
+### 示例图
+
+![5123084b9e5a5f9371db19224575a43](https://github.com/user-attachments/assets/73c38cc2-49b8-4d67-b48e-77cd28b1fd81)
+
+## 👥 贡献指南
+
+- 🌟 Star 这个项目！（点右上角的星星，感谢支持！）
+- 🐛 提交 Issue 报告问题
+- 💡 提出新功能建议
+- 🔧 提交 Pull Request 改进代码
+
+## 📌 注意事项
+
+- 请把astrbot的引用消息开关给关了，否则无法发送视频、音频（视频、音频不能引用）。
+- Docker容器部署的astrbot要配置好路径映射，否则无法发送图片、视频、音频，不会配置映射的建议不要用docker部署。
+- 海外服务器可能无法直接访问大部分API，网络问题自行解决。
+- 收录的某些API可能并不稳定，存在失效的情况，属于正常现象。
+- 如果想第一时间得到反馈，可以来作者的插件反馈群（QQ群）：460973561（不点star不给进）
+
+## 🤝 鸣谢
+
+本插件收录的免费api大多来自下面的站点，希望有能力的使用者可以赞助一下。另外如有某个api失效，可在各站点间找平替。
+
+- 枫林API：<https://api.yuafeng.cn>
+- 枫林API二代: <https://api-v2.yuafeng.cn>
+- 稳定API：<https://api.xingchenfu.xyz>
+- 倾梦API：<https://api.317ak.cn>， 此站点需注册账号获取ckey密钥！！
+- 桑帛云API：<https://api.lolimi.cn>
+- 糖豆子API：<https://api.tangdouz.com>
+- PearAPI：<https://api.pearktrue.cn>
+- 问情免费API：<https://free.wqwlkj.cn>
+- 龙珠API: <https://sdkapi.hhlqilongzhu.cn>

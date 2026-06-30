@@ -1,0 +1,6 @@
+name: astrbot_plugin_actions
+display_name: 快捷指令动作
+desc: 根据自定义前缀或正则匹配指令，触发无上下文单次对话，可用于生图、嵌字翻译等场景。本项目是对旧版 Chatluna 快捷指令 (chatluna-actions) 在 Astrobot 内的复刻版本 (?)
+version: v1.0.0
+author: teatube
+repo: https://github.com/teatube/astrbot_plugin_actions

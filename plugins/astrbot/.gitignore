@@ -1,0 +1,5 @@
+# 运行期数据 (KV / 渲染图 / 各插件落盘), 不入库
+data/
+# Python 缓存
+__pycache__/
+*.pyc

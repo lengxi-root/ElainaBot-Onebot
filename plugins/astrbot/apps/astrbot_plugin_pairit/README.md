@@ -1,0 +1,59 @@
+# PairIt
+
+自动匹配群友发送的括号，这下括号再也不会出现不成对的情况了
+
+## 快速使用
+
+> [!important]
+>
+> 现已加入 Astrbot 插件库
+
+### 插件商店安装
+
+直接在插件商店找到本插件，安装即可
+
+![](https://img.bili33.top/file/1773226471162_image.png)
+
+### 从仓库安装
+
+直接在 Astrbot 的 plugin 文件夹下 Git clone
+
+```bash
+$ git clone https://github.com/GamerNoTitle/astrbot_plugin_pairit.git
+```
+
+然后去重启 astrbot / 重载插件即可
+
+### 命令列表
+
+```
+/pairit
+    |
+    |- about 显示帮助信息
+    |- enable/disable
+    |       |- me 为自己启用/禁用 Pairit 插件（默认）
+    |       |- group 为群组启用/禁用 Pairit 插件
+    |- status 显示 PairIt 插件在本群和自己身上的启用状态
+```
+
+例如，使用 `/pairit disable` 将会为自己禁用 Pairit 插件，因为 `me` 为缺省项
+
+而使用 `/pairit disable group` 将会为整个群组禁用 Pairit 插件，`enable` 同理
+
+## Why I made this?
+
+现在好多群友喜欢在自己的消息后面带一个 `(`，而在我所在的 Osu Telegram 群里，有一个叫做 [Allen](https://t.me/jizizr_bot) 的 bot 能够匹配群友发的括号
+
+<div align="center">
+<img src="https://img.bili33.top/file/1773214920753_image.png">
+</div>
+
+于是我就给 Astrbot 也做了一个这样的插件，实现了同样的功能
+
+### 快速排错
+
+#### 没反应啊？日志也没有任何 `[PairIt]` 开头的输出
+
+检查是否安装了 **唤醒增强** 插件（对应 repo: https://github.com/Zhalslar/astrbot_plugin_wakepro )
+
+该插件的插件配置中有「屏蔽复读」选项，如果开启了会切断消息时间的传播，导致 PairIt 无法接收到消息事件，进而无法做出对应的回应 [#4](https://github.com/GamerNoTitle/astrbot_plugin_pairit/issues/4)
