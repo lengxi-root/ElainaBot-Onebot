@@ -248,7 +248,7 @@ input,textarea,select{font-family:inherit}
 <!-- Login -->
 <div id="login">
   <div class="login-card">
-    <div class="login-logo">✦</div>
+    <div class="login-logo"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5 10.1 7.6z"/><path d="M19 14l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg></div>
     <h1>AI 开发助手</h1>
     <p>使用框架管理员密码登录，开始让 AI 编写与管理插件。</p>
     <form id="loginForm">
@@ -263,23 +263,23 @@ input,textarea,select{font-family:inherit}
 <div id="app">
   <div class="topbar">
     <div class="brand">
-      <div class="mark">✦</div>
+      <div class="mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5 10.1 7.6z"/><path d="M19 14l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg></div>
       <div>ElainaBot<small>AI 开发助手面板</small></div>
     </div>
     <div class="spacer"></div>
     <div class="model-pick" title="选择模型">
-      <span>🧠</span>
+      <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg></span>
       <select id="modelSel"></select>
     </div>
     <div class="status"><span class="dot" id="connDot"></span><span id="connTxt">连接中…</span></div>
-    <button class="icon-btn" id="settingsBtn" title="设置 (OpenAI 地址 / 密钥 / 模型)">⚙</button>
-    <button class="icon-btn" id="logoutBtn" title="退出登录">⎋</button>
+    <button class="icon-btn" id="settingsBtn" title="设置 (OpenAI 地址 / 密钥 / 模型)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+    <button class="icon-btn" id="logoutBtn" title="退出登录"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
   </div>
 
   <div class="main">
     <!-- sidebar -->
     <div class="sidebar">
-      <button class="new-chat" id="newChat">＋ 新建对话</button>
+      <button class="new-chat" id="newChat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> 新建对话</button>
       <div class="panel" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
         <div class="sess-title">对话</div>
         <div class="sessions" id="sessions"></div>
@@ -304,7 +304,7 @@ input,textarea,select{font-family:inherit}
       <div class="composer">
         <div class="box">
           <textarea id="input" rows="1" placeholder="对 AI 说点什么… 例如：写一个 ID 命令插件，返回我的 QQ 号"></textarea>
-          <button class="send" id="sendBtn" title="发送">➤</button>
+          <button class="send" id="sendBtn" title="发送"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
         </div>
         <div class="hint">Enter 发送 · Shift+Enter 换行 · AI 可读写文件、热重载插件、运行测试、管理配置</div>
       </div>
@@ -332,23 +332,23 @@ input,textarea,select{font-family:inherit}
 <!-- Settings modal -->
 <div class="modal" id="settingsModal">
   <div class="modal-card">
-    <h2>⚙ AI 设置</h2>
+    <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>AI 设置</h2>
     <div class="sub">自定义 OpenAI 兼容接口地址与密钥，保存后自动获取可用模型。密钥仅保存在框架本地 (data/，不入库)。</div>
     <div class="set-row">
-      <div class="set-label">🔗 接口地址 (base_url)</div>
+      <div class="set-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>接口地址 (base_url)</div>
       <input class="set-input" id="setBaseUrl" placeholder="https://api.openai.com/v1" spellcheck="false" autocomplete="off">
       <div class="set-hint">需为 OpenAI 兼容接口，通常以 /v1 结尾。</div>
     </div>
     <div class="set-row">
-      <div class="set-label">🔑 API 密钥 (api_key)</div>
+      <div class="set-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3"/></svg>API 密钥 (api_key)</div>
       <input class="set-input" id="setApiKey" type="password" placeholder="留空表示不修改已保存的密钥" spellcheck="false" autocomplete="off">
       <div class="set-hint">将以 Bearer 方式调用上游；留空不会清除现有密钥。</div>
     </div>
     <div class="set-row">
-      <div class="set-label">🧠 模型 (model)</div>
+      <div class="set-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>模型 (model)</div>
       <div class="set-modelrow">
         <select id="setModel"></select>
-        <button class="btn-ghost" id="setFetchModels" type="button">↻ 获取模型</button>
+        <button class="btn-ghost" id="setFetchModels" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>获取模型</button>
       </div>
       <div class="set-hint">点「获取模型」用上面填写的地址/密钥拉取列表。</div>
     </div>
@@ -378,6 +378,23 @@ function api(path,opts={}){
   return fetch(path,opts);
 }
 function fmtTime(t){const d=new Date(t*1000);return d.toLocaleTimeString('zh-CN',{hour12:false});}
+
+/* ---- inline SVG 图标 (全局统一, 不使用 emoji/字体图标) ---- */
+const SVG={
+  spark:'<path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5 10.1 7.6z"/><path d="M19 14l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
+  chat:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  trash:'<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
+  tool:'<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  user:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  bot:'<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>',
+  refresh:'<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+  chev:'<polyline points="9 18 15 12 9 6"/>',
+  check:'<polyline points="20 6 9 17 4 12"/>',
+  x:'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  alert:'<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  info:'<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>',
+};
+function ic(name,sz){sz=sz||16;return `<svg class="ico" width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${SVG[name]||''}</svg>`;}
 
 /* ---- markdown-lite ---- */
 function render(md){
@@ -443,7 +460,7 @@ async function start(){
   loadSystem();setInterval(loadSystem,8000);
   await loadCalls();
   connectSSE();
-  if(!CFG.api_key_set)toast('尚未配置密钥：点右上角 ⚙ 填写 OpenAI 地址与 api_key');
+  if(!CFG.api_key_set)toast('尚未配置密钥：点右上角「设置」填写 OpenAI 地址与 api_key');
 }
 function showLogin(){$('#login').style.display='flex';$('#app').style.display='none';}
 
@@ -478,14 +495,14 @@ function fillSetModels(list,selected){
 }
 async function fetchSetModels(){
   const base=$('#setBaseUrl').value.trim(), key=$('#setApiKey').value.trim();
-  const btn=$('#setFetchModels');btn.disabled=true;btn.textContent='获取中…';setErr('');
+  const btn=$('#setFetchModels');btn.disabled=true;btn.innerHTML=ic('refresh',15)+' 获取中…';setErr('');
   try{
     const qs=new URLSearchParams();if(base)qs.set('base_url',base);if(key)qs.set('api_key',key);
     const d=await (await api('/api/ext/aidev/models'+(qs.toString()?'?'+qs.toString():''))).json();
     if(d.success&&d.models&&d.models.length){fillSetModels(d.models,$('#setModel').value||MODEL);setErr('获取到 '+d.models.length+' 个模型',true);}
     else setErr(d.error||'未获取到模型');
   }catch(e){setErr('请求失败: '+e.message);}
-  btn.disabled=false;btn.textContent='↻ 获取模型';
+  btn.disabled=false;btn.innerHTML=ic('refresh',15)+' 获取模型';
 }
 async function saveSettings(){
   const base=$('#setBaseUrl').value.trim(), key=$('#setApiKey').value.trim(), m=$('#setModel').value;
@@ -518,7 +535,7 @@ async function loadSessions(pick){
   if(!list.length){box.innerHTML='<div class="act-empty" style="font-size:12px">点击上方「新建对话」开始</div>';}
   list.forEach(s=>{
     const el=document.createElement('div');el.className='sess'+(s.id===SID?' active':'');
-    el.innerHTML=`<div class="si">💬</div><div class="meta"><b>${esc(s.title||'新对话')}</b><span>${s.message_count} 条消息</span></div><button class="del" title="删除">🗑</button>`;
+    el.innerHTML=`<div class="si">${ic('chat',16)}</div><div class="meta"><b>${esc(s.title||'新对话')}</b><span>${s.message_count} 条消息</span></div><button class="del" title="删除">${ic('trash',15)}</button>`;
     el.addEventListener('click',()=>selectSession(s.id));
     el.querySelector('.del').addEventListener('click',ev=>{ev.stopPropagation();delSession(s.id);});
     box.appendChild(el);
@@ -549,7 +566,7 @@ async function loadHistory(){
 function renderWelcome(){
   $('#chatTitle').textContent='新对话';
   $('#messages').innerHTML=`<div class="welcome">
-    <div class="wbadge">✦</div>
+    <div class="wbadge">${ic('spark',30)}</div>
     <h2>你好，我是 AI 开发助手</h2>
     <p>我能直接为这个框架编写、修改、热重载插件，运行测试，检查系统与管理配置。把需求告诉我吧。</p>
     <div class="chips">
@@ -574,7 +591,7 @@ function startAiTurn(){
   const box=$('#messages');if(box.querySelector('.welcome'))box.innerHTML='';
   const el=document.createElement('div');el.className='msg ai';
   el.innerHTML=`<div class="av">AI</div><div class="bubble">`+
-    `<div class="tsteps" style="display:none"><div class="tsteps-head">🔧 工具调用 · <b class="cnt">0</b> 步<span class="chev">▸</span></div><div class="tsteps-body"></div></div>`+
+    `<div class="tsteps" style="display:none"><div class="tsteps-head">${ic('tool',14)} 工具调用 · <b class="cnt">0</b> 步<span class="chev">${ic('chev',11)}</span></div><div class="tsteps-body"></div></div>`+
     `<div class="typing"><i></i><i></i><i></i></div><div class="answer"></div></div>`;
   box.appendChild(el);scrollChat();
   const stepsWrap=el.querySelector('.tsteps');
@@ -584,8 +601,8 @@ function startAiTurn(){
 function finishAiTurn(turn,d){
   turn.typing.remove();
   const ok=d&&d.success;
-  const content=ok?(d.message||'(无内容)'):('⚠️ '+((d&&(d.message||d.error))||'调用失败'));
-  turn.answer.innerHTML=render(content);
+  if(ok){turn.answer.innerHTML=render(d.message||'(无内容)');}
+  else{turn.answer.innerHTML='<span class="answer-err">'+ic('alert',15)+' '+esc((d&&(d.message||d.error))||'调用失败')+'</span>';}
   if(turn.stepsWrap.style.display!=='none')turn.stepsWrap.classList.add('collapsed'); // 完成后折叠保持整洁
   $('#chatMeta').textContent=ok?('完成 · '+((d&&d.iterations)||1)+' 步'):'出错';
   scrollChat();
@@ -627,10 +644,10 @@ async function send(){
 
 /* ---- activity feed: 调用/结果按 id 配对, 紧凑箭头折叠行 ---- */
 const EV={
-  user:{ic:'👤',label:'用户消息',badge:'输入',bc:'b-user'},
-  assistant:{ic:'🤖',label:'AI 回复',badge:'回复',bc:'b-ai'},
-  error:{ic:'⚠️',label:'错误',badge:'error',bc:'b-err'},
-  info:{ic:'ℹ️',label:'信息',badge:'info',bc:'b-tool'},
+  user:{ic:ic('user',15),label:'用户消息',badge:'输入',bc:'b-user'},
+  assistant:{ic:ic('bot',15),label:'AI 回复',badge:'回复',bc:'b-ai'},
+  error:{ic:ic('alert',15),label:'错误',badge:'error',bc:'b-err'},
+  info:{ic:ic('info',15),label:'信息',badge:'info',bc:'b-tool'},
 };
 const openRows=new Set();   // 记忆展开状态, 跨重渲染保持
 /* 把原始事件流合并为「行」: tool_call + tool_result 按 id 配成一行 */
@@ -655,20 +672,20 @@ function buildRows(events){
 function rowMatch(k){if(FILTER==='all')return true;if(FILTER==='tool')return k==='tool';if(FILTER==='msg')return k==='user'||k==='assistant'||k==='error';return true;}
 function rowEl(row){
   const el=document.createElement('div');el.className='ev';if(openRows.has(row.key))el.classList.add('open');
-  let dot='',ic='',name='',time=fmtTime(row.time),badge='',body='';
+  let dot='',icn='',name='',time=fmtTime(row.time),badge='',body='';
   if(row.kind==='tool'){
-    const st=row.status;dot=`<span class="ev-dot ${st}"></span>`;ic='🔧';name=row.name;
+    const st=row.status;dot=`<span class="ev-dot ${st}"></span>`;icn=ic('tool',16);name=row.name;
     time=(row.dur!=null?row.dur+'ms · ':'')+fmtTime(row.time);
-    badge=`<span class="ev-badge ${st==='ok'?'b-ok':st==='err'?'b-err':'b-run'}">${st==='ok'?'✓':st==='err'?'✗':'运行中'}</span>`;
+    badge=`<span class="ev-badge ${st==='ok'?'b-ok':st==='err'?'b-err':'b-run'}">${st==='ok'?ic('check',13):st==='err'?ic('x',13):'运行中'}</span>`;
     if(row.args!=null)body+=`<div class="lbl">参数</div><pre>${esc(typeof row.args==='string'?row.args:JSON.stringify(row.args,null,2))}</pre>`;
     if(row.result!=null)body+=`<div class="lbl">结果</div><pre>${esc(typeof row.result==='string'?row.result:JSON.stringify(row.result,null,2))}</pre>`;
     if(!body)body='<div class="lbl">运行中…</div>';
   }else{
-    const m=EV[row.kind]||EV.info;ic=m.ic;name=m.label;
+    const m=EV[row.kind]||EV.info;icn=m.ic;name=m.label;
     badge=`<span class="ev-badge ${m.bc}">${m.badge}</span>`;
     body=`<pre>${esc(typeof row.content==='string'?row.content:JSON.stringify(row.content,null,2))}</pre>`;
   }
-  el.innerHTML=`<div class="ev-top"><span class="chev">▸</span>${dot}<span class="ev-ic">${ic}</span>`+
+  el.innerHTML=`<div class="ev-top"><span class="chev">${ic('chev',11)}</span>${dot}<span class="ev-ic">${icn}</span>`+
     `<div class="ev-name"><b>${esc(name)}</b><span class="t">${esc(time)}</span></div>${badge}</div>`+
     `<div class="ev-body">${body}</div>`;
   el.querySelector('.ev-top').addEventListener('click',()=>{el.classList.toggle('open');el.classList.contains('open')?openRows.add(row.key):openRows.delete(row.key);});
