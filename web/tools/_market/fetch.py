@@ -30,13 +30,13 @@ async def _try_fetch_json(session, urls, headers, timeout):
 
 
 async def _fetch_plugin_json(force=False):
-    """从 GitHub 获取 plugins.json, 按镜像排名依次尝试"""
+    """从 GitHub 获取 onebot_plugin.json, 按镜像排名依次尝试"""
     global _plugin_cache, _plugin_cache_ts
     now = time.time()
     if not force and _plugin_cache and (now - _plugin_cache_ts) < _PLUGIN_CACHE_TTL:
         return _plugin_cache
 
-    raw_url = f'https://raw.githubusercontent.com/{PLUGIN_REPO}/main/plugins.json'
+    raw_url = f'https://raw.githubusercontent.com/{PLUGIN_REPO}/main/onebot_plugin.json'
     headers = {'User-Agent': 'ElainaBot/1.0'}
     timeout = _aiohttp.ClientTimeout(total=10)
     async with _aiohttp.ClientSession() as session:
