@@ -10,8 +10,8 @@ from aiohttp import web
 
 import web.auth as auth
 from core.plugin.web_pages import register_route
-from plugins.ai_dev.app import aiconfig
-from plugins.ai_dev.app import agent as agentmod
+from . import aiconfig
+from . import agent as agentmod
 
 log = logging.getLogger('ElainaBot.plugins.ai_dev')
 

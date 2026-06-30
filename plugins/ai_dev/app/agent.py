@@ -6,8 +6,8 @@ import time
 
 import aiohttp
 
-from plugins.ai_dev.app import aiconfig
-from plugins.ai_dev.app import tools as toolmod
+from . import aiconfig
+from . import tools as toolmod
 
 SYSTEM_PROMPT = """你是 ElainaBot OneBot 框架内置的 AI 开发助手, 运行在框架进程内, 拥有一组工具来直接操作本框架的代码与配置。
 

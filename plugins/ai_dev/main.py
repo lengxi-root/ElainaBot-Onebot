@@ -13,10 +13,10 @@ import os
 
 from core.plugin.decorators import handler, on_load, on_unload
 from core.plugin.web_pages import register_page, unregister_page
-from plugins.ai_dev.app import agent as agentmod
-from plugins.ai_dev.app import aiconfig
-from plugins.ai_dev.app import webpanel
-from plugins.ai_dev.app.store import AIStore
+from .app import agent as agentmod
+from .app import aiconfig
+from .app import webpanel
+from .app.store import AIStore
 
 __plugin_meta__ = {
     'name': 'AI 开发助手',
