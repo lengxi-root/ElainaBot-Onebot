@@ -150,6 +150,14 @@ input,textarea,select{font-family:inherit}
 .tsteps.collapsed .tsteps-head .chev{transform:rotate(0)}
 .tsteps-body{padding:2px 5px 6px;display:flex;flex-direction:column;gap:1px}
 .tsteps.collapsed .tsteps-body{display:none}
+/* inline 思考过程 (推理模型) — 与工具时间线同款折叠风格 */
+.think{margin:0 0 10px;border:1px dashed color-mix(in srgb,var(--brand) 40%,var(--line));border-radius:11px;background:color-mix(in srgb,var(--brand) 5%,var(--bg2));overflow:hidden}
+.think-head{display:flex;align-items:center;gap:7px;padding:8px 11px;cursor:pointer;font-size:12.5px;color:var(--brand);font-weight:600;user-select:none}
+.think-head:hover{background:color-mix(in srgb,var(--brand) 8%,transparent)}
+.think-head .chev{margin-left:auto;color:var(--muted);transition:transform .18s;transform:rotate(90deg)}
+.think.collapsed .think-head .chev{transform:rotate(0)}
+.think-body{padding:4px 12px 11px;font-size:12.5px;line-height:1.6;color:var(--ink2);white-space:normal;max-height:280px;overflow:auto}
+.think.collapsed .think-body{display:none}
 .answer:empty{display:none}
 
 .composer{padding:14px 18px;border-top:1px solid var(--line2)}
@@ -352,6 +360,17 @@ input,textarea,select{font-family:inherit}
       </div>
       <div class="set-hint">点「获取模型」用上面填写的地址/密钥拉取列表。</div>
     </div>
+    <div class="set-row">
+      <div class="set-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2z"/></svg>深度思考 (reasoning_effort)</div>
+      <select id="setReasoning">
+        <option value="">默认 (跟随模型)</option>
+        <option value="minimal">minimal — 最少思考</option>
+        <option value="low">low — 低</option>
+        <option value="medium">medium — 中</option>
+        <option value="high">high — 高 (思考最充分)</option>
+      </select>
+      <div class="set-hint">仅推理模型 (如 gpt-5.x / o 系列) 生效；普通模型忽略此项。思考过程会显示在回复气泡的「思考过程」里。</div>
+    </div>
     <div class="set-err" id="setErr"></div>
     <div class="modal-actions">
       <button class="btn-primary" id="setSave" type="button">保存并应用</button>
@@ -393,6 +412,7 @@ const SVG={
   x:'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
   alert:'<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
   info:'<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>',
+  brain:'<path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2z"/>',
 };
 function ic(name,sz){sz=sz||16;return `<svg class="ico" width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${SVG[name]||''}</svg>`;}
 
@@ -482,6 +502,7 @@ function openSettings(){
   $('#setBaseUrl').value=CFG.base_url||'';
   $('#setApiKey').value='';
   $('#setApiKey').placeholder=CFG.api_key_set?'已配置 (留空表示不修改)':'sk-...';
+  $('#setReasoning').value=CFG.reasoning_effort||'';
   fillSetModels(MODEL?[MODEL]:[],MODEL);
   setErr('');
   $('#settingsModal').classList.add('show');
@@ -505,10 +526,10 @@ async function fetchSetModels(){
   btn.disabled=false;btn.innerHTML=ic('refresh',15)+' 获取模型';
 }
 async function saveSettings(){
-  const base=$('#setBaseUrl').value.trim(), key=$('#setApiKey').value.trim(), m=$('#setModel').value;
+  const base=$('#setBaseUrl').value.trim(), key=$('#setApiKey').value.trim(), m=$('#setModel').value, re=$('#setReasoning').value;
   const btn=$('#setSave');btn.disabled=true;btn.textContent='保存中…';setErr('');
   try{
-    const payload={base_url:base,model:m};
+    const payload={base_url:base,model:m,reasoning_effort:re};
     if(key)payload.api_key=key;          // 留空不修改已保存密钥
     const d=await (await api('/api/ext/aidev/config',{method:'POST',body:JSON.stringify(payload)})).json();
     if(!d.success){setErr(d.error||'保存失败');btn.disabled=false;btn.textContent='保存并应用';return;}
@@ -527,7 +548,7 @@ $('#setSave').addEventListener('click',saveSettings);
 $('#settingsModal').addEventListener('click',e=>{if(e.target.id==='settingsModal')closeSettings();});
 
 /* ---- sessions ---- */
-async function loadSessions(pick){
+async function loadSessions(pick,keepView){
   const d=await (await api('/api/ext/aidev/sessions')).json();
   const box=$('#sessions');box.innerHTML='';
   const list=(d.sessions||[]).filter(s=>!s.id.startsWith('qq_'));
@@ -540,6 +561,7 @@ async function loadSessions(pick){
     el.querySelector('.del').addEventListener('click',ev=>{ev.stopPropagation();delSession(s.id);});
     box.appendChild(el);
   });
+  if(keepView)return;            // 发送完成后只刷新侧栏列表, 保留当前实时气泡 (思考过程/工具时间线不被历史视图覆盖)
   if(SID)loadHistory();else renderWelcome();
 }
 async function selectSession(id){SID=id;localStorage.setItem('ai_dev_sid',id);loadSessions();}
@@ -591,21 +613,36 @@ function startAiTurn(){
   const box=$('#messages');if(box.querySelector('.welcome'))box.innerHTML='';
   const el=document.createElement('div');el.className='msg ai';
   el.innerHTML=`<div class="av">AI</div><div class="bubble">`+
+    `<div class="think collapsed" style="display:none"><div class="think-head">${ic('brain',14)} 思考过程<span class="chev">${ic('chev',11)}</span></div><div class="think-body"></div></div>`+
     `<div class="tsteps" style="display:none"><div class="tsteps-head">${ic('tool',14)} 工具调用 · <b class="cnt">0</b> 步<span class="chev">${ic('chev',11)}</span></div><div class="tsteps-body"></div></div>`+
     `<div class="typing"><i></i><i></i><i></i></div><div class="answer"></div></div>`;
   box.appendChild(el);scrollChat();
   const stepsWrap=el.querySelector('.tsteps');
   stepsWrap.querySelector('.tsteps-head').addEventListener('click',()=>stepsWrap.classList.toggle('collapsed'));
-  return {el,stepsWrap,stepsBody:el.querySelector('.tsteps-body'),cnt:el.querySelector('.cnt'),typing:el.querySelector('.typing'),answer:el.querySelector('.answer')};
+  const thinkWrap=el.querySelector('.think');
+  thinkWrap.querySelector('.think-head').addEventListener('click',()=>thinkWrap.classList.toggle('collapsed'));
+  return {el,stepsWrap,stepsBody:el.querySelector('.tsteps-body'),cnt:el.querySelector('.cnt'),thinkWrap,thinkBody:el.querySelector('.think-body'),typing:el.querySelector('.typing'),answer:el.querySelector('.answer')};
+}
+function setThink(turn,text){
+  if(!turn||!turn.thinkWrap)return;
+  if(text&&text.trim()){turn.thinkWrap.style.display='';turn.thinkBody.innerHTML=render(text);}
+  else turn.thinkWrap.style.display='none';
 }
 function finishAiTurn(turn,d){
   turn.typing.remove();
+  if(d&&d.reasoning&&!(turn.thinkBody&&turn.thinkBody.innerHTML.trim()))setThink(turn,d.reasoning);
   const ok=d&&d.success;
   if(ok){turn.answer.innerHTML=render(d.message||'(无内容)');}
   else{turn.answer.innerHTML='<span class="answer-err">'+ic('alert',15)+' '+esc((d&&(d.message||d.error))||'调用失败')+'</span>';}
   if(turn.stepsWrap.style.display!=='none')turn.stepsWrap.classList.add('collapsed'); // 完成后折叠保持整洁
   $('#chatMeta').textContent=ok?('完成 · '+((d&&d.iterations)||1)+' 步'):'出错';
   scrollChat();
+}
+/* 实时把本回合的思考过程渲染进气泡 */
+function renderLiveReasoning(){
+  if(!liveTurn)return;
+  const txt=evbuf.slice(liveTurn.startIdx).filter(e=>e.type==='reasoning').map(e=>(e.data||{}).content||'').filter(Boolean).join('\n\n');
+  setThink(liveTurn.turn,txt);
 }
 /* 实时把本回合的工具调用渲染进气泡内的时间线 */
 function renderLiveSteps(){
@@ -631,13 +668,13 @@ async function send(){
   sending=true;$('#sendBtn').disabled=true;
   addMsg('user',text,true);inp.value='';autoGrow();
   const turn=startAiTurn();
-  liveTurn={stepsWrap:turn.stepsWrap,stepsBody:turn.stepsBody,cnt:turn.cnt,startIdx:evbuf.length};
+  liveTurn={stepsWrap:turn.stepsWrap,stepsBody:turn.stepsBody,cnt:turn.cnt,thinkWrap:turn.thinkWrap,thinkBody:turn.thinkBody,turn,startIdx:evbuf.length};
   $('#chatMeta').textContent='AI 运行中…';
   try{
     const r=await api('/api/ext/aidev/chat',{method:'POST',body:JSON.stringify({session_id:SID,message:text,model:MODEL})});
     const d=await r.json();
     finishAiTurn(turn,d);
-    loadSessions();
+    loadSessions(false,true);
   }catch(e){finishAiTurn(turn,{success:false,message:'网络错误: '+e});}
   sending=false;liveTurn=null;$('#sendBtn').disabled=false;inp.focus();
 }
@@ -648,6 +685,7 @@ const EV={
   assistant:{ic:ic('bot',15),label:'AI 回复',badge:'回复',bc:'b-ai'},
   error:{ic:ic('alert',15),label:'错误',badge:'error',bc:'b-err'},
   info:{ic:ic('info',15),label:'信息',badge:'info',bc:'b-tool'},
+  reasoning:{ic:ic('brain',15),label:'思考过程',badge:'thinking',bc:'b-ai'},
 };
 const openRows=new Set();   // 记忆展开状态, 跨重渲染保持
 /* 把原始事件流合并为「行」: tool_call + tool_result 按 id 配成一行 */
@@ -664,12 +702,13 @@ function buildRows(events){
       else rows.push({kind:'tool',key:'t:'+(d.id||('i'+i)),name:d.name||'工具',args:null,time:e.time,status:d.ok?'ok':'err',dur:d.duration_ms,result:d.result});
     }else if(e.type==='user'){rows.push({kind:'user',key:'u:'+i,content:d.content,time:e.time});}
     else if(e.type==='assistant'){rows.push({kind:'assistant',key:'a:'+i,content:d.content,time:e.time});}
+    else if(e.type==='reasoning'){rows.push({kind:'reasoning',key:'r:'+i,content:d.content,time:e.time});}
     else if(e.type==='error'){rows.push({kind:'error',key:'e:'+i,content:d.message||JSON.stringify(d),time:e.time});}
     else{rows.push({kind:'info',key:'n:'+i,content:d.message||d.text||JSON.stringify(d),time:e.time});}
   });
   return rows;
 }
-function rowMatch(k){if(FILTER==='all')return true;if(FILTER==='tool')return k==='tool';if(FILTER==='msg')return k==='user'||k==='assistant'||k==='error';return true;}
+function rowMatch(k){if(FILTER==='all')return true;if(FILTER==='tool')return k==='tool';if(FILTER==='msg')return k==='user'||k==='assistant'||k==='error'||k==='reasoning';return true;}
 function rowEl(row){
   const el=document.createElement('div');el.className='ev';if(openRows.has(row.key))el.classList.add('open');
   let dot='',icn='',name='',time=fmtTime(row.time),badge='',body='';
@@ -700,7 +739,7 @@ function renderEvents(){
 }
 function pushEvent(e){
   evbuf.push(e);if(evbuf.length>600)evbuf=evbuf.slice(-600);
-  renderEvents();if(sending&&liveTurn)renderLiveSteps();
+  renderEvents();if(sending&&liveTurn){renderLiveSteps();renderLiveReasoning();}
 }
 async function loadCalls(){
   try{const d=await (await api('/api/ext/aidev/calls?limit=300')).json();evbuf=d.events||[];renderEvents();}catch(e){}

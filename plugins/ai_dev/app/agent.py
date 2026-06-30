@@ -11,8 +11,8 @@ import time
 
 import aiohttp
 
-from plugins.ai_dev import aiconfig
-from plugins.ai_dev import tools as toolmod
+from plugins.ai_dev.app import aiconfig
+from plugins.ai_dev.app import tools as toolmod
 
 SYSTEM_PROMPT = """你是 ElainaBot OneBot 框架内置的 AI 开发助手, 运行在框架进程内, 拥有一组工具来直接操作本框架的代码与配置。
 
@@ -38,6 +38,20 @@ class OpenAIError(Exception):
     pass
 
 
+def _extract_reasoning(msg: dict) -> str:
+    """从响应 message 中提取推理/思考过程 (兼容多种字段名)。"""
+    for k in ('reasoning_content', 'reasoning', 'thinking'):
+        v = msg.get(k)
+        if isinstance(v, str) and v.strip():
+            return v
+        if isinstance(v, list):  # 部分端点返回分段数组
+            parts = [p.get('text', '') if isinstance(p, dict) else str(p) for p in v]
+            joined = '\n'.join(p for p in parts if p)
+            if joined.strip():
+                return joined
+    return ''
+
+
 async def _chat_completion(session: aiohttp.ClientSession, messages: list, model: str) -> dict:
     url = aiconfig.base_url() + '/chat/completions'
     payload = {
@@ -47,19 +61,31 @@ async def _chat_completion(session: aiohttp.ClientSession, messages: list, model
         'tool_choice': 'auto',
         'temperature': aiconfig.temperature(),
     }
+    effort = aiconfig.reasoning_effort()
+    if effort:
+        payload['reasoning_effort'] = effort
     headers = {
         'Authorization': f'Bearer {aiconfig.api_key()}',
         'Content-Type': 'application/json',
     }
     timeout = aiohttp.ClientTimeout(total=aiconfig.request_timeout())
-    async with session.post(url, json=payload, headers=headers, timeout=timeout) as resp:
-        text = await resp.text()
-        if resp.status != 200:
+    # 部分推理模型拒绝自定义 temperature/不支持某参数: 命中时去掉该参数重试一次。
+    for attempt in range(2):
+        async with session.post(url, json=payload, headers=headers, timeout=timeout) as resp:
+            text = await resp.text()
+            if resp.status == 200:
+                try:
+                    return json.loads(text)
+                except json.JSONDecodeError as e:
+                    raise OpenAIError(f'返回非 JSON: {text[:500]}') from e
+            low = text.lower()
+            if attempt == 0 and resp.status == 400 and (
+                    'temperature' in low or 'reasoning_effort' in low or 'unsupported' in low):
+                payload.pop('temperature', None)
+                payload.pop('reasoning_effort', None)
+                continue
             raise OpenAIError(f'HTTP {resp.status}: {text[:500]}')
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError as e:
-            raise OpenAIError(f'返回非 JSON: {text[:500]}') from e
+    raise OpenAIError('模型调用失败')
 
 
 def _build_messages(history: list, user_text: str, model_prompt: str) -> list:
@@ -82,6 +108,7 @@ async def run_agent(store, session_id: str, user_text: str, model: str = '') -> 
         return {'ok': False, 'message': '未配置 api_key', 'iterations': 0}
 
     model = model or aiconfig.model()
+    final_reasoning = ''
     history = store.get_messages(session_id)
     sys_override = aiconfig.system_prompt()
     messages = _build_messages([m for m in history if m.get('role') != 'system'], user_text, sys_override)
@@ -102,6 +129,12 @@ async def run_agent(store, session_id: str, user_text: str, model: str = '') -> 
             msg = choice.get('message') or {}
             tool_calls = msg.get('tool_calls') or []
             usage = resp.get('usage') or {}
+            reasoning = _extract_reasoning(msg)
+            if reasoning:
+                store.add_event('reasoning', {
+                    'content': reasoning,
+                    'iteration': iteration,
+                }, session_id)
 
             # 把助手这一步的消息加入上下文
             assistant_msg = {'role': 'assistant', 'content': msg.get('content') or ''}
@@ -111,8 +144,10 @@ async def run_agent(store, session_id: str, user_text: str, model: str = '') -> 
 
             if not tool_calls:
                 final_text = msg.get('content') or ''
+                final_reasoning = reasoning
                 store.add_event('assistant', {
                     'content': final_text,
+                    'reasoning': reasoning,
                     'iteration': iteration,
                     'usage': usage,
                     'model': resp.get('model', model),
@@ -165,4 +200,4 @@ async def run_agent(store, session_id: str, user_text: str, model: str = '') -> 
     # 持久化对话历史 (剔除 system, 由下次重建)
     new_history = [m for m in messages if m.get('role') != 'system']
     store.set_messages(session_id, new_history)
-    return {'ok': True, 'message': final_text, 'iterations': iteration}
+    return {'ok': True, 'message': final_text, 'reasoning': final_reasoning, 'iterations': iteration}

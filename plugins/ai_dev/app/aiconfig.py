@@ -22,14 +22,16 @@ DEFAULTS = {
     'max_iterations': 12,
     'request_timeout': 120,
     'system_prompt': '',
+    'reasoning_effort': '',
 }
 
 # 允许面板写入并持久化的字段
 _WRITABLE = ('base_url', 'api_key', 'model', 'temperature', 'max_iterations',
-             'request_timeout', 'system_prompt', 'enabled')
+             'request_timeout', 'system_prompt', 'enabled', 'reasoning_effort')
 
+# 子模块位于 ai_dev/app/, data 目录在插件根 ai_dev/data/
 _OVERRIDE_FILE = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), 'data', 'runtime_config.json')
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'runtime_config.json')
 _lock = threading.Lock()
 _override_cache = None
 
@@ -136,6 +138,12 @@ def system_prompt() -> str:
     return str(get('system_prompt') or '')
 
 
+def reasoning_effort() -> str:
+    """思考强度: '' 表示不指定 (跟随模型默认), 否则 minimal/low/medium/high。"""
+    v = str(get('reasoning_effort') or '').strip().lower()
+    return v if v in ('minimal', 'low', 'medium', 'high') else ''
+
+
 def is_configured() -> bool:
     return bool(api_key())
 
@@ -150,5 +158,6 @@ def public_config() -> dict:
         'max_iterations': max_iterations(),
         'request_timeout': request_timeout(),
         'system_prompt': system_prompt(),
+        'reasoning_effort': reasoning_effort(),
         'api_key_set': is_configured(),
     }
