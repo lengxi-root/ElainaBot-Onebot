@@ -1,10 +1,4 @@
-"""ai_dev Agent 工具集
-
-为 AI 提供操作框架的能力: 文件读写、目录浏览、插件热重载与自检、
-配置读写、运行 Python 自测、系统/框架状态检查、通过 OneBot 发消息。
-
-所有文件操作均沙箱限定在仓库根目录内, 并禁止访问 .git 目录。
-"""
+"""Agent 工具集: 文件读写/编辑、目录、插件热重载与指令测试、配置读写、运行 Python、发消息。文件操作沙箱限定在仓库内且禁访 .git。"""
 
 import asyncio
 import json
@@ -37,6 +31,25 @@ def _safe_path(rel: str) -> str:
 
 def _rel(abs_path: str) -> str:
     return os.path.relpath(abs_path, ROOT).replace(os.sep, '/')
+
+
+def _render_message(message) -> str:
+    """把 OneBot 消息 (字符串或消息段列表) 渲染成可读文本, 非文本段以 [类型] 表示"""
+    if isinstance(message, str):
+        return message
+    if isinstance(message, list):
+        parts = []
+        for seg in message:
+            if isinstance(seg, dict):
+                t = seg.get('type')
+                if t == 'text':
+                    parts.append(seg.get('data', {}).get('text', ''))
+                else:
+                    parts.append(f'[{t}]')
+            else:
+                parts.append(str(seg))
+        return ''.join(parts)
+    return str(message)
 
 
 # ==================== 工具实现 ====================
@@ -80,6 +93,34 @@ async def _t_write_file(path: str, content: str) -> dict:
     with open(target, 'w', encoding='utf-8') as f:
         f.write(data)
     return {'path': _rel(target), 'bytes': len(data.encode('utf-8')), 'created': not existed}
+
+
+async def _t_edit_file(path: str, old_string: str, new_string: str = '',
+                       replace_all: bool = False) -> dict:
+    """局部精确替换 (不重写整文件): old_string 需逐字符精确且唯一, replace_all=true 才全部替换。"""
+    target = _safe_path(path)
+    if not os.path.isfile(target):
+        raise ValueError(f'文件不存在: {path} (新建文件请用 write_file)')
+    old = old_string if isinstance(old_string, str) else str(old_string)
+    new = '' if new_string is None else (new_string if isinstance(new_string, str) else str(new_string))
+    if old == '':
+        raise ValueError('old_string 不能为空 (新建文件请用 write_file)')
+    if old == new:
+        raise ValueError('old_string 与 new_string 相同, 无需修改')
+    with open(target, encoding='utf-8', errors='replace') as f:
+        content = f.read()
+    count = content.count(old)
+    if count == 0:
+        raise ValueError('未找到 old_string (需与文件内容逐字符精确匹配, 含缩进/换行); 可先 read_file 核对')
+    if count > 1 and not replace_all:
+        raise ValueError(f'old_string 在文件中出现 {count} 次, 不唯一; 请补充上下文使其唯一, 或传 replace_all=true 全部替换')
+    updated = content.replace(old, new) if replace_all else content.replace(old, new, 1)
+    if len(updated.encode('utf-8')) > _MAX_WRITE_BYTES:
+        raise ValueError('内容过大')
+    with open(target, 'w', encoding='utf-8') as f:
+        f.write(updated)
+    return {'path': _rel(target), 'replaced': count if replace_all else 1,
+            'bytes': len(updated.encode('utf-8'))}
 
 
 async def _t_delete_file(path: str) -> dict:
@@ -144,8 +185,105 @@ async def _t_reload_plugin(name: str) -> dict:
     }
 
 
+async def _t_test_command(text: str, user_id: str = '10000001', group_id=None,
+                          as_owner: bool = True, timeout: int = 15) -> dict:
+    """构造消息事件并真实触发匹配的处理器 (网络/定时器会真跑), 回复被捕获不发往 QQ。"""
+    pm = _plugin_manager()
+    if not pm:
+        raise ValueError('插件管理器不可用')
+    if not text or not str(text).strip():
+        raise ValueError('缺少要测试的指令文本 text')
+    from core.onebot.event import MessageEvent
+
+    is_group = group_id is not None
+    uid = int(user_id) if str(user_id).isdigit() else user_id
+    gid = (int(group_id) if str(group_id).isdigit() else group_id) if is_group else None
+    event = MessageEvent({
+        'post_type': 'message',
+        'message_type': 'group' if is_group else 'private',
+        'sub_type': 'normal',
+        'message_id': 0,
+        'user_id': uid,
+        'group_id': gid,
+        'message': [{'type': 'text', 'data': {'text': str(text)}}],
+        'raw_message': str(text),
+        'sender': {'user_id': uid, 'nickname': 'AI测试'},
+        'self_id': 0,
+    })
+
+    captured = []
+
+    class _CaptureAPI:
+        async def send_group_msg(self, group_id, message, **kw):
+            captured.append({'action': 'send_group_msg', 'group_id': group_id, 'text': _render_message(message)})
+            return {'status': 'ok', 'retcode': 0, 'data': {'message_id': 0}}
+
+        async def send_private_msg(self, user_id, message, **kw):
+            captured.append({'action': 'send_private_msg', 'user_id': user_id, 'text': _render_message(message)})
+            return {'status': 'ok', 'retcode': 0, 'data': {'message_id': 0}}
+
+        async def call_api(self, action, params=None, **kw):
+            captured.append({'action': action, 'params': params})
+            return {'status': 'ok', 'retcode': 0, 'data': {}}
+
+    event._api = _CaptureAPI()
+
+    try:
+        to = min(int(timeout), 120)
+    except (TypeError, ValueError):
+        to = 15
+
+    # 与 dispatch 相同的筛选: 场景 / 权限 / 正则, 取第一个匹配的处理器
+    match = None
+    for h in pm._all_handlers:
+        if h['group_only'] and not is_group:
+            continue
+        if h['private_only'] and is_group:
+            continue
+        if h['owner_only'] and not as_owner:
+            continue
+        m = h['compiled'].search(str(text))
+        if m:
+            match = (h, m)
+            break
+
+    if not match:
+        return {'matched': False, 'message': '没有处理器匹配该指令 (检查正则/场景/权限)', 'replies': []}
+
+    h, m = match
+    start = time.time()
+    error = ''
+    tb = ''
+    timed_out = False
+    try:
+        if h['is_coro']:
+            await asyncio.wait_for(h['func'](event, m), timeout=to)
+        else:
+            loop = asyncio.get_running_loop()
+            await asyncio.wait_for(loop.run_in_executor(None, h['func'], event, m), timeout=to)
+    except asyncio.TimeoutError:
+        timed_out = True
+        error = f'处理器执行超时 ({to}s)'
+    except Exception as e:  # noqa: BLE001 — 把处理器内部异常回报给模型
+        import traceback
+        error = f'{type(e).__name__}: {e}'
+        tb = traceback.format_exc()[-3000:]
+    return {
+        'matched': True,
+        'handler': h['name'],
+        'plugin': h.get('_plugin', ''),
+        'pattern': h['pattern'],
+        'duration_ms': int((time.time() - start) * 1000),
+        'timed_out': timed_out,
+        'error': error,
+        'traceback': tb,
+        'reply_count': len(captured),
+        'replies': captured,
+    }
+
+
 async def _t_run_python(code: str, timeout: int = _PYTHON_TIMEOUT) -> dict:
-    """在仓库根目录下以子进程运行 Python 代码 (用于自测), 带超时"""
+    """在仓库根以子进程运行 Python 代码, 带超时"""
     if not code or not code.strip():
         raise ValueError('缺少 code')
     try:
@@ -256,11 +394,13 @@ _DISPATCH = {
     'list_dir': _t_list_dir,
     'read_file': _t_read_file,
     'write_file': _t_write_file,
+    'edit_file': _t_edit_file,
     'delete_file': _t_delete_file,
     'make_dir': _t_make_dir,
     'list_plugins': _t_list_plugins,
     'list_handlers': _t_list_handlers,
     'reload_plugin': _t_reload_plugin,
+    'test_command': _t_test_command,
     'run_python': _t_run_python,
     'get_config': _t_get_config,
     'set_config': _t_set_config,
@@ -308,7 +448,7 @@ TOOLS_SCHEMA = [
         'type': 'function',
         'function': {
             'name': 'write_file',
-            'description': '写入/创建仓库内的文件 (会覆盖原内容并自动创建父目录)。用于编写或修改插件。',
+            'description': '写入/创建仓库内的文件 (会覆盖整个文件并自动创建父目录)。用于新建文件或整体重写; 若只改大文件的一小部分请优先用 edit_file。',
             'parameters': {
                 'type': 'object',
                 'properties': {
@@ -316,6 +456,27 @@ TOOLS_SCHEMA = [
                     'content': {'type': 'string', 'description': '完整文件内容'},
                 },
                 'required': ['path', 'content'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'edit_file',
+            'description': (
+                '对已存在文件做局部精确替换 (不重写整文件), 修改大插件时优先用它以省 token 并避免误改。 '
+                'old_string 必须与文件内容逐字符精确匹配 (含缩进/换行), 并需在文件中唯一 '
+                '(建议带上目标行前后若干行作为锚点); 不唯一会报错, 需补充上下文或传 replace_all=true。'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'path': {'type': 'string', 'description': '相对仓库根的文件路径'},
+                    'old_string': {'type': 'string', 'description': '要被替换的原文片段 (逐字符精确, 含缩进/换行, 需唯一)'},
+                    'new_string': {'type': 'string', 'description': '替换后的新内容 (留空表示删除该片段)'},
+                    'replace_all': {'type': 'boolean', 'description': '是否替换全部出现处 (如重命名变量), 默认 false 只替换唯一的一处'},
+                },
+                'required': ['path', 'old_string'],
             },
         },
     },
@@ -368,6 +529,28 @@ TOOLS_SCHEMA = [
                 'type': 'object',
                 'properties': {'name': {'type': 'string', 'description': '插件目录名, 如 example'}},
                 'required': ['name'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'test_command',
+            'description': (
+                '主动模拟用户发送一条指令并真实触发匹配的处理器, 验证功能是否正常 '
+                '(网络请求/定时器等会真实运行)。编写或修改插件并 reload_plugin 自检通过后, '
+                '应再用本工具实际跑一遍指令, 检查 matched/error/replies 确认功能无异常。'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'text': {'type': 'string', 'description': '要测试的指令文本, 如 "ping" 或 "天气 北京"'},
+                    'user_id': {'type': 'string', 'description': '模拟的发送者 QQ 号, 默认 10000001'},
+                    'group_id': {'type': 'string', 'description': '群号; 提供则模拟群聊, 不提供则模拟私聊'},
+                    'as_owner': {'type': 'boolean', 'description': '是否以主人身份触发 (可测试 owner_only 指令), 默认 true'},
+                    'timeout': {'type': 'integer', 'description': '处理器执行超时秒数, 默认 15, 上限 120'},
+                },
+                'required': ['text'],
             },
         },
     },

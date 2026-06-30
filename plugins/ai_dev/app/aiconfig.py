@@ -1,16 +1,9 @@
-"""ai_dev 配置读取
-
-配置来源 (优先级): 面板运行时覆盖 (data/runtime_config.json) > 框架
-config/settings.yaml 的 `ai` 段 > 环境变量 > 内置默认值。
-
-面板可在「设置」里自定义 OpenAI 地址(base_url)与密钥(api_key), 保存后写入
-data/runtime_config.json (该目录已被 .gitignore, 不会随插件提交), 立即生效。
-api_key 也可继续用环境变量 AI_DEV_API_KEY / OPENAI_API_KEY。
-"""
+"""配置读取, 优先级: 面板覆盖(data/runtime_config.json) > settings.yaml 的 ai 段 > 环境变量 > 默认值。"""
 
 import json
 import os
 import threading
+import uuid
 
 from core.base.config import cfg
 
@@ -19,15 +12,16 @@ DEFAULTS = {
     'base_url': 'https://api.ytea.top/v1',
     'model': 'gpt-4.1-nano',
     'temperature': 0.3,
-    'max_iterations': 12,
+    'max_iterations': 50,
     'request_timeout': 120,
     'system_prompt': '',
     'reasoning_effort': '',
+    'history_limit': 50,
 }
 
 # 允许面板写入并持久化的字段
 _WRITABLE = ('base_url', 'api_key', 'model', 'temperature', 'max_iterations',
-             'request_timeout', 'system_prompt', 'enabled', 'reasoning_effort')
+             'request_timeout', 'system_prompt', 'enabled', 'reasoning_effort', 'history_limit')
 
 # 子模块位于 ai_dev/app/, data 目录在插件根 ai_dev/data/
 _OVERRIDE_FILE = os.path.join(
@@ -81,6 +75,100 @@ def set_runtime(updates: dict) -> dict:
         return dict(cur)
 
 
+# ---- 多站点预设: 每个站点保存一套 base_url/api_key/model/reasoning_effort, 可随时一键切换 ----
+_PRESETS_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'ai_presets.json')
+_PRESET_FIELDS = ('base_url', 'model', 'reasoning_effort')
+
+
+def _load_presets_raw() -> dict:
+    try:
+        if os.path.exists(_PRESETS_FILE):
+            with open(_PRESETS_FILE, encoding='utf-8') as f:
+                d = json.load(f)
+            if isinstance(d, dict) and isinstance(d.get('presets'), list):
+                return {'active_id': str(d.get('active_id') or ''), 'presets': d['presets']}
+    except Exception:  # noqa: BLE001
+        pass
+    return {'active_id': '', 'presets': []}
+
+
+def _save_presets_raw(data: dict):
+    os.makedirs(os.path.dirname(_PRESETS_FILE), exist_ok=True)
+    tmp = _PRESETS_FILE + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, _PRESETS_FILE)
+
+
+def list_presets() -> dict:
+    """返回站点列表 (不含 api_key 明文, 仅标记是否已设) 与当前激活站点 id。"""
+    raw = _load_presets_raw()
+    presets = [{
+        'id': p.get('id', ''),
+        'name': p.get('name', '') or '未命名站点',
+        'base_url': p.get('base_url', ''),
+        'model': p.get('model', ''),
+        'reasoning_effort': p.get('reasoning_effort', ''),
+        'api_key_set': bool(p.get('api_key')),
+    } for p in raw['presets'] if p.get('id')]
+    return {'active_id': raw.get('active_id', ''), 'presets': presets}
+
+
+def save_preset(p: dict) -> dict:
+    """新增或更新一个站点预设 (按 id 匹配, 无 id 则新建)。api_key 留空不改、null 清除。"""
+    with _lock:
+        raw = _load_presets_raw()
+        pid = str((p or {}).get('id') or '').strip()
+        item = next((x for x in raw['presets'] if x.get('id') == pid), None) if pid else None
+        if item is None:
+            pid = pid or uuid.uuid4().hex[:8]
+            item = {'id': pid}
+            raw['presets'].append(item)
+        item['name'] = str(p.get('name') or '').strip() or item.get('name') or '未命名站点'
+        for k in _PRESET_FIELDS:
+            if k in p:
+                item[k] = str(p.get(k) or '').strip()
+        if 'api_key' in p:
+            ak = p['api_key']
+            if ak is None:
+                item.pop('api_key', None)
+            elif isinstance(ak, str) and ak.strip():
+                item['api_key'] = ak.strip()
+        _save_presets_raw(raw)
+        return list_presets()
+
+
+def delete_preset(pid: str) -> dict:
+    with _lock:
+        raw = _load_presets_raw()
+        raw['presets'] = [x for x in raw['presets'] if x.get('id') != pid]
+        if raw.get('active_id') == pid:
+            raw['active_id'] = ''
+        _save_presets_raw(raw)
+        return list_presets()
+
+
+def apply_preset(pid: str):
+    """切换到某站点: 把其配置写入当前生效覆盖 (base_url/model/reasoning_effort/api_key)。返回最新列表, 不存在返回 None。"""
+    with _lock:
+        raw = _load_presets_raw()
+        item = next((x for x in raw['presets'] if x.get('id') == pid), None)
+        if not item:
+            return None
+        raw['active_id'] = pid
+        _save_presets_raw(raw)
+    updates = {'reasoning_effort': item.get('reasoning_effort', '')}
+    if item.get('base_url'):
+        updates['base_url'] = item['base_url']
+    if item.get('model'):
+        updates['model'] = item['model']
+    if item.get('api_key'):
+        updates['api_key'] = item['api_key']
+    set_runtime(updates)
+    return list_presets()
+
+
 def _ai(key: str, default=None):
     return cfg.get('settings', f'ai.{key}', default)
 
@@ -127,6 +215,14 @@ def max_iterations() -> int:
         return DEFAULTS['max_iterations']
 
 
+def history_limit() -> int:
+    """单会话保留的最大对话轮数 (1 轮 = 用户提问 + AI 回复); <=0 表示不限制。"""
+    try:
+        return int(get('history_limit'))
+    except (TypeError, ValueError):
+        return DEFAULTS['history_limit']
+
+
 def request_timeout() -> int:
     try:
         return int(get('request_timeout'))
@@ -156,6 +252,7 @@ def public_config() -> dict:
         'model': model(),
         'temperature': temperature(),
         'max_iterations': max_iterations(),
+        'history_limit': history_limit(),
         'request_timeout': request_timeout(),
         'system_prompt': system_prompt(),
         'reasoning_effort': reasoning_effort(),

@@ -75,10 +75,10 @@ input,textarea,select{font-family:inherit}
   color:var(--ink2);border:1px solid var(--line);background:var(--card);transition:.2s}
 .icon-btn:hover{color:var(--brand);border-color:var(--brand);background:var(--brand-soft)}
 
-.main{flex:1;display:flex;min-height:0;gap:14px;padding:14px 16px}
+.main{flex:1;display:flex;min-height:0;gap:10px;padding:10px 12px}
 
 /* sidebar */
-.sidebar{width:248px;flex:0 0 248px;display:flex;flex-direction:column;gap:12px}
+.sidebar{width:200px;flex:0 0 200px;display:flex;flex-direction:column;gap:10px}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
 .new-chat{height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;gap:8px;
   background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;font-weight:600;font-size:14px;
@@ -99,19 +99,15 @@ input,textarea,select{font-family:inherit}
 .sess:hover .del{opacity:1}
 .sess .del:hover{color:var(--red);background:var(--red-soft)}
 
-.sys-card{padding:14px}
-.sys-card h4{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
-.sys-row{display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;color:var(--ink2)}
-.sys-row b{color:var(--ink);font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* chat */
 .chat{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
-.chat-head{padding:15px 20px;border-bottom:1px solid var(--line2);display:flex;align-items:center;gap:10px}
+.chat-head{padding:11px 16px;border-bottom:1px solid var(--line2);display:flex;align-items:center;gap:10px}
 .chat-head h3{font-size:15px}
 .chat-head .tag{font-size:11px;color:var(--brand);background:var(--brand-soft);padding:3px 9px;border-radius:20px;font-weight:600}
 .chat-head .spacer{flex:1}
 .chat-head .mini{font-size:12px;color:var(--muted)}
-.messages{flex:1;overflow-y:auto;padding:22px 24px;display:flex;flex-direction:column;gap:18px}
+.messages{flex:1;overflow-y:auto;padding:18px 18px;display:flex;flex-direction:column;gap:16px}
 .welcome{margin:auto;text-align:center;max-width:440px;color:var(--ink2)}
 .welcome .wbadge{width:64px;height:64px;border-radius:20px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;
   background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;font-size:30px;box-shadow:var(--shadow-lg)}
@@ -137,6 +133,25 @@ input,textarea,select{font-family:inherit}
 .bubble code{font-family:var(--mono);font-size:12.5px;background:var(--bg2);padding:2px 6px;border-radius:6px}
 .bubble pre code{background:none;padding:0;color:inherit}
 .msg.user .bubble code{background:rgba(255,255,255,.2);color:#fff}
+.bubble p{margin:0 0 8px}.bubble p:last-child{margin-bottom:0}
+.bubble>:first-child{margin-top:0}.bubble>:last-child{margin-bottom:0}
+.bubble .md-h{margin:12px 0 7px;line-height:1.35;font-weight:700}
+.bubble h1.md-h{font-size:18px}.bubble h2.md-h{font-size:16.5px}.bubble h3.md-h{font-size:15px}
+.bubble h4.md-h,.bubble h5.md-h,.bubble h6.md-h{font-size:14px}
+.bubble ul,.bubble ol{margin:6px 0 8px;padding-left:21px}
+.bubble li{margin:2px 0}
+.bubble blockquote{margin:8px 0;padding:4px 12px;border-left:3px solid var(--brand);background:var(--bg2);border-radius:0 8px 8px 0;color:var(--ink2)}
+.msg.user .bubble blockquote{background:rgba(255,255,255,.14);border-left-color:rgba(255,255,255,.6)}
+.bubble hr{border:none;border-top:1px solid var(--line2);margin:11px 0}
+.bubble a{color:var(--brand);text-decoration:underline}
+.msg.user .bubble a{color:#fff}
+.bubble del{opacity:.7}
+.bubble table{border-collapse:collapse;margin:9px 0;font-size:13px;width:auto;max-width:100%;display:block;overflow-x:auto}
+.bubble th,.bubble td{border:1px solid var(--line2);padding:6px 11px;text-align:left}
+.bubble thead th{background:var(--bg2);font-weight:700;white-space:nowrap}
+.bubble tbody tr:nth-child(even){background:color-mix(in srgb,var(--ink) 3%,transparent)}
+.msg.user .bubble th,.msg.user .bubble td{border-color:rgba(255,255,255,.3)}
+.msg.user .bubble thead th,.msg.user .bubble tbody tr:nth-child(even){background:rgba(255,255,255,.12)}
 .typing{display:flex;gap:5px;padding:4px 0}
 .typing i{width:8px;height:8px;border-radius:50%;background:var(--brand);opacity:.5;animation:bounce 1.2s infinite}
 .typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
@@ -160,7 +175,7 @@ input,textarea,select{font-family:inherit}
 .think.collapsed .think-body{display:none}
 .answer:empty{display:none}
 
-.composer{padding:14px 18px;border-top:1px solid var(--line2)}
+.composer{padding:12px 14px;border-top:1px solid var(--line2)}
 .composer .box{display:flex;gap:10px;align-items:flex-end;background:var(--bg2);border:1.5px solid var(--line);
   border-radius:16px;padding:10px 10px 10px 16px;transition:.2s}
 .composer .box:focus-within{border-color:var(--brand);box-shadow:0 0 0 4px var(--brand-soft);background:var(--card)}
@@ -170,17 +185,27 @@ input,textarea,select{font-family:inherit}
   color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;transition:.2s;box-shadow:0 6px 14px color-mix(in srgb,var(--brand) 35%,transparent)}
 .send:hover{transform:translateY(-1px)}
 .send:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.attach{width:34px;height:34px;flex:0 0 34px;border-radius:10px;color:var(--muted);display:flex;align-items:center;justify-content:center;transition:.15s}
+.attach:hover{background:var(--brand-soft);color:var(--brand)}
+.composer.drag .box{border-color:var(--brand);background:var(--brand-soft)}
+.composer .thumbs{display:flex;flex-wrap:wrap;gap:8px;padding:0 4px 8px}
+.composer .thumbs:empty{display:none}
+.thumb{position:relative;width:60px;height:60px;border-radius:10px;overflow:hidden;border:1.5px solid var(--line)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb .rm{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:12px;line-height:18px;text-align:center}
+.bubble .imgs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.bubble .imgs img{max-width:160px;max-height:160px;border-radius:10px;border:1px solid var(--line);cursor:pointer;display:block}
 .composer .hint{font-size:11px;color:var(--muted);margin-top:7px;padding-left:4px}
 
 /* activity */
-.activity{width:380px;flex:0 0 380px;display:flex;flex-direction:column;overflow:hidden}
-.act-head{padding:15px 18px;border-bottom:1px solid var(--line2);display:flex;align-items:center;gap:10px}
-.act-head h3{font-size:14px}
-.act-head .spacer{flex:1}
-.tabs{display:flex;gap:4px;background:var(--bg2);border-radius:10px;padding:3px}
-.tab{font-size:12px;padding:6px 13px;border-radius:8px;color:var(--ink2);font-weight:600;transition:.15s}
+.activity{width:300px;flex:0 0 300px;display:flex;flex-direction:column;overflow:hidden}
+.act-head{padding:11px 12px;border-bottom:1px solid var(--line2);display:flex;align-items:center;flex-wrap:nowrap;gap:7px}
+.act-head h3{font-size:14px;white-space:nowrap;flex:0 0 auto}
+.act-head .spacer{flex:1;min-width:0}
+.tabs{display:flex;flex-wrap:nowrap;flex:0 0 auto;gap:3px;background:var(--bg2);border-radius:10px;padding:3px}
+.tab{flex:0 0 auto;font-size:11.5px;padding:5px 9px;border-radius:8px;color:var(--ink2);font-weight:600;white-space:nowrap;transition:.15s}
 .tab.active{background:var(--card);color:var(--brand);box-shadow:0 2px 6px rgba(60,72,140,.1)}
-.act-clear{font-size:12px;color:var(--muted)}
+.act-clear{font-size:12px;color:var(--muted);flex:0 0 auto;white-space:nowrap}
 .act-clear:hover{color:var(--red)}
 .act-list{flex:1;overflow-y:auto;padding:6px 8px;display:flex;flex-direction:column;gap:1px}
 .act-empty{margin:auto;text-align:center;color:var(--muted);font-size:13px;padding:40px 20px}
@@ -246,9 +271,42 @@ input,textarea,select{font-family:inherit}
 .set-err{color:var(--red);font-size:12.5px;min-height:16px;margin-top:10px}
 .set-err.ok{color:var(--green)}
 
-@media(max-width:1180px){.activity{width:320px;flex-basis:320px}}
-@media(max-width:1020px){.activity{display:none}.sidebar{width:210px;flex-basis:210px}}
-@media(max-width:760px){.sidebar{display:none}.main{padding:8px}}
+/* 顶栏菜单按钮 (仅窄屏显示) + 抽屉遮罩 + 站点预设 */
+.menu-btn{display:none}
+.site-pick select{max-width:130px}
+.drawer-back{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:35;animation:fade .18s}
+.drawer-back.show{display:block}
+.preset-bar{display:flex;gap:8px;align-items:center}
+.preset-bar select{flex:1;min-width:0;height:38px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg2);padding:0 10px;font-size:13px;color:var(--ink)}
+.preset-bar .btn-ghost{flex:0 0 auto;padding:0 12px;height:38px}
+
+@media(max-width:1180px){.activity{width:270px;flex-basis:270px}}
+@media(max-width:1020px){
+  .activity{position:fixed;top:0;right:0;bottom:0;width:320px;max-width:86vw;z-index:40;border-radius:0;
+    transform:translateX(105%);transition:transform .25s ease;box-shadow:-10px 0 30px rgba(20,24,60,.18)}
+  .activity.open{transform:none}
+  .sidebar{width:184px;flex-basis:184px}
+  .menu-act{display:flex}
+}
+@media(max-width:760px){
+  .topbar{height:56px;flex:0 0 56px;padding:0 10px;gap:8px}
+  .brand small{display:none}
+  .brand{font-size:14px}
+  .status{display:none}
+  .model-pick{padding:6px 9px}
+  .model-pick select{max-width:108px}
+  .site-pick select{max-width:108px}
+  .main{padding:8px;gap:0}
+  .sidebar{position:fixed;top:0;left:0;bottom:0;width:260px;max-width:84vw;z-index:40;background:var(--bg);padding:12px;
+    transform:translateX(-105%);transition:transform .25s ease;box-shadow:10px 0 30px rgba(20,24,60,.18);overflow-y:auto}
+  .sidebar.open{transform:none}
+  .menu-side{display:flex}
+}
+@media(max-width:480px){
+  .model-pick:not(.site-pick){display:none}
+  .composer{padding:10px}
+  .bubble .imgs img{max-width:120px;max-height:120px}
+}
 </style>
 </head>
 <body>
@@ -270,16 +328,22 @@ input,textarea,select{font-family:inherit}
 <!-- App -->
 <div id="app">
   <div class="topbar">
+    <button class="icon-btn menu-btn menu-side" id="menuSidebar" title="对话列表"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
     <div class="brand">
       <div class="mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5 10.1 7.6z"/><path d="M19 14l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg></div>
       <div>ElainaBot<small>AI 开发助手面板</small></div>
     </div>
     <div class="spacer"></div>
+    <div class="model-pick site-pick" title="切换 AI 站点">
+      <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20a15.3 15.3 0 0 1 0-20z"/><circle cx="12" cy="12" r="10"/></svg></span>
+      <select id="siteSel" title="切换 AI 站点"><option value="">默认配置</option></select>
+    </div>
     <div class="model-pick" title="选择模型">
       <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg></span>
       <select id="modelSel"></select>
     </div>
     <div class="status"><span class="dot" id="connDot"></span><span id="connTxt">连接中…</span></div>
+    <button class="icon-btn menu-btn menu-act" id="menuActivity" title="实时调用"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg></button>
     <button class="icon-btn" id="settingsBtn" title="设置 (OpenAI 地址 / 密钥 / 模型)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
     <button class="icon-btn" id="logoutBtn" title="退出登录"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
   </div>
@@ -291,12 +355,6 @@ input,textarea,select{font-family:inherit}
       <div class="panel" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
         <div class="sess-title">对话</div>
         <div class="sessions" id="sessions"></div>
-      </div>
-      <div class="panel sys-card">
-        <h4>系统状态</h4>
-        <div id="sysInfo">
-          <div class="sys-row"><span>加载中…</span></div>
-        </div>
       </div>
     </div>
 
@@ -310,18 +368,21 @@ input,textarea,select{font-family:inherit}
       </div>
       <div class="messages" id="messages"></div>
       <div class="composer">
+        <div class="thumbs" id="thumbs"></div>
         <div class="box">
+          <button class="attach" id="attachBtn" title="添加图片（也可直接粘贴/拖拽）"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></button>
+          <input type="file" id="fileInput" accept="image/*" multiple hidden>
           <textarea id="input" rows="1" placeholder="对 AI 说点什么… 例如：写一个 ID 命令插件，返回我的 QQ 号"></textarea>
           <button class="send" id="sendBtn" title="发送"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
         </div>
-        <div class="hint">Enter 发送 · Shift+Enter 换行 · AI 可读写文件、热重载插件、运行测试、管理配置</div>
+        <div class="hint">Enter 发送 · Shift+Enter 换行 · 可粘贴/拖拽图片（需选用支持视觉的模型）· AI 可读写文件、热重载插件、运行测试</div>
       </div>
     </div>
 
     <!-- activity -->
     <div class="panel activity">
       <div class="act-head">
-        <h3>实时调用 / 日志</h3>
+        <h3>实时调用</h3>
         <div class="spacer"></div>
         <div class="tabs">
           <button class="tab active" data-f="all">全部</button>
@@ -335,13 +396,24 @@ input,textarea,select{font-family:inherit}
       </div>
     </div>
   </div>
+  <div class="drawer-back" id="drawerBack"></div>
 </div>
 
 <!-- Settings modal -->
 <div class="modal" id="settingsModal">
   <div class="modal-card">
     <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>AI 设置</h2>
-    <div class="sub">自定义 OpenAI 兼容接口地址与密钥，保存后自动获取可用模型。密钥仅保存在本地。</div>
+    <div class="sub">管理多个 AI 站点（接口地址/密钥/模型），随时一键切换。密钥仅保存在服务器本地。</div>
+    <div class="set-row preset-row">
+      <div class="set-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20a15.3 15.3 0 0 1 0-20z"/></svg>AI 站点 (预设)</div>
+      <div class="preset-bar">
+        <select id="presetSel"><option value="">— 新站点 —</option></select>
+        <button class="btn-ghost" id="presetApply" type="button">切换</button>
+        <button class="btn-ghost" id="presetDel" type="button">删除</button>
+      </div>
+      <input class="set-input" id="presetName" placeholder="站点名称，如「OpenAI 官方」「中转 A」" spellcheck="false" autocomplete="off" style="margin-top:8px">
+      <div class="set-hint">选择一个站点会把下面字段填好；填好地址/密钥/模型后点「存为站点」保存或更新。「切换」会立即应用该站点。</div>
+    </div>
     <div class="set-row">
       <div class="set-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>接口地址 (base_url)</div>
       <input class="set-input" id="setBaseUrl" placeholder="https://api.openai.com/v1" spellcheck="false" autocomplete="off">
@@ -371,9 +443,15 @@ input,textarea,select{font-family:inherit}
       </select>
       <div class="set-hint">仅推理模型 (如 gpt-5.x / o 系列) 生效；普通模型忽略此项。思考过程会显示在回复气泡的「思考过程」里。</div>
     </div>
+    <div class="set-row">
+      <div class="set-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>工具调用上限 (max_iterations)</div>
+      <input class="set-input" id="setMaxIter" type="number" min="1" step="1" placeholder="50" spellcheck="false" autocomplete="off">
+      <div class="set-hint">AI 单次回复内连续调用工具的最大次数 (迭代步数)，达到后会强制结束本回合 (提示「已达到最大迭代步数」，可能打断未完成的任务)。默认 50，可按需调大。</div>
+    </div>
     <div class="set-err" id="setErr"></div>
     <div class="modal-actions">
       <button class="btn-primary" id="setSave" type="button">保存并应用</button>
+      <button class="btn-ghost" id="presetSave" type="button">存为站点</button>
       <button class="btn-ghost" id="setCancel" type="button">取消</button>
     </div>
   </div>
@@ -416,21 +494,77 @@ const SVG={
 };
 function ic(name,sz){sz=sz||16;return `<svg class="ico" width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${SVG[name]||''}</svg>`;}
 
-/* ---- markdown-lite ---- */
+/* ---- markdown ---- 支持 代码块/行内代码/标题/表格/列表/引用/分割线/粗斜体/删除线/链接 */
+function mdInline(s){
+  s=esc(s);
+  s=s.replace(/`([^`]+)`/g,(m,c)=>'<code>'+c+'</code>');
+  s=s.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+  s=s.replace(/__([^_]+)__/g,'<b>$1</b>');
+  s=s.replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<i>$2</i>');
+  s=s.replace(/~~([^~]+)~~/g,'<del>$1</del>');
+  s=s.replace(/\[([^\]]+)\]\(((?:https?:|\/)[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+  return s;
+}
+function mdSplitRow(s){return s.trim().replace(/^\|/,'').replace(/\|$/,'').split('|');}
+function mdIsTableSep(s){return /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(s);}
+function mdBlocks(text){
+  const lines=text.split('\n');
+  let out='',i=0;
+  while(i<lines.length){
+    const line=lines[i];
+    if(line.trim()===''){i++;continue;}
+    // table
+    if(line.indexOf('|')>=0 && i+1<lines.length && mdIsTableSep(lines[i+1])){
+      const header=mdSplitRow(line);
+      const aligns=mdSplitRow(lines[i+1]).map(c=>{const t=c.trim();const l=t.startsWith(':'),r=t.endsWith(':');return (l&&r)?'center':r?'right':l?'left':'';});
+      i+=2;const body=[];
+      while(i<lines.length && lines[i].indexOf('|')>=0 && lines[i].trim()!==''){body.push(mdSplitRow(lines[i]));i++;}
+      const cell=(c,j,tag)=>`<${tag}${aligns[j]?' style="text-align:'+aligns[j]+'"':''}>${mdInline((c||'').trim())}</${tag}>`;
+      out+='<table><thead><tr>'+header.map((c,j)=>cell(c,j,'th')).join('')+'</tr></thead><tbody>'
+        +body.map(r=>'<tr>'+header.map((_,j)=>cell(r[j],j,'td')).join('')+'</tr>').join('')+'</tbody></table>';
+      continue;
+    }
+    // heading
+    const h=line.match(/^(#{1,6})\s+(.*)$/);
+    if(h){out+=`<h${h[1].length} class="md-h">${mdInline(h[2].trim())}</h${h[1].length}>`;i++;continue;}
+    // hr
+    if(/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)){out+='<hr>';i++;continue;}
+    // blockquote
+    if(/^\s*>\s?/.test(line)){
+      const buf=[];
+      while(i<lines.length && /^\s*>\s?/.test(lines[i])){buf.push(lines[i].replace(/^\s*>\s?/,''));i++;}
+      out+='<blockquote>'+mdBlocks(buf.join('\n'))+'</blockquote>';continue;
+    }
+    // list (有序/无序)
+    if(/^\s*[-*+]\s+/.test(line) || /^\s*\d+[.)]\s+/.test(line)){
+      const ordered=/^\s*\d+[.)]\s+/.test(line);
+      const re=ordered?/^\s*\d+[.)]\s+(.*)$/:/^\s*[-*+]\s+(.*)$/;
+      const items=[];
+      while(i<lines.length && re.test(lines[i])){items.push(lines[i].match(re)[1]);i++;}
+      out+=(ordered?'<ol>':'<ul>')+items.map(it=>`<li>${mdInline(it)}</li>`).join('')+(ordered?'</ol>':'</ul>');
+      continue;
+    }
+    // paragraph
+    const buf=[];
+    while(i<lines.length && lines[i].trim()!=='' && !/^(#{1,6})\s/.test(lines[i]) && !/^\s*>\s?/.test(lines[i])
+      && !/^\s*([-*+]|\d+[.)])\s+/.test(lines[i]) && !/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(lines[i])
+      && !(lines[i].indexOf('|')>=0 && i+1<lines.length && mdIsTableSep(lines[i+1]))){buf.push(lines[i]);i++;}
+    out+='<p>'+buf.map(mdInline).join('<br>')+'</p>';
+  }
+  return out;
+}
 function render(md){
-  md=md||'';
+  md=(md||'').replace(/\r\n?/g,'\n');
   const parts=md.split(/```/);
   let out='';
   for(let i=0;i<parts.length;i++){
     if(i%2===1){
-      let code=parts[i].replace(/^[\w-]*\n/,'');
-      out+='<pre><code>'+esc(code)+'</code></pre>';
+      let seg=parts[i],lang='';
+      const nl=seg.indexOf('\n');
+      if(nl>=0){const first=seg.slice(0,nl).trim();if(/^[\w+#.-]*$/.test(first)){lang=first;seg=seg.slice(nl+1);}}
+      out+='<pre><code'+(lang?' class="lang-'+esc(lang)+'"':'')+'>'+esc(seg.replace(/\n$/,''))+'</code></pre>';
     }else{
-      let t=esc(parts[i]);
-      t=t.replace(/`([^`]+)`/g,'<code>$1</code>');
-      t=t.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
-      t=t.replace(/\n/g,'<br>');
-      out+=t;
+      out+=mdBlocks(parts[i]);
     }
   }
   return out;
@@ -475,9 +609,9 @@ async function start(){
   $('#login').style.display='none';$('#app').style.display='flex';
   CFG=(await r.json()).config||{};
   if(!MODEL)MODEL=CFG.model||'';
+  await loadPresets();
   await loadModels();
   await loadSessions(true);
-  loadSystem();setInterval(loadSystem,8000);
   await loadCalls();
   connectSSE();
   if(!CFG.api_key_set)toast('尚未配置密钥：点右上角「设置」填写 OpenAI 地址与 api_key');
@@ -503,7 +637,10 @@ function openSettings(){
   $('#setApiKey').value='';
   $('#setApiKey').placeholder=CFG.api_key_set?'已配置 (留空表示不修改)':'sk-...';
   $('#setReasoning').value=CFG.reasoning_effort||'';
+  $('#setMaxIter').value=(CFG.max_iterations!=null?CFG.max_iterations:50);
   fillSetModels(MODEL?[MODEL]:[],MODEL);
+  if($('#presetSel')){$('#presetSel').value=ACTIVE_PRESET||'';
+    const ap=PRESETS.find(x=>x.id===ACTIVE_PRESET);$('#presetName').value=ap?ap.name:'';}
   setErr('');
   $('#settingsModal').classList.add('show');
 }
@@ -527,9 +664,11 @@ async function fetchSetModels(){
 }
 async function saveSettings(){
   const base=$('#setBaseUrl').value.trim(), key=$('#setApiKey').value.trim(), m=$('#setModel').value, re=$('#setReasoning').value;
+  const miRaw=$('#setMaxIter').value.trim();
   const btn=$('#setSave');btn.disabled=true;btn.textContent='保存中…';setErr('');
   try{
     const payload={base_url:base,model:m,reasoning_effort:re};
+    if(miRaw!==''){const mi=parseInt(miRaw,10);if(isNaN(mi)||mi<1){setErr('工具调用上限需为 ≥1 的整数');btn.disabled=false;btn.textContent='保存并应用';return;}payload.max_iterations=mi;}
     if(key)payload.api_key=key;          // 留空不修改已保存密钥
     const d=await (await api('/api/ext/aidev/config',{method:'POST',body:JSON.stringify(payload)})).json();
     if(!d.success){setErr(d.error||'保存失败');btn.disabled=false;btn.textContent='保存并应用';return;}
@@ -546,6 +685,79 @@ $('#setCancel').addEventListener('click',closeSettings);
 $('#setFetchModels').addEventListener('click',fetchSetModels);
 $('#setSave').addEventListener('click',saveSettings);
 $('#settingsModal').addEventListener('click',e=>{if(e.target.id==='settingsModal')closeSettings();});
+
+/* ---- AI 站点预设: 顶栏一键切换 + 设置里管理 ---- */
+let PRESETS=[], ACTIVE_PRESET='';
+function fillSiteSelectors(){
+  const head=$('#siteSel');
+  head.innerHTML='<option value="">默认配置</option>'+PRESETS.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+  head.value=ACTIVE_PRESET||'';
+  const mng=$('#presetSel');
+  mng.innerHTML='<option value="">— 新站点 —</option>'+PRESETS.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+}
+async function loadPresets(){
+  try{
+    const d=await (await api('/api/ext/aidev/presets')).json();
+    PRESETS=d.presets||[];ACTIVE_PRESET=d.active_id||'';
+    fillSiteSelectors();
+  }catch(e){}
+}
+async function applyPreset(id){
+  if(!id){return;}
+  const d=await (await api('/api/ext/aidev/presets/apply',{method:'POST',body:JSON.stringify({id})})).json();
+  if(!d.success){toast(d.error||'切换失败');return;}
+  PRESETS=d.presets||PRESETS;ACTIVE_PRESET=d.active_id||id;CFG=d.config||CFG;
+  MODEL=CFG.model||MODEL;localStorage.setItem('ai_dev_model',MODEL);
+  fillSiteSelectors();await loadModels();
+  const p=PRESETS.find(x=>x.id===ACTIVE_PRESET);
+  toast('已切换到站点：'+(p?p.name:id));
+}
+$('#siteSel').addEventListener('change',e=>{const id=e.target.value;if(id)applyPreset(id);else fillSiteSelectors();});
+/* 设置弹窗内的站点管理 */
+function fillPresetEditor(id){
+  const p=PRESETS.find(x=>x.id===id);
+  if(!p){$('#presetName').value='';return;}
+  $('#presetName').value=p.name||'';
+  $('#setBaseUrl').value=p.base_url||'';
+  fillSetModels(p.model?[p.model]:[],p.model);
+  $('#setReasoning').value=p.reasoning_effort||'';
+  $('#setApiKey').value='';
+  $('#setApiKey').placeholder=p.api_key_set?'该站点已配置密钥 (留空表示不修改)':'sk-...';
+}
+$('#presetSel').addEventListener('change',e=>fillPresetEditor(e.target.value));
+$('#presetApply').addEventListener('click',async()=>{
+  const id=$('#presetSel').value;if(!id){setErr('请先选择一个站点');return;}
+  await applyPreset(id);setErr('已切换并应用该站点',true);
+});
+$('#presetSave').addEventListener('click',async()=>{
+  const name=$('#presetName').value.trim();
+  const base=$('#setBaseUrl').value.trim(), key=$('#setApiKey').value.trim(), m=$('#setModel').value, re=$('#setReasoning').value;
+  if(!name){setErr('请填写站点名称');return;}
+  if(!base){setErr('请填写接口地址 (base_url)');return;}
+  const payload={id:$('#presetSel').value||'',name,base_url:base,model:m,reasoning_effort:re};
+  if(key)payload.api_key=key;
+  const btn=$('#presetSave');btn.disabled=true;
+  try{
+    const d=await (await api('/api/ext/aidev/presets/save',{method:'POST',body:JSON.stringify(payload)})).json();
+    PRESETS=d.presets||PRESETS;fillSiteSelectors();
+    const saved=PRESETS.find(x=>x.name===name);if(saved)$('#presetSel').value=saved.id;
+    setErr('站点已保存，可在顶栏随时切换',true);toast('站点已保存');
+  }catch(e){setErr('保存失败: '+e.message);}
+  btn.disabled=false;
+});
+$('#presetDel').addEventListener('click',async()=>{
+  const id=$('#presetSel').value;if(!id){setErr('请先选择要删除的站点');return;}
+  const d=await (await api('/api/ext/aidev/presets/delete',{method:'POST',body:JSON.stringify({id})})).json();
+  PRESETS=d.presets||[];ACTIVE_PRESET=d.active_id||'';fillSiteSelectors();
+  $('#presetSel').value='';fillPresetEditor('');setErr('站点已删除',true);
+});
+
+/* ---- 手机端抽屉: 侧栏 / 实时调用 ---- */
+function closeDrawers(){$('.sidebar').classList.remove('open');$('.activity').classList.remove('open');$('#drawerBack').classList.remove('show');}
+function openDrawer(sel){const el=$(sel);const on=el.classList.contains('open');closeDrawers();if(!on){el.classList.add('open');$('#drawerBack').classList.add('show');}}
+$('#menuSidebar').addEventListener('click',()=>openDrawer('.sidebar'));
+$('#menuActivity').addEventListener('click',()=>openDrawer('.activity'));
+$('#drawerBack').addEventListener('click',closeDrawers);
 
 /* ---- sessions ---- */
 async function loadSessions(pick,keepView){
@@ -564,7 +776,7 @@ async function loadSessions(pick,keepView){
   if(keepView)return;            // 发送完成后只刷新侧栏列表, 保留当前实时气泡 (思考过程/工具时间线不被历史视图覆盖)
   if(SID)loadHistory();else renderWelcome();
 }
-async function selectSession(id){SID=id;localStorage.setItem('ai_dev_sid',id);loadSessions();}
+async function selectSession(id){SID=id;localStorage.setItem('ai_dev_sid',id);loadSessions();closeDrawers();}
 async function delSession(id){
   await api('/api/ext/aidev/sessions/delete',{method:'POST',body:JSON.stringify({session_id:id})});
   if(id===SID){SID='';localStorage.removeItem('ai_dev_sid');}
@@ -572,18 +784,58 @@ async function delSession(id){
 }
 $('#newChat').addEventListener('click',async()=>{
   const d=await (await api('/api/ext/aidev/sessions',{method:'POST',body:'{}'})).json();
-  if(d.success){SID=d.session.id;localStorage.setItem('ai_dev_sid',SID);loadSessions();$('#input').focus();}
+  if(d.success){SID=d.session.id;localStorage.setItem('ai_dev_sid',SID);loadSessions();closeDrawers();$('#input').focus();}
 });
 
 async function loadHistory(){
   const d=await (await api('/api/ext/aidev/history?session_id='+SID)).json();
-  const box=$('#messages');box.innerHTML='';
-  const msgs=d.messages||[];
-  if(!msgs.length){renderWelcome();return;}
-  msgs.forEach(m=>addMsg(m.role==='user'?'user':'ai',m.content,false));
-  scrollChat();
+  renderHistory(d.messages||[],d.events||[]);
   const cur=(await (await api('/api/ext/aidev/sessions')).json()).sessions.find(s=>s.id===SID);
   $('#chatTitle').textContent=cur?cur.title:'对话';
+}
+/* 刷新后重建对话: 优先用会话事件流还原每个回合的内联工具调用/思考时间线 */
+function renderHistory(msgs,events){
+  const box=$('#messages');box.innerHTML='';
+  events=events||[];
+  const hasConv=events.some(e=>e.type==='user'||e.type==='assistant'||e.type==='error');
+  if(hasConv){
+    let tools=[],reason=[];
+    events.forEach(e=>{
+      const d=e.data||{};
+      if(e.type==='user'){addMsg('user',d.content||'',false,d.images||[]);tools=[];reason=[];}
+      else if(e.type==='reasoning'){if(d.content)reason.push(d.content);}
+      else if(e.type==='tool_call'||e.type==='tool_result'){tools.push(e);}
+      else if(e.type==='assistant'){addAiTurnFromHistory(d.content||'',tools,reason.join('\n\n'),true);tools=[];reason=[];}
+      else if(e.type==='error'){addAiTurnFromHistory(d.message||(typeof d==='string'?d:JSON.stringify(d)),tools,reason.join('\n\n'),false);tools=[];reason=[];}
+    });
+    if(tools.length||reason.join('').trim())addAiTurnFromHistory('',tools,reason.join('\n\n'),true);
+  }else if(msgs.length){
+    msgs.forEach(m=>addMsg(m.role==='user'?'user':'ai',m.content,false));
+  }else{renderWelcome();return;}
+  scrollChat();
+}
+/* 静态渲染一个已完成的 AI 回合 (含可折叠的工具调用时间线 + 思考过程) */
+function addAiTurnFromHistory(content,toolEvents,reasonText,ok){
+  const box=$('#messages');if(box.querySelector('.welcome'))box.innerHTML='';
+  const rows=buildRows(toolEvents||[]).filter(r=>r.kind==='tool');
+  const el=document.createElement('div');el.className='msg ai';el.style.animation='none';
+  let thinkHtml='';
+  if(reasonText&&reasonText.trim())
+    thinkHtml=`<div class="think collapsed"><div class="think-head">${ic('brain',14)} 思考过程<span class="chev">${ic('chev',11)}</span></div><div class="think-body">${render(reasonText)}</div></div>`;
+  let stepsHtml='';
+  if(rows.length)
+    stepsHtml=`<div class="tsteps collapsed"><div class="tsteps-head">${ic('tool',14)} 工具调用 · <b class="cnt">${rows.length}</b> 步<span class="chev">${ic('chev',11)}</span></div><div class="tsteps-body"></div></div>`;
+  let ansHtml='';
+  if(content&&content.trim())ansHtml=ok!==false?render(content):'<span class="answer-err">'+ic('alert',15)+' '+esc(content)+'</span>';
+  el.innerHTML=`<div class="av">AI</div><div class="bubble">${thinkHtml}${stepsHtml}<div class="answer">${ansHtml}</div></div>`;
+  box.appendChild(el);
+  if(rows.length){
+    const sw=el.querySelector('.tsteps'),body=el.querySelector('.tsteps-body');
+    rows.forEach(r=>body.appendChild(rowEl(r)));
+    sw.querySelector('.tsteps-head').addEventListener('click',()=>sw.classList.toggle('collapsed'));
+  }
+  if(thinkHtml){const tw=el.querySelector('.think');tw.querySelector('.think-head').addEventListener('click',()=>tw.classList.toggle('collapsed'));}
+  return el;
 }
 function renderWelcome(){
   $('#chatTitle').textContent='新对话';
@@ -601,11 +853,16 @@ function renderWelcome(){
 }
 
 /* ---- messages ---- */
-function addMsg(role,content,anim){
+function imgsHtml(images){
+  if(!images||!images.length)return '';
+  return `<div class="imgs">${images.map(u=>`<img src="${esc(u)}" onclick="window.open(this.src)">`).join('')}</div>`;
+}
+function addMsg(role,content,anim,images){
   const w=$('#welcome'); const box=$('#messages');
   if(box.querySelector('.welcome'))box.innerHTML='';
   const el=document.createElement('div');el.className='msg '+role;if(!anim)el.style.animation='none';
-  el.innerHTML=`<div class="av">${role==='user'?'我':'AI'}</div><div class="bubble">${role==='ai'?render(content):esc(content).replace(/\n/g,'<br>')}</div>`;
+  const inner=role==='ai'?render(content):imgsHtml(images)+esc(content).replace(/\n/g,'<br>');
+  el.innerHTML=`<div class="av">${role==='user'?'我':'AI'}</div><div class="bubble">${inner}</div>`;
   box.appendChild(el);scrollChat();return el;
 }
 /* 开启一次 AI 回合: 气泡内含「工具调用时间线 + 思考点 + 答案」 */
@@ -662,16 +919,41 @@ inp.addEventListener('input',autoGrow);
 inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
 $('#sendBtn').addEventListener('click',send);
 
+/* ---- 图片附件 (多模态): 点击/粘贴/拖拽, base64 data URL ---- */
+let pendingImages=[];
+const MAX_IMAGES=8;
+function renderThumbs(){
+  const wrap=$('#thumbs');
+  wrap.innerHTML=pendingImages.map((u,i)=>`<div class="thumb"><img src="${esc(u)}"><span class="rm" data-i="${i}" title="移除">×</span></div>`).join('');
+  wrap.querySelectorAll('.rm').forEach(b=>b.addEventListener('click',()=>{pendingImages.splice(+b.dataset.i,1);renderThumbs();}));
+}
+function addFiles(files){
+  const imgs=[...files].filter(f=>f.type.startsWith('image/'));
+  imgs.forEach(f=>{
+    if(pendingImages.length>=MAX_IMAGES)return;
+    const reader=new FileReader();
+    reader.onload=()=>{if(pendingImages.length<MAX_IMAGES){pendingImages.push(reader.result);renderThumbs();}};
+    reader.readAsDataURL(f);
+  });
+}
+$('#attachBtn').addEventListener('click',()=>$('#fileInput').click());
+$('#fileInput').addEventListener('change',e=>{addFiles(e.target.files);e.target.value='';});
+inp.addEventListener('paste',e=>{const f=[...(e.clipboardData?.files||[])];if(f.some(x=>x.type.startsWith('image/'))){e.preventDefault();addFiles(f);}});
+const composer=document.querySelector('.composer');
+['dragover','dragenter'].forEach(ev=>composer.addEventListener(ev,e=>{e.preventDefault();composer.classList.add('drag');}));
+['dragleave','drop'].forEach(ev=>composer.addEventListener(ev,e=>{e.preventDefault();if(ev==='drop')addFiles(e.dataTransfer.files);composer.classList.remove('drag');}));
+
 async function send(){
-  const text=inp.value.trim();if(!text||sending)return;
+  const text=inp.value.trim();const imgs=pendingImages.slice();
+  if((!text&&!imgs.length)||sending)return;
   if(!SID){const d=await (await api('/api/ext/aidev/sessions',{method:'POST',body:'{}'})).json();SID=d.session.id;localStorage.setItem('ai_dev_sid',SID);}
   sending=true;$('#sendBtn').disabled=true;
-  addMsg('user',text,true);inp.value='';autoGrow();
+  addMsg('user',text,true,imgs);inp.value='';pendingImages=[];renderThumbs();autoGrow();
   const turn=startAiTurn();
   liveTurn={stepsWrap:turn.stepsWrap,stepsBody:turn.stepsBody,cnt:turn.cnt,thinkWrap:turn.thinkWrap,thinkBody:turn.thinkBody,turn,startIdx:evbuf.length};
   $('#chatMeta').textContent='AI 运行中…';
   try{
-    const r=await api('/api/ext/aidev/chat',{method:'POST',body:JSON.stringify({session_id:SID,message:text,model:MODEL})});
+    const r=await api('/api/ext/aidev/chat',{method:'POST',body:JSON.stringify({session_id:SID,message:text,model:MODEL,images:imgs})});
     const d=await r.json();
     finishAiTurn(turn,d);
     loadSessions(false,true);
@@ -746,29 +1028,6 @@ async function loadCalls(){
 }
 $$('.tab').forEach(t=>t.addEventListener('click',()=>{$$('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');FILTER=t.dataset.f;renderEvents();}));
 $('#actClear').addEventListener('click',()=>{evbuf=[];renderEvents();});
-
-/* ---- system ---- */
-async function loadSystem(){
-  try{
-    const d=await (await api('/api/ext/aidev/calls?limit=1')).json(); // keepalive cheap; real sys via tool not needed
-  }catch(e){}
-  // pull live system info via dedicated lightweight call
-  fetchSys();
-}
-async function fetchSys(){
-  try{
-    const r=await api('/api/system/info');
-    if(!r.ok)return;
-    const d=await r.json();const s=d.data||d;const box=$('#sysInfo');
-    const cpu=s.cpu_percent!=null?s.cpu_percent+'%':'—';
-    const mem=(s.memory&&s.memory.percent!=null)?s.memory.percent+'%':'—';
-    box.innerHTML=`
-      <div class="sys-row"><span>CPU</span><b>${cpu}</b></div>
-      <div class="sys-row"><span>内存</span><b>${mem}</b></div>
-      <div class="sys-row"><span>插件</span><b>${(s.plugins!=null?s.plugins:(s.plugin_count!=null?s.plugin_count:'—'))}</b></div>
-      <div class="sys-row"><span>系统</span><b>${esc(s.system||s.os||navigator.platform)}</b></div>`;
-  }catch(e){}
-}
 
 /* ---- SSE ---- */
 function connectSSE(){

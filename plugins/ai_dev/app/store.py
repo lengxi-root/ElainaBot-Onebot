@@ -1,12 +1,4 @@
-"""ai_dev 会话与调用日志存储
-
-维护:
-- 多个对话会话 (session) 的消息历史 (OpenAI messages 格式)
-- 全局事件流 (用户消息 / 助手回复 / 工具调用 / 工具结果 / 错误), 用于 Web 面板的
-  「完整日志 + 完整调用」展示, 并实时广播给所有连接的 SSE 客户端。
-
-数据持久化到插件 data/ 目录 (sessions.json + events.jsonl), 进程重启后可恢复。
-"""
+"""会话历史 + 事件流存储, 持久化到 data/ (sessions.json + events.jsonl)。"""
 
 import asyncio
 import contextlib
@@ -16,8 +8,8 @@ import time
 import uuid
 from collections import deque
 
-_MAX_EVENTS = 2000          # 内存中保留的事件数
-_MAX_SESSION_MESSAGES = 80   # 单会话保留的消息数 (滚动裁剪, 保留 system)
+_MAX_EVENTS = 2000              # 内存中保留的事件数
+_DEFAULT_HISTORY_ROUNDS = 50    # 单会话默认保留的对话轮数 (面板「设置」可改, 配置不可用时回退)
 
 
 class AIStore:
@@ -84,6 +76,14 @@ class AIStore:
         self._save_sessions()
         return True
 
+    def _history_limit(self) -> int:
+        """单会话保留的最大对话轮数 (面板「设置」可改, 默认 50); <=0 不限制。"""
+        try:
+            from . import aiconfig
+            return int(aiconfig.history_limit())
+        except Exception:
+            return _DEFAULT_HISTORY_ROUNDS
+
     def get_messages(self, sid: str) -> list:
         sess = self._sessions.get(sid)
         return list(sess['messages']) if sess else []
@@ -92,16 +92,14 @@ class AIStore:
         sess = self._sessions.get(sid)
         if not sess:
             return
-        # 滚动裁剪: 保留 system + 最近的若干条
+        # 保留 system, 其余按对话轮 (user 边界) 裁剪到最近 limit_rounds 轮
         system = [m for m in messages if m.get('role') == 'system']
         rest = [m for m in messages if m.get('role') != 'system']
-        if len(rest) > _MAX_SESSION_MESSAGES:
-            rest = rest[-_MAX_SESSION_MESSAGES:]
-            # 避免从工具调用序列中间截断: OpenAI 要求 role=tool 的消息必须紧跟在
-            # 含 tool_calls 的 assistant 之后。从首个 user 回合边界对齐, 防止产生
-            # 「孤立 tool 消息」导致下次请求 400。
-            while rest and rest[0].get('role') != 'user':
-                rest.pop(0)
+        limit_rounds = self._history_limit()
+        if limit_rounds > 0:
+            user_idx = [i for i, m in enumerate(rest) if m.get('role') == 'user']
+            if len(user_idx) > limit_rounds:
+                rest = rest[user_idx[len(user_idx) - limit_rounds]:]
         sess['messages'] = system + rest
         sess['updated'] = time.time()
         if not sess.get('title'):
@@ -136,10 +134,10 @@ class AIStore:
                             self._events.append(json.loads(line))
         if self._events:
             self._seq = self._events[-1].get('seq', 0)
-            self._compact_event_file()  # 启动时压实事件文件, 防止 jsonl 无限增长
+            self._compact_event_file()
 
     def _compact_event_file(self):
-        """把磁盘事件文件压实为内存中保留的最近事件 (启动时调用一次)"""
+        """启动时把事件文件压实为内存保留的最近事件"""
         with contextlib.suppress(Exception):
             tmp = self._events_file + '.tmp'
             with open(tmp, 'w', encoding='utf-8') as f:
@@ -151,10 +149,7 @@ class AIStore:
     # ==================== 事件 ====================
 
     def add_event(self, etype: str, data: dict, session_id: str = '') -> dict:
-        """记录一个事件并广播给所有 SSE 订阅者
-
-        etype: user | assistant | tool_call | tool_result | error | info | delta
-        """
+        """记录事件并广播给 SSE 订阅者 (etype: user/assistant/tool_call/tool_result/error/info/delta)"""
         self._seq += 1
         event = {
             'seq': self._seq,
@@ -164,7 +159,7 @@ class AIStore:
             'data': data,
         }
         self._events.append(event)
-        # delta (流式增量) 不落盘, 避免事件文件膨胀
+        # delta (流式增量) 不落盘
         if etype != 'delta':
             self._append_event_file(event)
         self._broadcast(event)
@@ -172,6 +167,13 @@ class AIStore:
 
     def recent_events(self, limit: int = 300, exclude_delta: bool = True) -> list:
         items = [e for e in self._events if not (exclude_delta and e['type'] == 'delta')]
+        return items[-limit:]
+
+    def session_events(self, sid: str, limit: int = 1000) -> list:
+        """返回某会话的非 delta 事件, 用于刷新后重建调用时间线"""
+        if not sid:
+            return []
+        items = [e for e in self._events if e.get('session_id') == sid and e['type'] != 'delta']
         return items[-limit:]
 
     def _append_event_file(self, event: dict):

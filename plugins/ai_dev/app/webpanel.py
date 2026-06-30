@@ -1,21 +1,4 @@
-"""ai_dev Web 面板路由 (插件侧边栏页面 + /api/ext/aidev/* 接口)
-
-通过框架的 register_route 机制注册, 统一挂在 /api/ext/aidev/ 前缀下,
-热重载/卸载即时生效。面板 HTML 由 register_page 提供, 在侧边栏以
-iframe 渲染。鉴权复用框架 web.auth (Bearer token / ?token=)。
-
-接口:
-- GET  /api/ext/aidev/config         面板配置 (不含 key 明文)
-- GET  /api/ext/aidev/models         代理上游模型列表
-- GET  /api/ext/aidev/sessions       会话列表
-- POST /api/ext/aidev/sessions       新建会话
-- POST /api/ext/aidev/sessions/delete  删除会话
-- GET  /api/ext/aidev/history        某会话历史
-- POST /api/ext/aidev/chat           发送消息 (执行 Agent)
-- GET  /api/ext/aidev/calls          最近事件 (完整调用 + 日志)
-- GET  /api/ext/aidev/stream         SSE 实时事件流
-- POST /api/ext/aidev/clear          清空会话
-"""
+"""Web 面板路由: 侧边栏页面 + /api/ext/aidev/* 接口 (config/models/sessions/history/chat/calls/stream/clear)。"""
 
 import asyncio
 import contextlib
@@ -46,6 +29,10 @@ def register_routes():
     """通过框架 register_route 注册全部 /api/ext/aidev/* 路由 (热重载安全)。"""
     register_route('GET', _PREFIX + '/config', _get_config)
     register_route('POST', _PREFIX + '/config', _set_config)
+    register_route('GET', _PREFIX + '/presets', _get_presets)
+    register_route('POST', _PREFIX + '/presets/save', _save_preset)
+    register_route('POST', _PREFIX + '/presets/delete', _del_preset)
+    register_route('POST', _PREFIX + '/presets/apply', _apply_preset)
     register_route('GET', _PREFIX + '/models', _get_models)
     register_route('GET', _PREFIX + '/sessions', _get_sessions)
     register_route('POST', _PREFIX + '/sessions', _create_session)
@@ -63,14 +50,10 @@ async def _get_config(request: web.Request):
 
 
 async def _set_config(request: web.Request):
-    """保存面板自定义配置 (base_url / api_key / model 等), 立即生效。
-
-    api_key 为空字符串表示「不修改」(避免前端因不回显密钥而误清空); 传 null
-    表示清除该覆盖, 回退到 settings.yaml / 环境变量。
-    """
+    """保存面板配置, 立即生效。api_key 空字符串=不修改, null=清除覆盖回退默认。"""
     body = await _json(request)
     updates = {}
-    for k in ('base_url', 'model', 'temperature', 'max_iterations', 'system_prompt', 'reasoning_effort'):
+    for k in ('base_url', 'model', 'temperature', 'max_iterations', 'history_limit', 'system_prompt', 'reasoning_effort'):
         if k in body:
             updates[k] = body[k]
     # api_key: 仅当显式提供且非空白时才更新; null 清除
@@ -82,6 +65,28 @@ async def _set_config(request: web.Request):
             updates['api_key'] = ak.strip()
     aiconfig.set_runtime(updates)
     return web.json_response({'success': True, 'config': aiconfig.public_config()})
+
+
+async def _get_presets(request: web.Request):
+    return web.json_response({'success': True, **aiconfig.list_presets()})
+
+
+async def _save_preset(request: web.Request):
+    body = await _json(request)
+    return web.json_response({'success': True, **aiconfig.save_preset(body)})
+
+
+async def _del_preset(request: web.Request):
+    body = await _json(request)
+    return web.json_response({'success': True, **aiconfig.delete_preset(str(body.get('id', '')))})
+
+
+async def _apply_preset(request: web.Request):
+    body = await _json(request)
+    res = aiconfig.apply_preset(str(body.get('id', '')))
+    if res is None:
+        return web.json_response({'success': False, 'error': '站点不存在'})
+    return web.json_response({'success': True, 'config': aiconfig.public_config(), **res})
 
 
 async def _get_models(request: web.Request):
@@ -128,10 +133,17 @@ async def _get_history(request: web.Request):
     for m in msgs:
         role = m.get('role')
         if role == 'user':
-            view.append({'role': 'user', 'content': m.get('content', '')})
+            view.append({'role': 'user', 'content': _content_text(m.get('content', ''))})
         elif role == 'assistant' and m.get('content'):
-            view.append({'role': 'assistant', 'content': m.get('content', '')})
-    return web.json_response({'success': True, 'messages': view})
+            view.append({'role': 'assistant', 'content': _content_text(m.get('content', ''))})
+    return web.json_response({'success': True, 'messages': view, 'events': _store().session_events(sid)})
+
+
+def _content_text(content):
+    """content 可能是字符串或多模态数组, 统一取出文本部分用于展示。"""
+    if isinstance(content, list):
+        return '\n'.join(p.get('text', '') for p in content if isinstance(p, dict) and p.get('type') == 'text')
+    return content or ''
 
 
 async def _post_chat(request: web.Request):
@@ -139,10 +151,12 @@ async def _post_chat(request: web.Request):
     message = str(body.get('message', '')).strip()
     model = str(body.get('model', '') or '')
     sid = str(body.get('session_id', '') or '')
-    if not message:
+    raw_images = body.get('images') or []
+    images = [u for u in raw_images if isinstance(u, str) and u.startswith('data:image')][:8] if isinstance(raw_images, list) else []
+    if not message and not images:
         return web.json_response({'success': False, 'error': '消息为空'}, status=400)
     sess = _store().ensure_session(sid)
-    result = await agentmod.run_agent(_store(), sess['id'], message, model)
+    result = await agentmod.run_agent(_store(), sess['id'], message, model, images=images)
     return web.json_response({
         'success': result.get('ok', False),
         'session_id': sess['id'],
