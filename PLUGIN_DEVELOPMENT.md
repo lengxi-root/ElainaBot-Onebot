@@ -601,4 +601,4 @@ async def my_points(event, match):
 
 ---
 
-更多问题欢迎加入交流群 **[631348711](https://qm.qq.com/q/qSErOcGf2o)** 讨论。
+更多问题欢迎加入交流群 **[164178653](https://qm.qq.com/q/nepv1UcwRE)** 讨论。

@@ -5,9 +5,9 @@
 
 ElainaBot OneBot 是一个基于 Python 的 QQ 机器人框架，采用 **OneBot v11** 协议标准，纯异步架构，支持 NapCat / LLOneBot / go-cqhttp 等多种 OneBot 实现，具备插件热重载、模块化扩展、插件市场、Web 面板管理等特性。
 
-[![Python](https://img.shields.io/badge/Python-3.9+-blue?logo=python&logoColor=white)](https://python.org)
+[![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![QQ群](https://img.shields.io/badge/QQ交流群-631348711-blue)](https://qm.qq.com/q/qSErOcGf2o)
+[![QQ群](https://img.shields.io/badge/QQ交流群-164178653-blue)](https://qm.qq.com/q/nepv1UcwRE)
 
 - **纯异步架构** — 基于 aiohttp，反向/正向 WebSocket 与 HTTP 多种接入方式
 - **插件市场** — 基于 GitHub 插件库，一键浏览、安装、更新插件
@@ -20,13 +20,13 @@ ElainaBot OneBot 是一个基于 Python 的 QQ 机器人框架，采用 **OneBot
 
 ## 📢 交流群
 
-**Elaina Bot 框架交流群：[631348711](https://qm.qq.com/q/qSErOcGf2o)**
+**Elaina Bot 框架交流群：[164178653](https://qm.qq.com/q/nepv1UcwRE)**
 
 ## 🚀 快速开始
 
 ### 环境要求
 
-- Python 3.9+
+- Python 3.11+
 - Git
 - NapCat / LLOneBot / go-cqhttp 等任意 OneBot v11 实现
 
