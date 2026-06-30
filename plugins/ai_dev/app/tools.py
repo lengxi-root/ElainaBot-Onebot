@@ -101,6 +101,38 @@ async def _t_write_file(path: str, content: str) -> dict:
     return {'path': _rel(target), 'bytes': len(data.encode('utf-8')), 'created': not existed}
 
 
+async def _t_edit_file(path: str, old_string: str, new_string: str = '',
+                       replace_all: bool = False) -> dict:
+    """对已存在文件做局部精确替换 (不重写整文件), 适合修改大插件。
+
+    old_string 必须与文件内容逐字符精确匹配 (含缩进与换行); 默认要求其在文件中
+    唯一, 否则报错提示补充上下文; replace_all=true 时替换全部出现处。
+    """
+    target = _safe_path(path)
+    if not os.path.isfile(target):
+        raise ValueError(f'文件不存在: {path} (新建文件请用 write_file)')
+    old = old_string if isinstance(old_string, str) else str(old_string)
+    new = '' if new_string is None else (new_string if isinstance(new_string, str) else str(new_string))
+    if old == '':
+        raise ValueError('old_string 不能为空 (新建文件请用 write_file)')
+    if old == new:
+        raise ValueError('old_string 与 new_string 相同, 无需修改')
+    with open(target, encoding='utf-8', errors='replace') as f:
+        content = f.read()
+    count = content.count(old)
+    if count == 0:
+        raise ValueError('未找到 old_string (需与文件内容逐字符精确匹配, 含缩进/换行); 可先 read_file 核对')
+    if count > 1 and not replace_all:
+        raise ValueError(f'old_string 在文件中出现 {count} 次, 不唯一; 请补充上下文使其唯一, 或传 replace_all=true 全部替换')
+    updated = content.replace(old, new) if replace_all else content.replace(old, new, 1)
+    if len(updated.encode('utf-8')) > _MAX_WRITE_BYTES:
+        raise ValueError('内容过大')
+    with open(target, 'w', encoding='utf-8') as f:
+        f.write(updated)
+    return {'path': _rel(target), 'replaced': count if replace_all else 1,
+            'bytes': len(updated.encode('utf-8'))}
+
+
 async def _t_delete_file(path: str) -> dict:
     target = _safe_path(path)
     if os.path.isfile(target):
@@ -377,6 +409,7 @@ _DISPATCH = {
     'list_dir': _t_list_dir,
     'read_file': _t_read_file,
     'write_file': _t_write_file,
+    'edit_file': _t_edit_file,
     'delete_file': _t_delete_file,
     'make_dir': _t_make_dir,
     'list_plugins': _t_list_plugins,
@@ -430,7 +463,7 @@ TOOLS_SCHEMA = [
         'type': 'function',
         'function': {
             'name': 'write_file',
-            'description': '写入/创建仓库内的文件 (会覆盖原内容并自动创建父目录)。用于编写或修改插件。',
+            'description': '写入/创建仓库内的文件 (会覆盖整个文件并自动创建父目录)。用于新建文件或整体重写; 若只改大文件的一小部分请优先用 edit_file。',
             'parameters': {
                 'type': 'object',
                 'properties': {
@@ -438,6 +471,27 @@ TOOLS_SCHEMA = [
                     'content': {'type': 'string', 'description': '完整文件内容'},
                 },
                 'required': ['path', 'content'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'edit_file',
+            'description': (
+                '对已存在文件做局部精确替换 (不重写整文件), 修改大插件时优先用它以省 token 并避免误改。 '
+                'old_string 必须与文件内容逐字符精确匹配 (含缩进/换行), 并需在文件中唯一 '
+                '(建议带上目标行前后若干行作为锚点); 不唯一会报错, 需补充上下文或传 replace_all=true。'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'path': {'type': 'string', 'description': '相对仓库根的文件路径'},
+                    'old_string': {'type': 'string', 'description': '要被替换的原文片段 (逐字符精确, 含缩进/换行, 需唯一)'},
+                    'new_string': {'type': 'string', 'description': '替换后的新内容 (留空表示删除该片段)'},
+                    'replace_all': {'type': 'boolean', 'description': '是否替换全部出现处 (如重命名变量), 默认 false 只替换唯一的一处'},
+                },
+                'required': ['path', 'old_string'],
             },
         },
     },
