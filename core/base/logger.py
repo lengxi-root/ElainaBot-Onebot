@@ -1,5 +1,6 @@
 """日志系统"""
 
+import contextlib
 import logging
 import sys
 
@@ -68,7 +69,5 @@ def report_error(module_type: str, name: str, error: Exception, context: dict | 
     if context:
         data['context'] = context
     for cb in _error_callbacks:
-        try:
+        with contextlib.suppress(Exception):
             cb(data)
-        except Exception:
-            pass

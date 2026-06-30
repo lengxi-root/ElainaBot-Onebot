@@ -12,13 +12,7 @@ class _DispatchMixin:
     """异步事件分发"""
 
     def _build_dispatch_index(self):
-        """按 priority 排序并预分桶
-
-        - _msg_handlers: 可处理 message 事件的处理器
-        - _generic_handlers: 未声明 event_types 的处理器 (对所有非消息事件均候选)
-        - _typed_handlers: {event_type: [handler...]} 声明了具体事件类型的处理器
-        分桶后, 每条事件只需遍历相关子集而非全部处理器。
-        """
+        """按 priority 排序并预分桶 (消息桶/通用桶/类型桶), 避免每条事件遍历全部处理器"""
         self._all_handlers = sorted(self._all_handlers, key=lambda h: -h['priority'])
         self._all_interceptors = sorted(self._all_interceptors, key=lambda i: -i['priority'])
 
@@ -39,15 +33,8 @@ class _DispatchMixin:
         self._typed_handlers = typed
 
     async def dispatch(self, event) -> bool:
-        """异步分发事件到匹配的处理器
-
-        Args:
-            event: OneBotEvent (MessageEvent / NoticeEvent / ...)
-
-        Returns:
-            是否有处理器匹配并执行
-        """
-        content = event.content if hasattr(event, 'content') else ''
+        """异步分发事件到匹配的处理器, 返回是否命中"""
+        content = event.content
         post_type = event.post_type
 
         # 拦截器
@@ -59,24 +46,20 @@ class _DispatchMixin:
             except Exception as e:
                 report_error(PLUGIN, ic.get('_plugin', '?'), e)
 
-        # 消息事件 — 仅遍历消息桶
+        # 消息事件 — 仅遍历消息桶 (event 必为 MessageEvent, 直取属性)
         if post_type == 'message':
             for h in self._msg_handlers:
-                # 场景过滤
-                if h['group_only'] and not getattr(event, 'is_group', False):
+                if h['group_only'] and not event.is_group:
                     continue
-                if h['private_only'] and not getattr(event, 'is_private', False):
+                if h['private_only'] and not event.is_private:
                     continue
-                # 权限检查
                 if h['owner_only'] and not self._is_owner(event):
                     continue
-                # 正则匹配
                 m = h['compiled'].search(content)
                 if not m:
                     continue
-                # 冷却检查
                 if h['cooldown'] > 0:
-                    key = f"{h['name']}:{getattr(event, 'user_id', '')}"
+                    key = f"{h['name']}:{event.user_id}"
                     now = time.time()
                     if now - self._cooldowns.get(key, 0) < h['cooldown']:
                         continue

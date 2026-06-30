@@ -15,7 +15,7 @@ from core.module.manager import ModuleManager
 from core.onebot.adapter import OneBotAdapter
 from core.onebot.api import set_adapter, set_main_loop
 from core.onebot.connection import ConnectionManager
-from core.onebot.event import MessageEvent, NoticeEvent, MetaEvent
+from core.onebot.event import MessageEvent, MetaEvent, NoticeEvent
 from core.plugin.manager import PluginManager
 from core.server.http_server import HttpServer
 from core.services.config_watcher import ConfigWatcherService

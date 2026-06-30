@@ -1,6 +1,21 @@
 """OneBot v11 事件模型 (异步框架)"""
 
 import time
+from enum import StrEnum
+
+
+class PostType(StrEnum):
+    """OneBot 上报类型"""
+    MESSAGE = 'message'
+    NOTICE = 'notice'
+    REQUEST = 'request'
+    META = 'meta_event'
+
+
+class MsgType(StrEnum):
+    """消息类型"""
+    GROUP = 'group'
+    PRIVATE = 'private'
 
 
 class OneBotEvent:
@@ -44,11 +59,11 @@ class MessageEvent(OneBotEvent):
 
     @property
     def is_group(self) -> bool:
-        return self.message_type == 'group'
+        return self.message_type == MsgType.GROUP
 
     @property
     def is_private(self) -> bool:
-        return self.message_type == 'private'
+        return self.message_type == MsgType.PRIVATE
 
     @property
     def sender_nickname(self) -> str:
@@ -71,11 +86,7 @@ class MessageEvent(OneBotEvent):
         return self._content
 
     async def reply(self, message, **kwargs):
-        """异步回复消息
-
-        Args:
-            message: 消息内容 (字符串或消息段列表)
-        """
+        """异步回复消息 (字符串或消息段列表)"""
         if self._api is None:
             return None
         if isinstance(message, str):
@@ -146,13 +157,13 @@ def parse_event(data: dict) -> OneBotEvent | None:
         return None
 
     match data.get('post_type'):
-        case 'message':
+        case PostType.MESSAGE:
             return MessageEvent(data)
-        case 'notice':
+        case PostType.NOTICE:
             return NoticeEvent(data)
-        case 'request':
+        case PostType.REQUEST:
             return RequestEvent(data)
-        case 'meta_event':
+        case PostType.META:
             return MetaEvent(data)
         case _:
             return OneBotEvent(data)

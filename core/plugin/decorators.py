@@ -22,19 +22,7 @@ def handler(
     event_types=None,
     cooldown=0,
 ):
-    """注册消息处理器
-
-    Args:
-        pattern: 正则匹配模式
-        name: 处理器名称 (默认取函数名)
-        desc: 描述信息
-        priority: 优先级 (数值越大越先匹配)
-        owner_only: 仅主人可用
-        group_only: 仅群聊可用
-        private_only: 仅私聊可用
-        event_types: 限定事件类型集合 (如 {'message', 'notice'})
-        cooldown: 冷却时间 (秒)
-    """
+    """注册消息处理器 (pattern 正则; priority 越大越先匹配; event_types 限定事件类型; cooldown 秒)"""
 
     def decorator(func):
         _pending_handlers.append(

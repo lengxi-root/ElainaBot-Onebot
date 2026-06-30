@@ -6,7 +6,7 @@ import os
 import sqlite3
 from collections import deque
 
-from core.base.logger import get_logger, SYSTEM
+from core.base.logger import SYSTEM, get_logger
 
 log = get_logger(SYSTEM, '日志存储')
 
@@ -169,7 +169,7 @@ class LogService:
 
     def _cleanup_sync(self):
         cutoff = (datetime.datetime.now() - datetime.timedelta(days=self._retention_days)).strftime('%Y-%m-%d %H:%M:%S')
-        for (log_type, _bot_qq), conn in self._connections.items():
+        for conn in self._connections.values():
             try:
                 conn.execute('DELETE FROM log WHERE timestamp < ?', (cutoff,))
                 conn.commit()

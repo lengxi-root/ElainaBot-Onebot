@@ -3,9 +3,7 @@
 import asyncio
 import json
 import logging
-import time
 import uuid
-from typing import Any, Dict, Optional
 
 logger = logging.getLogger('ElainaBot.onebot.api')
 
@@ -29,7 +27,7 @@ class OneBotAPI:
     def __init__(self, adapter=None):
         self._adapter = adapter or _adapter_ref
 
-    async def call_api(self, action: str, params: dict = None, self_id: str = None) -> Optional[dict]:
+    async def call_api(self, action: str, params: dict = None, self_id: str = None) -> dict | None:
         """调用 OneBot API — 优先走 WebSocket, 无连接时回退到 HTTP 客户端"""
         if not self._adapter:
             return None
@@ -54,7 +52,7 @@ class OneBotAPI:
 
         try:
             # aiohttp 的 WebSocketResponse/ClientWebSocketResponse 使用 send_str
-            send = getattr(ws, 'send_str', None) or getattr(ws, 'send_text')
+            send = getattr(ws, 'send_str', None) or ws.send_text
             await send(json.dumps(payload, ensure_ascii=False))
             async with asyncio.timeout(30):
                 return await future
@@ -67,21 +65,21 @@ class OneBotAPI:
             self._adapter.api_responses.pop(echo, None)
             return None
 
-    async def send_group_msg(self, group_id, message, **kwargs) -> Optional[dict]:
+    async def send_group_msg(self, group_id, message, **kwargs) -> dict | None:
         return await self.call_api('send_group_msg', {
             'group_id': int(group_id),
             'message': message,
             **kwargs
         })
 
-    async def send_private_msg(self, user_id, message, **kwargs) -> Optional[dict]:
+    async def send_private_msg(self, user_id, message, **kwargs) -> dict | None:
         return await self.call_api('send_private_msg', {
             'user_id': int(user_id),
             'message': message,
             **kwargs
         })
 
-    async def send_msg(self, message_type: str, target_id, message, **kwargs) -> Optional[dict]:
+    async def send_msg(self, message_type: str, target_id, message, **kwargs) -> dict | None:
         params = {'message_type': message_type, 'message': message, **kwargs}
         if message_type == 'group':
             params['group_id'] = int(target_id)
@@ -89,63 +87,63 @@ class OneBotAPI:
             params['user_id'] = int(target_id)
         return await self.call_api('send_msg', params)
 
-    async def delete_msg(self, message_id) -> Optional[dict]:
+    async def delete_msg(self, message_id) -> dict | None:
         return await self.call_api('delete_msg', {'message_id': int(message_id)})
 
-    async def get_msg(self, message_id) -> Optional[dict]:
+    async def get_msg(self, message_id) -> dict | None:
         return await self.call_api('get_msg', {'message_id': int(message_id)})
 
-    async def get_login_info(self) -> Optional[dict]:
+    async def get_login_info(self) -> dict | None:
         return await self.call_api('get_login_info')
 
-    async def get_stranger_info(self, user_id) -> Optional[dict]:
+    async def get_stranger_info(self, user_id) -> dict | None:
         return await self.call_api('get_stranger_info', {'user_id': int(user_id)})
 
-    async def get_friend_list(self) -> Optional[dict]:
+    async def get_friend_list(self) -> dict | None:
         return await self.call_api('get_friend_list')
 
-    async def get_group_list(self) -> Optional[dict]:
+    async def get_group_list(self) -> dict | None:
         return await self.call_api('get_group_list')
 
-    async def get_group_info(self, group_id) -> Optional[dict]:
+    async def get_group_info(self, group_id) -> dict | None:
         return await self.call_api('get_group_info', {'group_id': int(group_id)})
 
-    async def get_group_member_list(self, group_id) -> Optional[dict]:
+    async def get_group_member_list(self, group_id) -> dict | None:
         return await self.call_api('get_group_member_list', {'group_id': int(group_id)})
 
-    async def get_group_member_info(self, group_id, user_id) -> Optional[dict]:
+    async def get_group_member_info(self, group_id, user_id) -> dict | None:
         return await self.call_api('get_group_member_info', {
             'group_id': int(group_id),
             'user_id': int(user_id)
         })
 
-    async def set_group_kick(self, group_id, user_id, reject_add=False) -> Optional[dict]:
+    async def set_group_kick(self, group_id, user_id, reject_add=False) -> dict | None:
         return await self.call_api('set_group_kick', {
             'group_id': int(group_id),
             'user_id': int(user_id),
             'reject_add_request': reject_add
         })
 
-    async def set_group_ban(self, group_id, user_id, duration=1800) -> Optional[dict]:
+    async def set_group_ban(self, group_id, user_id, duration=1800) -> dict | None:
         return await self.call_api('set_group_ban', {
             'group_id': int(group_id),
             'user_id': int(user_id),
             'duration': duration
         })
 
-    async def set_group_whole_ban(self, group_id, enable=True) -> Optional[dict]:
+    async def set_group_whole_ban(self, group_id, enable=True) -> dict | None:
         return await self.call_api('set_group_whole_ban', {
             'group_id': int(group_id),
             'enable': enable
         })
 
-    async def set_friend_add_request(self, flag, approve=True) -> Optional[dict]:
+    async def set_friend_add_request(self, flag, approve=True) -> dict | None:
         return await self.call_api('set_friend_add_request', {
             'flag': flag,
             'approve': approve
         })
 
-    async def set_group_add_request(self, flag, sub_type, approve=True) -> Optional[dict]:
+    async def set_group_add_request(self, flag, sub_type, approve=True) -> dict | None:
         return await self.call_api('set_group_add_request', {
             'flag': flag,
             'sub_type': sub_type,

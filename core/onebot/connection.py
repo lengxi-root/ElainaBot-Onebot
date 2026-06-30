@@ -1,16 +1,11 @@
-"""OneBot 连接管理器 — 按配置维护正向/反向 WebSocket 与 HTTP 连接
-
-连接类型 (框架视角):
-- ws_reverse  : 反向 WS, 框架作为服务器, OneBot 端连入 (可自定义监听 host:port, 默认复用主服务端口)
-- ws_forward  : 正向 WS, 框架作为客户端, 主动连接 OneBot 端的 WS 服务器
-- http_server : HTTP 服务器, 框架接收 OneBot 事件上报 (可自定义监听 host:port, 默认复用主服务端口)
-- http_client : HTTP 客户端, 框架通过 HTTP 调用 OneBot API
-"""
+"""OneBot 连接管理器 — 维护正向/反向 WS 与 HTTP 连接"""
 
 import asyncio
+import contextlib
 import json
 import logging
 import uuid
+from enum import StrEnum
 
 import aiohttp
 from aiohttp import web
@@ -19,7 +14,16 @@ from core.base.config import cfg
 
 logger = logging.getLogger('ElainaBot.onebot.connection')
 
-CONN_TYPES = ('ws_reverse', 'ws_forward', 'http_server', 'http_client')
+
+class ConnType(StrEnum):
+    """OneBot 连接类型"""
+    WS_REVERSE = 'ws_reverse'
+    WS_FORWARD = 'ws_forward'
+    HTTP_SERVER = 'http_server'
+    HTTP_CLIENT = 'http_client'
+
+
+CONN_TYPES = tuple(ConnType)
 
 
 def default_connections():
@@ -30,7 +34,7 @@ def default_connections():
 def normalize(conn: dict) -> dict:
     """补全连接配置的缺省字段"""
     c = dict(conn or {})
-    c.setdefault('type', 'ws_reverse')
+    c.setdefault('type', ConnType.WS_REVERSE)
     c.setdefault('name', c['type'])
     c['enable'] = bool(c.get('enable', False))
     c.setdefault('host', cfg.get('settings', 'server.host', '0.0.0.0'))
@@ -107,9 +111,9 @@ class ConnectionManager:
                 continue
             port = int(c.get('port') or main_port)
             path = str(c.get('path') or '/') or '/'
-            if c['type'] == 'ws_reverse':
+            if c['type'] == ConnType.WS_REVERSE:
                 ws_tokens[(port, path)] = c.get('token', '') or ''
-            elif c['type'] == 'http_server':
+            elif c['type'] == ConnType.HTTP_SERVER:
                 http_secrets[(port, path)] = c.get('secret', '') or ''
         self._adapter.reverse_ws_tokens = ws_tokens
         self._adapter.reverse_http_secrets = http_secrets
@@ -118,7 +122,7 @@ class ConnectionManager:
     def _register_http_clients(self):
         self._adapter.clear_http_clients()
         for c in self._configs:
-            if c.get('enable') and c['type'] == 'http_client' and c.get('url'):
+            if c.get('enable') and c['type'] == ConnType.HTTP_CLIENT and c.get('url'):
                 self._adapter.register_http_client(c['name'], c['url'], c.get('token', ''))
 
     # ── 自定义端口监听 (反向 WS / HTTP 上报) ──
@@ -131,7 +135,7 @@ class ConnectionManager:
         # 按 (host, port) 分组, 同端口可挂多条路径
         groups = {}
         for c in self._configs:
-            if not c.get('enable') or c['type'] not in ('ws_reverse', 'http_server'):
+            if not c.get('enable') or c['type'] not in (ConnType.WS_REVERSE, ConnType.HTTP_SERVER):
                 continue
             host = str(c.get('host') or main_host)
             port = int(c.get('port') or main_port)
@@ -147,7 +151,7 @@ class ConnectionManager:
                 seen = set()
                 for c in conns:
                     path = str(c.get('path') or '/') or '/'
-                    if c['type'] == 'ws_reverse':
+                    if c['type'] == ConnType.WS_REVERSE:
                         key = ('GET', path)
                         if key not in seen:
                             app.router.add_get(path, http_server._handle_onebot_ws)
@@ -172,20 +176,16 @@ class ConnectionManager:
 
     async def _stop_listeners(self):
         for runner, site in list(self._sites.values()):
-            try:
+            with contextlib.suppress(Exception):
                 await site.stop()
-            except Exception:
-                pass
-            try:
+            with contextlib.suppress(Exception):
                 await runner.cleanup()
-            except Exception:
-                pass
         self._sites.clear()
 
     # ── 正向 WS 客户端 ──
     async def _start_forward_clients(self):
         for c in self._configs:
-            if c.get('enable') and c['type'] == 'ws_forward' and c.get('url'):
+            if c.get('enable') and c['type'] == ConnType.WS_FORWARD and c.get('url'):
                 name = c['name']
                 self._tasks[name] = asyncio.create_task(self._forward_loop(c))
 
@@ -194,10 +194,8 @@ class ConnectionManager:
         for t in tasks:
             t.cancel()
         for t in tasks:
-            try:
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await t
-            except (asyncio.CancelledError, Exception):
-                pass
         self._tasks.clear()
 
     async def _forward_loop(self, conn: dict):
@@ -216,16 +214,18 @@ class ConnectionManager:
             try:
                 self._set_status(name, connected=False, error='连接中…')
                 timeout = aiohttp.ClientTimeout(total=None, sock_connect=10)
-                async with aiohttp.ClientSession(timeout=timeout) as session:
-                    async with session.ws_connect(url, headers=headers, heartbeat=30) as ws:
-                        self._adapter.register_bot(temp_id, ws)
-                        conn['_self_id'] = temp_id
-                        self._forward_ids.add(temp_id)
-                        self._set_status(name, connected=True, error='', self_id=temp_id)
-                        logger.info(f'正向 WS 已连接: {name} -> {url}')
-                        # 主动探测真实 self_id, 即便事件经其它通道(HTTP)上报也能正确归属
-                        probe_task = asyncio.create_task(self._probe_self_id(conn, ws))
-                        await self._consume(ws, conn)
+                async with (
+                    aiohttp.ClientSession(timeout=timeout) as session,
+                    session.ws_connect(url, headers=headers, heartbeat=30) as ws,
+                ):
+                    self._adapter.register_bot(temp_id, ws)
+                    conn['_self_id'] = temp_id
+                    self._forward_ids.add(temp_id)
+                    self._set_status(name, connected=True, error='', self_id=temp_id)
+                    logger.info(f'正向 WS 已连接: {name} -> {url}')
+                    # 主动探测真实 self_id, 即便事件经其它通道(HTTP)上报也能正确归属
+                    probe_task = asyncio.create_task(self._probe_self_id(conn, ws))
+                    await self._consume(ws, conn)
             except asyncio.CancelledError:
                 self._cleanup_forward(conn)
                 self._set_status(name, connected=False, error='已停止')
@@ -248,7 +248,7 @@ class ConnectionManager:
         fut = self._loop.create_future()
         adapter.api_responses[echo] = fut
         try:
-            send = getattr(ws, 'send_str', None) or getattr(ws, 'send_text')
+            send = getattr(ws, 'send_str', None) or ws.send_text
             await send(json.dumps({'action': 'get_login_info', 'params': {}, 'echo': echo}))
             async with asyncio.timeout(10):
                 resp = await fut
@@ -311,21 +311,21 @@ class ConnectionManager:
             name = c['name']
             ctype = c['type']
             entry = {'name': name, 'type': ctype, 'enable': c.get('enable', False), 'connected': False, 'self_id': None, 'error': ''}
-            if ctype == 'ws_forward':
+            if ctype == ConnType.WS_FORWARD:
                 st = self._status.get(name, {})
                 entry['connected'] = st.get('connected', False)
                 entry['self_id'] = st.get('self_id')
                 entry['error'] = st.get('error', '')
-            elif ctype == 'ws_reverse':
+            elif ctype == ConnType.WS_REVERSE:
                 # 排除正向连接占用的 self_id, 仅统计真正连入的反向连接
                 reverse_ids = [k for k in self._adapter.websockets
                                if not str(k).startswith('forward:') and k not in self._forward_ids]
                 entry['connected'] = c.get('enable', False) and bool(reverse_ids)
                 entry['self_id'] = reverse_ids[0] if reverse_ids else None
                 entry['error'] = self._status.get(name, {}).get('error', '')
-            elif ctype == 'http_client':
+            elif ctype == ConnType.HTTP_CLIENT:
                 entry['connected'] = c.get('enable', False) and (c['name'] in self._adapter.http_clients)
-            elif ctype == 'http_server':
+            elif ctype == ConnType.HTTP_SERVER:
                 entry['connected'] = c.get('enable', False)
                 entry['error'] = self._status.get(name, {}).get('error', '')
             result.append(entry)
