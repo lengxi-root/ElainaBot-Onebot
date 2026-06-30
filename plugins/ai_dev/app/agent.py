@@ -1,9 +1,4 @@
-"""ai_dev Agent — OpenAI 兼容接口的工具调用循环
-
-通过 aiohttp 调用 /chat/completions, 支持多轮 function-calling:
-模型请求工具 -> 本地执行 -> 把结果回灌 -> 直到模型给出最终回答。
-每一步都会写入 AIStore 并广播到 Web 面板 (完整调用 + 完整日志)。
-"""
+"""Agent: OpenAI 兼容接口的多轮工具调用循环, 每步写入 AIStore 并广播到面板。"""
 
 import asyncio
 import json

@@ -1,21 +1,4 @@
-"""ai_dev Web 面板路由 (插件侧边栏页面 + /api/ext/aidev/* 接口)
-
-通过框架的 register_route 机制注册, 统一挂在 /api/ext/aidev/ 前缀下,
-热重载/卸载即时生效。面板 HTML 由 register_page 提供, 在侧边栏以
-iframe 渲染。鉴权复用框架 web.auth (Bearer token / ?token=)。
-
-接口:
-- GET  /api/ext/aidev/config         面板配置 (不含 key 明文)
-- GET  /api/ext/aidev/models         代理上游模型列表
-- GET  /api/ext/aidev/sessions       会话列表
-- POST /api/ext/aidev/sessions       新建会话
-- POST /api/ext/aidev/sessions/delete  删除会话
-- GET  /api/ext/aidev/history        某会话历史
-- POST /api/ext/aidev/chat           发送消息 (执行 Agent)
-- GET  /api/ext/aidev/calls          最近事件 (完整调用 + 日志)
-- GET  /api/ext/aidev/stream         SSE 实时事件流
-- POST /api/ext/aidev/clear          清空会话
-"""
+"""Web 面板路由: 侧边栏页面 + /api/ext/aidev/* 接口 (config/models/sessions/history/chat/calls/stream/clear)。"""
 
 import asyncio
 import contextlib
@@ -63,11 +46,7 @@ async def _get_config(request: web.Request):
 
 
 async def _set_config(request: web.Request):
-    """保存面板自定义配置 (base_url / api_key / model 等), 立即生效。
-
-    api_key 为空字符串表示「不修改」(避免前端因不回显密钥而误清空); 传 null
-    表示清除该覆盖, 回退到 settings.yaml / 环境变量。
-    """
+    """保存面板配置, 立即生效。api_key 空字符串=不修改, null=清除覆盖回退默认。"""
     body = await _json(request)
     updates = {}
     for k in ('base_url', 'model', 'temperature', 'max_iterations', 'history_limit', 'system_prompt', 'reasoning_effort'):

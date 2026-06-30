@@ -1,10 +1,4 @@
-"""ai_dev Agent 工具集
-
-为 AI 提供操作框架的能力: 文件读写、目录浏览、插件热重载与自检、
-配置读写、运行 Python 自测、系统/框架状态检查、通过 OneBot 发消息。
-
-所有文件操作均沙箱限定在仓库根目录内, 并禁止访问 .git 目录。
-"""
+"""Agent 工具集: 文件读写/编辑、目录、插件热重载与指令测试、配置读写、运行 Python、发消息。文件操作沙箱限定在仓库内且禁访 .git。"""
 
 import asyncio
 import json
@@ -103,11 +97,7 @@ async def _t_write_file(path: str, content: str) -> dict:
 
 async def _t_edit_file(path: str, old_string: str, new_string: str = '',
                        replace_all: bool = False) -> dict:
-    """对已存在文件做局部精确替换 (不重写整文件), 适合修改大插件。
-
-    old_string 必须与文件内容逐字符精确匹配 (含缩进与换行); 默认要求其在文件中
-    唯一, 否则报错提示补充上下文; replace_all=true 时替换全部出现处。
-    """
+    """局部精确替换 (不重写整文件): old_string 需逐字符精确且唯一, replace_all=true 才全部替换。"""
     target = _safe_path(path)
     if not os.path.isfile(target):
         raise ValueError(f'文件不存在: {path} (新建文件请用 write_file)')
@@ -197,12 +187,7 @@ async def _t_reload_plugin(name: str) -> dict:
 
 async def _t_test_command(text: str, user_id: str = '10000001', group_id=None,
                           as_owner: bool = True, timeout: int = 15) -> dict:
-    """主动构造一条消息事件并真实触发匹配的处理器, 实地验证指令功能是否正常。
-
-    与 reload_plugin (只做热重载自检) 不同, 本工具会真正执行处理器逻辑:
-    插件内的网络请求、定时器等都会真实运行 (在框架进程内, 走服务器的网络),
-    处理器的回复会被捕获返回而不会真正发往 QQ; 不受冷却限制。
-    """
+    """构造消息事件并真实触发匹配的处理器 (网络/定时器会真跑), 回复被捕获不发往 QQ。"""
     pm = _plugin_manager()
     if not pm:
         raise ValueError('插件管理器不可用')
@@ -298,7 +283,7 @@ async def _t_test_command(text: str, user_id: str = '10000001', group_id=None,
 
 
 async def _t_run_python(code: str, timeout: int = _PYTHON_TIMEOUT) -> dict:
-    """在仓库根目录下以子进程运行 Python 代码 (用于自测), 带超时"""
+    """在仓库根以子进程运行 Python 代码, 带超时"""
     if not code or not code.strip():
         raise ValueError('缺少 code')
     try:

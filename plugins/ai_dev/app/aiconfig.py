@@ -1,12 +1,4 @@
-"""ai_dev 配置读取
-
-配置来源 (优先级): 面板运行时覆盖 (data/runtime_config.json) > 框架
-config/settings.yaml 的 `ai` 段 > 环境变量 > 内置默认值。
-
-面板可在「设置」里自定义 OpenAI 地址(base_url)与密钥(api_key), 保存后写入
-data/runtime_config.json (该目录已被 .gitignore, 不会随插件提交), 立即生效。
-api_key 也可继续用环境变量 AI_DEV_API_KEY / OPENAI_API_KEY。
-"""
+"""配置读取, 优先级: 面板覆盖(data/runtime_config.json) > settings.yaml 的 ai 段 > 环境变量 > 默认值。"""
 
 import json
 import os
