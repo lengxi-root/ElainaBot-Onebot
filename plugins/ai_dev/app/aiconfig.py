@@ -19,7 +19,7 @@ DEFAULTS = {
     'base_url': 'https://api.ytea.top/v1',
     'model': 'gpt-4.1-nano',
     'temperature': 0.3,
-    'max_iterations': 12,
+    'max_iterations': 50,
     'request_timeout': 120,
     'system_prompt': '',
     'reasoning_effort': '',

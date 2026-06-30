@@ -381,9 +381,9 @@ input,textarea,select{font-family:inherit}
       <div class="set-hint">仅推理模型 (如 gpt-5.x / o 系列) 生效；普通模型忽略此项。思考过程会显示在回复气泡的「思考过程」里。</div>
     </div>
     <div class="set-row">
-      <div class="set-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>对话上限 (history_limit)</div>
-      <input class="set-input" id="setHistoryLimit" type="number" min="0" step="1" placeholder="50" spellcheck="false" autocomplete="off">
-      <div class="set-hint">单个会话保留的最大对话轮数 (1 轮 = 提问+回复)，超出后丢弃最旧的轮次以控制上下文长度。默认 50，填 0 表示不限制。</div>
+      <div class="set-label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>工具调用上限 (max_iterations)</div>
+      <input class="set-input" id="setMaxIter" type="number" min="1" step="1" placeholder="50" spellcheck="false" autocomplete="off">
+      <div class="set-hint">AI 单次回复内连续调用工具的最大次数 (迭代步数)，达到后会强制结束本回合 (提示「已达到最大迭代步数」，可能打断未完成的任务)。默认 50，可按需调大。</div>
     </div>
     <div class="set-err" id="setErr"></div>
     <div class="modal-actions">
@@ -572,7 +572,7 @@ function openSettings(){
   $('#setApiKey').value='';
   $('#setApiKey').placeholder=CFG.api_key_set?'已配置 (留空表示不修改)':'sk-...';
   $('#setReasoning').value=CFG.reasoning_effort||'';
-  $('#setHistoryLimit').value=(CFG.history_limit!=null?CFG.history_limit:50);
+  $('#setMaxIter').value=(CFG.max_iterations!=null?CFG.max_iterations:50);
   fillSetModels(MODEL?[MODEL]:[],MODEL);
   setErr('');
   $('#settingsModal').classList.add('show');
@@ -597,11 +597,11 @@ async function fetchSetModels(){
 }
 async function saveSettings(){
   const base=$('#setBaseUrl').value.trim(), key=$('#setApiKey').value.trim(), m=$('#setModel').value, re=$('#setReasoning').value;
-  const hlRaw=$('#setHistoryLimit').value.trim();
+  const miRaw=$('#setMaxIter').value.trim();
   const btn=$('#setSave');btn.disabled=true;btn.textContent='保存中…';setErr('');
   try{
     const payload={base_url:base,model:m,reasoning_effort:re};
-    if(hlRaw!==''){const hl=parseInt(hlRaw,10);if(isNaN(hl)||hl<0){setErr('对话上限需为 ≥0 的整数');btn.disabled=false;btn.textContent='保存并应用';return;}payload.history_limit=hl;}
+    if(miRaw!==''){const mi=parseInt(miRaw,10);if(isNaN(mi)||mi<1){setErr('工具调用上限需为 ≥1 的整数');btn.disabled=false;btn.textContent='保存并应用';return;}payload.max_iterations=mi;}
     if(key)payload.api_key=key;          // 留空不修改已保存密钥
     const d=await (await api('/api/ext/aidev/config',{method:'POST',body:JSON.stringify(payload)})).json();
     if(!d.success){setErr(d.error||'保存失败');btn.disabled=false;btn.textContent='保存并应用';return;}
