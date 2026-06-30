@@ -32,12 +32,7 @@ async def handle_echo(event, match):
     await event.reply(text)
 
 
-# ==================== block 放行 / 拦截示例 ====================
-# 多个插件注册相同指令时, 框架按 priority 从高到低依次匹配:
-#   - block=False (默认): 命中后放行, 后续相同指令的处理器仍会执行
-#   - block=True : 命中即拦截, 后续低优先级处理器不再触发
-# 下面两个处理器都匹配 "^拦截示例$", 高优先级那个设了 block=True, 所以只有它会响应。
-
+# block 示例: 两个处理器同注册 "^拦截示例$", 高优先级设 block=True 命中即拦截, 低优先级不会触发
 @handler(r'^拦截示例$', name='拦截示例-高优先级', desc='block=True 命中即拦截后续插件',
          priority=10, block=True)
 async def block_demo_high(event, match):

@@ -146,25 +146,18 @@ async def welcome(event, match):
 
 #### 3.1.1 `block` 放行 / 拦截
 
-当**多个插件注册了相同(或重叠)的指令**时, 框架按 `priority` 从高到低依次匹配:
-
-- `block=False` (**默认**): 命中后**放行**, 继续匹配后续插件 — 所有命中的处理器都会按 `priority` 顺序执行。
-- `block=True`: 命中即**拦截**, 后续注册了相同指令的低优先级插件不再触发。
+多个插件注册相同指令时, `block=False` (默认) 放行让所有命中处理器按 `priority` 顺序执行, `block=True` 命中即拦截后续低优先级处理器。
 
 ```python
-# 插件 A — 高优先级, 拦截后续: 只有它响应 "^状态$"
-@handler(r'^状态$', name='系统状态', priority=10, block=True)
+@handler(r'^状态$', name='系统状态', priority=10, block=True)  # 命中即拦截, 只有它响应
 async def status(event, match):
     await event.reply("✅ 系统正常")
 
 
-# 插件 B — 同样注册 "^状态$", 但因为 A 设了 block=True, 这里不会被触发
-@handler(r'^状态$', name='天气状态', priority=0)
+@handler(r'^状态$', name='天气状态', priority=0)  # 被上面 block 拦截, 不会触发
 async def weather(event, match):
     await event.reply("☀️ 今天晴")
 ```
-
-> 默认放行意味着相同指令的多个插件都会回复; 若希望高优先级插件独占某指令, 显式设 `block=True`。
 
 ### 3.2 `@on_load` / `@on_unload` 生命周期钩子
 
