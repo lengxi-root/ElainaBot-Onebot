@@ -39,6 +39,25 @@ def _rel(abs_path: str) -> str:
     return os.path.relpath(abs_path, ROOT).replace(os.sep, '/')
 
 
+def _render_message(message) -> str:
+    """把 OneBot 消息 (字符串或消息段列表) 渲染成可读文本, 非文本段以 [类型] 表示"""
+    if isinstance(message, str):
+        return message
+    if isinstance(message, list):
+        parts = []
+        for seg in message:
+            if isinstance(seg, dict):
+                t = seg.get('type')
+                if t == 'text':
+                    parts.append(seg.get('data', {}).get('text', ''))
+                else:
+                    parts.append(f'[{t}]')
+            else:
+                parts.append(str(seg))
+        return ''.join(parts)
+    return str(message)
+
+
 # ==================== 工具实现 ====================
 
 
@@ -141,6 +160,108 @@ async def _t_reload_plugin(name: str) -> dict:
             {'name': h.get('name'), 'pattern': h.get('pattern'), 'desc': h.get('desc')}
             for h in info.handlers
         ],
+    }
+
+
+async def _t_test_command(text: str, user_id: str = '10000001', group_id=None,
+                          as_owner: bool = True, timeout: int = 15) -> dict:
+    """主动构造一条消息事件并真实触发匹配的处理器, 实地验证指令功能是否正常。
+
+    与 reload_plugin (只做热重载自检) 不同, 本工具会真正执行处理器逻辑:
+    插件内的网络请求、定时器等都会真实运行 (在框架进程内, 走服务器的网络),
+    处理器的回复会被捕获返回而不会真正发往 QQ; 不受冷却限制。
+    """
+    pm = _plugin_manager()
+    if not pm:
+        raise ValueError('插件管理器不可用')
+    if not text or not str(text).strip():
+        raise ValueError('缺少要测试的指令文本 text')
+    from core.onebot.event import MessageEvent
+
+    is_group = group_id is not None
+    uid = int(user_id) if str(user_id).isdigit() else user_id
+    gid = (int(group_id) if str(group_id).isdigit() else group_id) if is_group else None
+    event = MessageEvent({
+        'post_type': 'message',
+        'message_type': 'group' if is_group else 'private',
+        'sub_type': 'normal',
+        'message_id': 0,
+        'user_id': uid,
+        'group_id': gid,
+        'message': [{'type': 'text', 'data': {'text': str(text)}}],
+        'raw_message': str(text),
+        'sender': {'user_id': uid, 'nickname': 'AI测试'},
+        'self_id': 0,
+    })
+
+    captured = []
+
+    class _CaptureAPI:
+        async def send_group_msg(self, group_id, message, **kw):
+            captured.append({'action': 'send_group_msg', 'group_id': group_id, 'text': _render_message(message)})
+            return {'status': 'ok', 'retcode': 0, 'data': {'message_id': 0}}
+
+        async def send_private_msg(self, user_id, message, **kw):
+            captured.append({'action': 'send_private_msg', 'user_id': user_id, 'text': _render_message(message)})
+            return {'status': 'ok', 'retcode': 0, 'data': {'message_id': 0}}
+
+        async def call_api(self, action, params=None, **kw):
+            captured.append({'action': action, 'params': params})
+            return {'status': 'ok', 'retcode': 0, 'data': {}}
+
+    event._api = _CaptureAPI()
+
+    try:
+        to = min(int(timeout), 120)
+    except (TypeError, ValueError):
+        to = 15
+
+    # 与 dispatch 相同的筛选: 场景 / 权限 / 正则, 取第一个匹配的处理器
+    match = None
+    for h in pm._all_handlers:
+        if h['group_only'] and not is_group:
+            continue
+        if h['private_only'] and is_group:
+            continue
+        if h['owner_only'] and not as_owner:
+            continue
+        m = h['compiled'].search(str(text))
+        if m:
+            match = (h, m)
+            break
+
+    if not match:
+        return {'matched': False, 'message': '没有处理器匹配该指令 (检查正则/场景/权限)', 'replies': []}
+
+    h, m = match
+    start = time.time()
+    error = ''
+    tb = ''
+    timed_out = False
+    try:
+        if h['is_coro']:
+            await asyncio.wait_for(h['func'](event, m), timeout=to)
+        else:
+            loop = asyncio.get_running_loop()
+            await asyncio.wait_for(loop.run_in_executor(None, h['func'], event, m), timeout=to)
+    except asyncio.TimeoutError:
+        timed_out = True
+        error = f'处理器执行超时 ({to}s)'
+    except Exception as e:  # noqa: BLE001 — 把处理器内部异常回报给模型
+        import traceback
+        error = f'{type(e).__name__}: {e}'
+        tb = traceback.format_exc()[-3000:]
+    return {
+        'matched': True,
+        'handler': h['name'],
+        'plugin': h.get('_plugin', ''),
+        'pattern': h['pattern'],
+        'duration_ms': int((time.time() - start) * 1000),
+        'timed_out': timed_out,
+        'error': error,
+        'traceback': tb,
+        'reply_count': len(captured),
+        'replies': captured,
     }
 
 
@@ -261,6 +382,7 @@ _DISPATCH = {
     'list_plugins': _t_list_plugins,
     'list_handlers': _t_list_handlers,
     'reload_plugin': _t_reload_plugin,
+    'test_command': _t_test_command,
     'run_python': _t_run_python,
     'get_config': _t_get_config,
     'set_config': _t_set_config,
@@ -368,6 +490,28 @@ TOOLS_SCHEMA = [
                 'type': 'object',
                 'properties': {'name': {'type': 'string', 'description': '插件目录名, 如 example'}},
                 'required': ['name'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'test_command',
+            'description': (
+                '主动模拟用户发送一条指令并真实触发匹配的处理器, 验证功能是否正常 '
+                '(网络请求/定时器等会真实运行)。编写或修改插件并 reload_plugin 自检通过后, '
+                '应再用本工具实际跑一遍指令, 检查 matched/error/replies 确认功能无异常。'
+            ),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'text': {'type': 'string', 'description': '要测试的指令文本, 如 "ping" 或 "天气 北京"'},
+                    'user_id': {'type': 'string', 'description': '模拟的发送者 QQ 号, 默认 10000001'},
+                    'group_id': {'type': 'string', 'description': '群号; 提供则模拟群聊, 不提供则模拟私聊'},
+                    'as_owner': {'type': 'boolean', 'description': '是否以主人身份触发 (可测试 owner_only 指令), 默认 true'},
+                    'timeout': {'type': 'integer', 'description': '处理器执行超时秒数, 默认 15, 上限 120'},
+                },
+                'required': ['text'],
             },
         },
     },

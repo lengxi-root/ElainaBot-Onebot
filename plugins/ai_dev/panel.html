@@ -99,10 +99,6 @@ input,textarea,select{font-family:inherit}
 .sess:hover .del{opacity:1}
 .sess .del:hover{color:var(--red);background:var(--red-soft)}
 
-.sys-card{padding:14px}
-.sys-card h4{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
-.sys-row{display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;color:var(--ink2)}
-.sys-row b{color:var(--ink);font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* chat */
 .chat{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
@@ -292,12 +288,6 @@ input,textarea,select{font-family:inherit}
         <div class="sess-title">对话</div>
         <div class="sessions" id="sessions"></div>
       </div>
-      <div class="panel sys-card">
-        <h4>系统状态</h4>
-        <div id="sysInfo">
-          <div class="sys-row"><span>加载中…</span></div>
-        </div>
-      </div>
     </div>
 
     <!-- chat -->
@@ -477,7 +467,6 @@ async function start(){
   if(!MODEL)MODEL=CFG.model||'';
   await loadModels();
   await loadSessions(true);
-  loadSystem();setInterval(loadSystem,8000);
   await loadCalls();
   connectSSE();
   if(!CFG.api_key_set)toast('尚未配置密钥：点右上角「设置」填写 OpenAI 地址与 api_key');
@@ -746,29 +735,6 @@ async function loadCalls(){
 }
 $$('.tab').forEach(t=>t.addEventListener('click',()=>{$$('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');FILTER=t.dataset.f;renderEvents();}));
 $('#actClear').addEventListener('click',()=>{evbuf=[];renderEvents();});
-
-/* ---- system ---- */
-async function loadSystem(){
-  try{
-    const d=await (await api('/api/ext/aidev/calls?limit=1')).json(); // keepalive cheap; real sys via tool not needed
-  }catch(e){}
-  // pull live system info via dedicated lightweight call
-  fetchSys();
-}
-async function fetchSys(){
-  try{
-    const r=await api('/api/system/info');
-    if(!r.ok)return;
-    const d=await r.json();const s=d.data||d;const box=$('#sysInfo');
-    const cpu=s.cpu_percent!=null?s.cpu_percent+'%':'—';
-    const mem=(s.memory&&s.memory.percent!=null)?s.memory.percent+'%':'—';
-    box.innerHTML=`
-      <div class="sys-row"><span>CPU</span><b>${cpu}</b></div>
-      <div class="sys-row"><span>内存</span><b>${mem}</b></div>
-      <div class="sys-row"><span>插件</span><b>${(s.plugins!=null?s.plugins:(s.plugin_count!=null?s.plugin_count:'—'))}</b></div>
-      <div class="sys-row"><span>系统</span><b>${esc(s.system||s.os||navigator.platform)}</b></div>`;
-  }catch(e){}
-}
 
 /* ---- SSE ---- */
 function connectSSE(){
