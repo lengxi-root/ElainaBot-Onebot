@@ -1,6 +1,7 @@
 """HTTP 服务器 — 基于 aiohttp"""
 
 import asyncio
+import contextlib
 import json
 
 from aiohttp import web
@@ -67,7 +68,7 @@ class HttpServer:
         host = cfg.get('settings', 'server.host', '0.0.0.0')
         port = cfg.get('settings', 'server.port', 5201)
 
-        self._runner = web.AppRunner(self._app)
+        self._runner = web.AppRunner(self._app, shutdown_timeout=3)
         await self._runner.setup()
         self._site = web.TCPSite(self._runner, host, port)
         await self._site.start()
@@ -77,11 +78,24 @@ class HttpServer:
         log.info(f'Web: http://{host}:{port}/web/')
 
     async def stop(self, timeout: float = 5):
-        """停止服务器"""
+        """停止服务器: 先主动断开所有长连接 (OneBot 反向 WS / 面板 WS/SSE) 再清理, 避免卡住"""
+        adapter = getattr(self._app_instance, 'adapter', None)
+        if adapter:
+            for ws in list(getattr(adapter, 'websockets', {}).values()):
+                with contextlib.suppress(Exception):
+                    await ws.close(code=1001, message=b'Server shutdown')
+        with contextlib.suppress(Exception):
+            from web.ws import get_broadcast
+            get_broadcast().shutdown()
         if self._site:
-            await self._site.stop()
+            with contextlib.suppress(Exception):
+                await self._site.stop()
         if self._runner:
-            await self._runner.cleanup()
+            try:
+                async with asyncio.timeout(timeout):
+                    await self._runner.cleanup()
+            except (TimeoutError, Exception):
+                log.warning('HTTP 关闭超时, 强制结束')
 
     async def _handle_onebot_http(self, request: web.Request):
         """处理 OneBot HTTP 回调"""

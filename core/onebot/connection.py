@@ -88,8 +88,18 @@ class ConnectionManager:
 
     async def stop(self):
         self._stopping = True
+        await self._close_reverse_ws()
         await self._cancel_forward_clients()
         await self._stop_listeners()
+
+    async def _close_reverse_ws(self):
+        """主动关闭已接入的反向 WS, 避免监听端口清理时等待空闲超时"""
+        for sid in [k for k in list(self._adapter.websockets)
+                    if not str(k).startswith('forward:') and k not in self._forward_ids]:
+            ws = self._adapter.websockets.get(sid)
+            if ws is not None:
+                with contextlib.suppress(Exception):
+                    await ws.close(code=1001, message=b'Server shutdown')
 
     async def reload(self):
         """配置变更后重新应用 (重启正向客户端 / 自定义监听 + 刷新鉴权/HTTP 客户端)"""
