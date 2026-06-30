@@ -89,8 +89,7 @@ class LogService:
 
     async def execute(self, log_type: str, sql: str, params=None, bot_qq: str = '') -> int:
         """异步执行写操作（UPDATE/DELETE）"""
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, self._execute_sync, log_type, sql, params, bot_qq)
+        return await asyncio.to_thread(self._execute_sync, log_type, sql, params, bot_qq)
 
     def _execute_sync(self, log_type: str, sql: str, params=None, bot_qq: str = '') -> int:
         try:
@@ -104,8 +103,7 @@ class LogService:
 
     async def query(self, log_type: str, sql: str, params=None, bot_qq: str = '') -> list:
         """异步查询日志"""
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, self._query_sync, log_type, sql, params, bot_qq)
+        return await asyncio.to_thread(self._query_sync, log_type, sql, params, bot_qq)
 
     def _query_sync(self, log_type: str, sql: str, params=None, bot_qq: str = '') -> list:
         try:
@@ -123,7 +121,6 @@ class LogService:
             await self._flush_all()
 
     async def _flush_all(self):
-        loop = asyncio.get_running_loop()
         for key in list(self._queues.keys()):
             queue = self._queues.get(key)
             if not queue:
@@ -134,7 +131,7 @@ class LogService:
             if not entries:
                 continue
             log_type, bot_qq = key
-            await loop.run_in_executor(None, self._write_entries, log_type, bot_qq, entries)
+            await asyncio.to_thread(self._write_entries, log_type, bot_qq, entries)
 
     def _write_entries(self, log_type: str, bot_qq: str, entries: list):
         try:
@@ -164,8 +161,7 @@ class LogService:
         """异步清理过期日志"""
         if self._retention_days <= 0:
             return
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self._cleanup_sync)
+        await asyncio.to_thread(self._cleanup_sync)
 
     def _cleanup_sync(self):
         cutoff = (datetime.datetime.now() - datetime.timedelta(days=self._retention_days)).strftime('%Y-%m-%d %H:%M:%S')

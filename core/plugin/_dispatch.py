@@ -32,7 +32,7 @@ class _DispatchMixin:
         # 拦截器
         for ic in self._all_interceptors:
             try:
-                r = await ic['func'](event) if ic['is_coro'] else await asyncio.get_running_loop().run_in_executor(None, ic['func'], event)
+                r = await ic['func'](event) if ic['is_coro'] else await asyncio.to_thread(ic['func'], event)
                 if r is True:
                     return True
             except Exception as e:
@@ -92,11 +92,11 @@ class _DispatchMixin:
         plugin_name = h['name'] or h.get('_plugin', '')
         try:
             fn = h['func']
-            if h['is_coro']:
-                coro = fn(event, match)
-            else:
-                coro = asyncio.get_running_loop().run_in_executor(None, fn, event, match)
-            await asyncio.wait_for(coro, timeout=300)
+            async with asyncio.timeout(300):
+                if h['is_coro']:
+                    await fn(event, match)
+                else:
+                    await asyncio.to_thread(fn, event, match)
         except TimeoutError:
             report_error(PLUGIN, plugin_name, f'处理器 [{h["name"]}] 超时(300s)')
         except Exception as e:

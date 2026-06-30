@@ -55,13 +55,12 @@ class HookManager:
 
     async def emit(self, hook_name, *args, **kwargs):
         """广播执行"""
-        loop = asyncio.get_running_loop()
         for _, owner, cb, is_coro in self._get_sorted(hook_name):
             try:
                 if is_coro:
                     await cb(*args, **kwargs)
                 else:
-                    await loop.run_in_executor(None, lambda: cb(*args, **kwargs))
+                    await asyncio.to_thread(cb, *args, **kwargs)
             except Exception as e:
                 log.warning(f"[{owner}] hook '{hook_name}': {e}")
 
@@ -69,10 +68,9 @@ class HookManager:
         """管道执行"""
         if data is None:
             return None
-        loop = asyncio.get_running_loop()
         for _, owner, cb, is_coro in self._get_sorted(hook_name):
             try:
-                data = await cb(data) if is_coro else await loop.run_in_executor(None, cb, data)
+                data = await cb(data) if is_coro else await asyncio.to_thread(cb, data)
                 if data is None:
                     return None
             except Exception as e:

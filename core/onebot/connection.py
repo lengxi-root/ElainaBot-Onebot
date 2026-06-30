@@ -250,7 +250,8 @@ class ConnectionManager:
         try:
             send = getattr(ws, 'send_str', None) or getattr(ws, 'send_text')
             await send(json.dumps({'action': 'get_login_info', 'params': {}, 'echo': echo}))
-            resp = await asyncio.wait_for(fut, 10)
+            async with asyncio.timeout(10):
+                resp = await fut
             uid = str(((resp or {}).get('data') or {}).get('user_id') or '')
             if uid and conn.get('_self_id') != uid:
                 self._rekey_forward(conn, uid, ws)

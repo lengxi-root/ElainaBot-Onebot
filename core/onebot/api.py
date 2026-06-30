@@ -56,9 +56,9 @@ class OneBotAPI:
             # aiohttp 的 WebSocketResponse/ClientWebSocketResponse 使用 send_str
             send = getattr(ws, 'send_str', None) or getattr(ws, 'send_text')
             await send(json.dumps(payload, ensure_ascii=False))
-            result = await asyncio.wait_for(future, timeout=30)
-            return result
-        except asyncio.TimeoutError:
+            async with asyncio.timeout(30):
+                return await future
+        except TimeoutError:
             logger.warning(f'API 超时: {action}')
             self._adapter.api_responses.pop(echo, None)
             return None

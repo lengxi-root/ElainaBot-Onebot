@@ -50,11 +50,10 @@ class _WatcherMixin:
         return changed
 
     async def _watcher_loop(self):
-        loop = asyncio.get_running_loop()
         while self._watcher_running:
             try:
                 await asyncio.sleep(2)
-                changed = await loop.run_in_executor(None, self._detect_changed_plugins)
+                changed = await asyncio.to_thread(self._detect_changed_plugins)
                 for name in changed:
                     if name in self._plugins:
                         try:
