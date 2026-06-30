@@ -174,6 +174,13 @@ class AIStore:
         items = [e for e in self._events if not (exclude_delta and e['type'] == 'delta')]
         return items[-limit:]
 
+    def session_events(self, sid: str, limit: int = 1000) -> list:
+        """返回某会话的非 delta 事件 (按时间顺序), 用于刷新后重建对话内联调用时间线。"""
+        if not sid:
+            return []
+        items = [e for e in self._events if e.get('session_id') == sid and e['type'] != 'delta']
+        return items[-limit:]
+
     def _append_event_file(self, event: dict):
         try:
             with open(self._events_file, 'a', encoding='utf-8') as f:

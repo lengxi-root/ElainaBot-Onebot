@@ -189,11 +189,12 @@ input,textarea,select{font-family:inherit}
 
 /* activity */
 .activity{width:300px;flex:0 0 300px;display:flex;flex-direction:column;overflow:hidden}
-.act-head{padding:11px 14px;border-bottom:1px solid var(--line2);display:flex;align-items:center;gap:9px}
+.act-head{padding:11px 14px;border-bottom:1px solid var(--line2);display:flex;flex-direction:column;gap:9px}
+.act-head-top{display:flex;align-items:center;gap:9px}
 .act-head h3{font-size:14px}
 .act-head .spacer{flex:1}
-.tabs{display:flex;gap:4px;background:var(--bg2);border-radius:10px;padding:3px}
-.tab{font-size:12px;padding:6px 13px;border-radius:8px;color:var(--ink2);font-weight:600;transition:.15s}
+.tabs{display:flex;flex-wrap:nowrap;gap:4px;background:var(--bg2);border-radius:10px;padding:3px}
+.tab{flex:1 1 0;min-width:0;text-align:center;font-size:12px;padding:6px 4px;border-radius:8px;color:var(--ink2);font-weight:600;white-space:nowrap;transition:.15s}
 .tab.active{background:var(--card);color:var(--brand);box-shadow:0 2px 6px rgba(60,72,140,.1)}
 .act-clear{font-size:12px;color:var(--muted)}
 .act-clear:hover{color:var(--red)}
@@ -330,14 +331,16 @@ input,textarea,select{font-family:inherit}
     <!-- activity -->
     <div class="panel activity">
       <div class="act-head">
-        <h3>实时调用 / 日志</h3>
-        <div class="spacer"></div>
+        <div class="act-head-top">
+          <h3>实时调用</h3>
+          <div class="spacer"></div>
+          <button class="act-clear" id="actClear" title="清空显示">清空</button>
+        </div>
         <div class="tabs">
           <button class="tab active" data-f="all">全部</button>
           <button class="tab" data-f="tool">调用</button>
           <button class="tab" data-f="msg">对话</button>
         </div>
-        <button class="act-clear" id="actClear" title="清空显示">清空</button>
       </div>
       <div class="act-list" id="actList">
         <div class="act-empty">暂无活动，发送消息后这里会实时显示 AI 的每一次工具调用与结果。</div>
@@ -641,13 +644,53 @@ $('#newChat').addEventListener('click',async()=>{
 
 async function loadHistory(){
   const d=await (await api('/api/ext/aidev/history?session_id='+SID)).json();
-  const box=$('#messages');box.innerHTML='';
-  const msgs=d.messages||[];
-  if(!msgs.length){renderWelcome();return;}
-  msgs.forEach(m=>addMsg(m.role==='user'?'user':'ai',m.content,false));
-  scrollChat();
+  renderHistory(d.messages||[],d.events||[]);
   const cur=(await (await api('/api/ext/aidev/sessions')).json()).sessions.find(s=>s.id===SID);
   $('#chatTitle').textContent=cur?cur.title:'对话';
+}
+/* 刷新后重建对话: 优先用会话事件流还原每个回合的内联工具调用/思考时间线 */
+function renderHistory(msgs,events){
+  const box=$('#messages');box.innerHTML='';
+  events=events||[];
+  const hasConv=events.some(e=>e.type==='user'||e.type==='assistant'||e.type==='error');
+  if(hasConv){
+    let tools=[],reason=[];
+    events.forEach(e=>{
+      const d=e.data||{};
+      if(e.type==='user'){addMsg('user',d.content||'',false);tools=[];reason=[];}
+      else if(e.type==='reasoning'){if(d.content)reason.push(d.content);}
+      else if(e.type==='tool_call'||e.type==='tool_result'){tools.push(e);}
+      else if(e.type==='assistant'){addAiTurnFromHistory(d.content||'',tools,reason.join('\n\n'),true);tools=[];reason=[];}
+      else if(e.type==='error'){addAiTurnFromHistory(d.message||(typeof d==='string'?d:JSON.stringify(d)),tools,reason.join('\n\n'),false);tools=[];reason=[];}
+    });
+    if(tools.length||reason.join('').trim())addAiTurnFromHistory('',tools,reason.join('\n\n'),true);
+  }else if(msgs.length){
+    msgs.forEach(m=>addMsg(m.role==='user'?'user':'ai',m.content,false));
+  }else{renderWelcome();return;}
+  scrollChat();
+}
+/* 静态渲染一个已完成的 AI 回合 (含可折叠的工具调用时间线 + 思考过程) */
+function addAiTurnFromHistory(content,toolEvents,reasonText,ok){
+  const box=$('#messages');if(box.querySelector('.welcome'))box.innerHTML='';
+  const rows=buildRows(toolEvents||[]).filter(r=>r.kind==='tool');
+  const el=document.createElement('div');el.className='msg ai';el.style.animation='none';
+  let thinkHtml='';
+  if(reasonText&&reasonText.trim())
+    thinkHtml=`<div class="think collapsed"><div class="think-head">${ic('brain',14)} 思考过程<span class="chev">${ic('chev',11)}</span></div><div class="think-body">${render(reasonText)}</div></div>`;
+  let stepsHtml='';
+  if(rows.length)
+    stepsHtml=`<div class="tsteps collapsed"><div class="tsteps-head">${ic('tool',14)} 工具调用 · <b class="cnt">${rows.length}</b> 步<span class="chev">${ic('chev',11)}</span></div><div class="tsteps-body"></div></div>`;
+  let ansHtml='';
+  if(content&&content.trim())ansHtml=ok!==false?render(content):'<span class="answer-err">'+ic('alert',15)+' '+esc(content)+'</span>';
+  el.innerHTML=`<div class="av">AI</div><div class="bubble">${thinkHtml}${stepsHtml}<div class="answer">${ansHtml}</div></div>`;
+  box.appendChild(el);
+  if(rows.length){
+    const sw=el.querySelector('.tsteps'),body=el.querySelector('.tsteps-body');
+    rows.forEach(r=>body.appendChild(rowEl(r)));
+    sw.querySelector('.tsteps-head').addEventListener('click',()=>sw.classList.toggle('collapsed'));
+  }
+  if(thinkHtml){const tw=el.querySelector('.think');tw.querySelector('.think-head').addEventListener('click',()=>tw.classList.toggle('collapsed'));}
+  return el;
 }
 function renderWelcome(){
   $('#chatTitle').textContent='新对话';

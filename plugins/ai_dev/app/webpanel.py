@@ -131,7 +131,7 @@ async def _get_history(request: web.Request):
             view.append({'role': 'user', 'content': m.get('content', '')})
         elif role == 'assistant' and m.get('content'):
             view.append({'role': 'assistant', 'content': m.get('content', '')})
-    return web.json_response({'success': True, 'messages': view})
+    return web.json_response({'success': True, 'messages': view, 'events': _store().session_events(sid)})
 
 
 async def _post_chat(request: web.Request):
