@@ -70,7 +70,13 @@ class PluginManager(_LoaderMixin, _WatcherMixin, _DispatchMixin):
 
     # ==================== 管理接口 ====================
 
+    @staticmethod
+    def _plugin_key(name: str) -> str:
+        """禁用状态按插件目录粒度记录 (运行时按整个插件目录加载/卸载), 去掉 '目录/文件' 中的文件部分"""
+        return str(name).split('/', 1)[0]
+
     def enable_plugin(self, name):
+        name = self._plugin_key(name)
         changed = name in self._disabled_plugins
         self._disabled_plugins.discard(name)
         if changed:
@@ -82,6 +88,7 @@ class PluginManager(_LoaderMixin, _WatcherMixin, _DispatchMixin):
         return changed
 
     def disable_plugin(self, name):
+        name = self._plugin_key(name)
         changed = name not in self._disabled_plugins
         self._disabled_plugins.add(name)
         if changed:
@@ -180,7 +187,11 @@ class PluginManager(_LoaderMixin, _WatcherMixin, _DispatchMixin):
             with open(path, encoding='utf-8') as f:
                 data = json.load(f)
                 if isinstance(data, list):
-                    self._disabled_plugins = set(data)
+                    # 兼容旧格式 '目录/文件', 统一规整为插件目录名
+                    normalized = {self._plugin_key(n) for n in data}
+                    self._disabled_plugins = normalized
+                    if normalized != set(data):
+                        self._save_disabled_plugins()
         except Exception as e:
             log.warning(f'加载禁用插件列表失败: {e}')
 
